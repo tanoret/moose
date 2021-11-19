@@ -10,6 +10,7 @@
     ad_indexing_type = 'global'
     abs_zero = 1e-9
     recover = false # see #19126
+    threading = 'tbb openmp'
   []
   [turbulence]
     type = 'Exodiff'
@@ -33,5 +34,6 @@
 		     # is used in computation of the Rhie-Chow velocity required for the advection kernels)
 		     # Unfortunately I need to further bump this by one because I have a bug in my metaphysicl
 		     # debugging assertions (which I'm fixing)
+    threading = 'tbb openmp'
   []
 []
