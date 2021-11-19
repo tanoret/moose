@@ -15,6 +15,7 @@
 #include "libmesh/utility.h"
 #include "libmesh/type_tensor.h"
 #include "libmesh/compare_types.h"
+#include "libmesh/threads.h"
 
 template <typename T, typename T2, typename std::enable_if<ScalarTraits<T>::value, int>::type = 0>
 inline TypeVector<typename CompareTypes<T, T2>::supertype>
@@ -42,10 +43,12 @@ public:
 
   CellCenteredMapFunctor(const MooseMesh & mesh,
                          const bool nonorthgonal_correction,
-                         const bool correct_skewness = false)
+                         const bool correct_skewness = false,
+                         const bool map_filled = false)
     : _mesh(mesh),
       _nonorthgonal_correction(nonorthgonal_correction),
-      _correct_skewness(correct_skewness)
+      _correct_skewness(correct_skewness),
+      _map_filled(map_filled)
   {
   }
 
@@ -57,15 +60,23 @@ public:
   using Moose::FunctorImpl<T>::gradient;
   GradientType gradient(const FaceInfo & fi) const { return gradient(makeFace(fi)); }
 
+  void mapFilled(const bool map_filled) { _map_filled = map_filled; }
+
 private:
   FaceArg makeFace(const FaceInfo & fi) const { return Moose::FV::makeCDFace(fi); }
 
   const MooseMesh & _mesh;
   const bool _nonorthgonal_correction;
   const bool _correct_skewness;
+  bool _map_filled;
+  mutable Threads::spin_mutex _map_mutex;
 
   ValueType evaluate(const libMesh::Elem * const & elem, unsigned int) const override final
   {
+    if (_map_filled)
+      return libmesh_map_find(*this, elem->id());
+
+    Threads::spin_mutex::scoped_lock lock(_map_mutex);
     return (*const_cast<CellCenteredMapFunctor *>(this))[elem->id()];
   }
 

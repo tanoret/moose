@@ -35,7 +35,8 @@ PINSFVRhieChowInterpolator::PINSFVRhieChowInterpolator(const InputParameters & p
     _eps(isParamValid(NS::porosity)
              ? &const_cast<Moose::Functor<ADReal> &>(getFunctor<ADReal>(NS::porosity))
              : nullptr),
-    _rec(getParam<unsigned short>("reconstructions"))
+    _rec(getParam<unsigned short>("reconstructions")),
+    _reconstructed_eps(_moose_mesh, true)
 {
   if (_rec)
   {
@@ -77,12 +78,21 @@ PINSFVRhieChowInterpolator::interpolatorSetup()
 
   _geometric_fi.shrink_to_fit();
 
-  CellCenteredMapFunctor<ADReal, std::unordered_map<dof_id_type, ADReal>> reconstructed_eps(
-      _moose_mesh, true);
   const auto saved_do_derivatives = ADReal::do_derivatives;
   ADReal::do_derivatives = true;
-  Moose::FV::reconstruct(reconstructed_eps, *_eps, _rec, false, false, _geometric_fi, *this);
-  ADReal::do_derivatives = saved_do_derivatives;
+  _reconstructed_eps.mapFilled(false);
 
-  (*_eps) = std::move(reconstructed_eps);
+  Moose::FV::reconstruct(_reconstructed_eps, *_eps, _rec, false, false, _geometric_fi, *this);
+  ADReal::do_derivatives = saved_do_derivatives;
+  _reconstructed_eps.mapFilled(true);
+
+  _eps->assign(_reconstructed_eps);
+
+  const auto porosity_name = deduceFunctorName(NS::porosity);
+  for (const auto tid : make_range((unsigned int)(1), libMesh::n_threads()))
+  {
+    auto & other_epss = const_cast<Moose::Functor<ADReal> &>(
+        UserObject::_subproblem.getFunctor<ADReal>(porosity_name, tid, name()));
+    other_epss.assign(_reconstructed_eps);
+  }
 }

@@ -10,6 +10,8 @@
 #pragma once
 
 #include "INSFVRhieChowInterpolator.h"
+#include "CellCenteredMapFunctor.h"
+#include <unordered_map>
 
 class PINSFVRhieChowInterpolator : public INSFVRhieChowInterpolator
 {
@@ -23,4 +25,6 @@ protected:
   Moose::Functor<ADReal> * const _eps;
   const unsigned short _rec;
   std::vector<const FaceInfo *> _geometric_fi;
+
+  CellCenteredMapFunctor<ADReal, std::unordered_map<dof_id_type, ADReal>> _reconstructed_eps;
 };

@@ -103,10 +103,10 @@ private:
   const std::set<SubdomainID> _sub_ids;
 
   /// Mutex that prevents multiple threads from saving into the 'a' coefficients at the same time
-  static Threads::spin_mutex _a_mutex;
+  Threads::spin_mutex _a_mutex;
 
   /// Mutex that prevents multiple threads from saving into the 'b' coefficients  at the same time
-  static Threads::spin_mutex _b_mutex;
+  Threads::spin_mutex _b_mutex;
 };
 
 inline const ADReal &

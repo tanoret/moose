@@ -709,11 +709,11 @@ public:
   /**
    * Assign our wrapped object to be something new and release our previously wrapped object
    */
-  Functor<T> & operator=(const FunctorImpl<T> & wrapped)
+  template <typename FunctorIn>
+  void assign(const FunctorIn & wrapped)
   {
     _owned.reset();
     _wrapped = &wrapped;
-    return *this;
   }
 
   template <typename FunctorIn>

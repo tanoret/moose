@@ -47,10 +47,6 @@ INSFVRhieChowInterpolator::validParams()
   return params;
 }
 
-// Static mutex definitions
-Threads::spin_mutex INSFVRhieChowInterpolator::_a_mutex;
-Threads::spin_mutex INSFVRhieChowInterpolator::_b_mutex;
-
 INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & params)
   : GeneralUserObject(params),
     TaggingInterface(this),

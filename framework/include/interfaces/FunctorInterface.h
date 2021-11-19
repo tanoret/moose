@@ -59,12 +59,12 @@ protected:
    */
   bool isFunctor(const std::string & name) const;
 
-private:
   /**
    * Small helper to look up a functor name through the input parameter keys
    */
   std::string deduceFunctorName(const std::string & name) const;
 
+private:
   /**
    * Helper function to parse default functor values. This is implemented
    * as a specialization for supported types and returns NULL in all other cases.
