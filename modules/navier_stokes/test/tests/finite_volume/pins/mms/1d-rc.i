@@ -19,8 +19,10 @@ velocity_interp_method='rc'
 
 [UserObjects]
   [rc]
-    type = INSFVRhieChowInterpolator
+    type = PINSFVRhieChowInterpolator
     u = u
+    pressure = pressure
+    porosity = porosity
   []
 []
 
@@ -76,8 +78,6 @@ velocity_interp_method='rc'
     variable = pressure
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    vel = 'velocity'
-    pressure = pressure
     u = u
     rho = ${rho}
     porosity = porosity
@@ -92,10 +92,8 @@ velocity_interp_method='rc'
     type = PINSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = 'velocity'
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    pressure = pressure
     u = u
     rho = ${rho}
     porosity = porosity

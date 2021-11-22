@@ -37,9 +37,18 @@ registerMooseObject("NavierStokesApp", INSFVMomentumAdvection);
 InputParameters
 INSFVMomentumAdvection::validParams()
 {
-  InputParameters params = FVMatAdvection::validParams();
+  InputParameters params = FVFluxKernel::validParams();
   params += INSFVMomentumResidualObject::validParams();
-  params.addRequiredCoupledVar(NS::pressure, "The pressure variable.");
+  params.addParam<MooseFunctorName>(
+      "advected_quantity",
+      "An optional parameter for specifying an advected quantity from a material property. If this "
+      "is not specified, then the advected quantity will simply be the variable that this object "
+      "is acting on");
+  MooseEnum advected_interp_method("average upwind", "upwind");
+  params.addParam<MooseEnum>("advected_interp_method",
+                             advected_interp_method,
+                             "The interpolation to use for the advected quantity. Options are "
+                             "'upwind' and 'average', with the default being 'upwind'.");
   params.addRequiredCoupledVar("u", "The velocity in the x direction.");
   params.addCoupledVar("v", "The velocity in the y direction.");
   params.addCoupledVar("w", "The velocity in the z direction.");
@@ -62,9 +71,10 @@ INSFVMomentumAdvection::validParams()
 }
 
 INSFVMomentumAdvection::INSFVMomentumAdvection(const InputParameters & params)
-  : FVMatAdvection(params),
+  : FVFluxKernel(params),
     INSFVMomentumResidualObject(*this),
-    _p_var(dynamic_cast<const INSFVPressureVariable *>(getFieldVar(NS::pressure, 0))),
+    _adv_quant(getFunctor<ADReal>(isParamValid("advected_quantity") ? "advected_quantity"
+                                                                    : variable().name())),
     _u_var(dynamic_cast<const INSFVVelocityVariable *>(getFieldVar("u", 0))),
     _v_var(params.isParamValid("v")
                ? dynamic_cast<const INSFVVelocityVariable *>(getFieldVar("v", 0))
@@ -81,9 +91,6 @@ INSFVMomentumAdvection::INSFVMomentumAdvection(const InputParameters & params)
              "'--with-ad-indexing-type=global'");
 #endif
 
-  if (!_p_var)
-    paramError(NS::pressure, "the pressure must be a INSFVPressureVariable.");
-
   if (!_u_var)
     paramError("u", "the u velocity must be an INSFVVelocityVariable.");
 
@@ -97,11 +104,22 @@ INSFVMomentumAdvection::INSFVMomentumAdvection(const InputParameters & params)
                "In three-dimensions, the w velocity must be supplied and it must be an "
                "INSFVVelocityVariable.");
 
+  using namespace Moose::FV;
+
+  const auto & advected_interp_method = getParam<MooseEnum>("advected_interp_method");
+  if (advected_interp_method == "average")
+    _advected_interp_method = InterpMethod::Average;
+  else if (advected_interp_method == "upwind")
+    _advected_interp_method = InterpMethod::Upwind;
+  else
+    mooseError("Unrecognized interpolation type ",
+               static_cast<std::string>(advected_interp_method));
+
   const auto & velocity_interp_method = params.get<MooseEnum>("velocity_interp_method");
   if (velocity_interp_method == "average")
-    _velocity_interp_method = Moose::FV::InterpMethod::Average;
+    _velocity_interp_method = InterpMethod::Average;
   else if (velocity_interp_method == "rc")
-    _velocity_interp_method = Moose::FV::InterpMethod::RhieChow;
+    _velocity_interp_method = InterpMethod::RhieChow;
   else
     mooseError("Unrecognized interpolation type ",
                static_cast<std::string>(velocity_interp_method));
@@ -135,101 +153,15 @@ INSFVMomentumAdvection::skipForBoundary(const FaceInfo & fi) const
   return true;
 }
 
-void
-INSFVMomentumAdvection::interpolate(Moose::FV::InterpMethod m, ADRealVectorValue & v)
-{
-  const Elem * const elem = &_face_info->elem();
-  const Elem * const neighbor = _face_info->neighborPtr();
-
-  if (onBoundary(*_face_info))
-  {
-    v(0) = _u_var->getBoundaryFaceValue(*_face_info);
-    if (_v_var)
-      v(1) = _v_var->getBoundaryFaceValue(*_face_info);
-    if (_w_var)
-      v(2) = _w_var->getBoundaryFaceValue(*_face_info);
-
-    return;
-  }
-
-  const auto elem_face = elemFromFace();
-  const auto neighbor_face = neighborFromFace();
-
-  Moose::FV::interpolate(
-      Moose::FV::InterpMethod::Average, v, _vel(elem_face), _vel(neighbor_face), *_face_info, true);
-
-  if (m == Moose::FV::InterpMethod::Average)
-    return;
-
-  mooseAssert(neighbor && this->hasBlocks(neighbor->subdomain_id()),
-              "We should be on an internal face...");
-
-  // Get pressure gradient. This is the uncorrected gradient plus a correction from cell centroid
-  // values on either side of the face
-  const VectorValue<ADReal> & grad_p = _p_var->adGradSln(*_face_info);
-
-  // Get uncorrected pressure gradient. This will use the element centroid gradient if we are
-  // along a boundary face
-  const VectorValue<ADReal> & unc_grad_p = _p_var->uncorrectedAdGradSln(*_face_info);
-
-  const Point & elem_centroid = _face_info->elemCentroid();
-  const Point & neighbor_centroid = _face_info->neighborCentroid();
-  Real elem_volume = _face_info->elemVolume();
-  Real neighbor_volume = _face_info->neighborVolume();
-
-  // Now we need to perform the computations of D
-  const VectorValue<ADReal> & elem_a = _rc_uo.rcCoeff(elem);
-
-  mooseAssert(_subproblem.getCoordSystem(elem->subdomain_id()) ==
-                  _subproblem.getCoordSystem(neighbor->subdomain_id()),
-              "Coordinate systems must be the same between the two elements");
-
-  Real coord;
-  coordTransformFactor(_subproblem, elem->subdomain_id(), elem_centroid, coord);
-
-  elem_volume *= coord;
-
-  VectorValue<ADReal> elem_D = 0;
-  for (const auto i : make_range(_dim))
-  {
-    mooseAssert(elem_a(i).value() != 0, "We should not be dividing by zero");
-    elem_D(i) = elem_volume / elem_a(i);
-  }
-
-  VectorValue<ADReal> face_D;
-
-  const VectorValue<ADReal> & neighbor_a = _rc_uo.rcCoeff(neighbor);
-
-  coordTransformFactor(_subproblem, neighbor->subdomain_id(), neighbor_centroid, coord);
-  neighbor_volume *= coord;
-
-  VectorValue<ADReal> neighbor_D = 0;
-  for (const auto i : make_range(_dim))
-  {
-    mooseAssert(neighbor_a(i).value() != 0, "We should not be dividing by zero");
-    neighbor_D(i) = neighbor_volume / neighbor_a(i);
-  }
-  Moose::FV::interpolate(
-      Moose::FV::InterpMethod::Average, face_D, elem_D, neighbor_D, *_face_info, true);
-
-  const auto & b1 = _rc_uo.getB1(*_face_info);
-  const auto & b3 = _rc_uo.getB3(*_face_info);
-
-  // perform the pressure correction
-  for (const auto i : make_range(_dim))
-    v(i) += -face_D(i) * (grad_p(i) - unc_grad_p(i)) + face_D(i) * (b1(i) - b3(i));
-}
-
 ADReal
 INSFVMomentumAdvection::computeQpResidual()
 {
-  ADRealVectorValue v;
   ADReal adv_quant_interface;
 
   const auto elem_face = elemFromFace();
   const auto neighbor_face = neighborFromFace();
 
-  this->interpolate(_velocity_interp_method, v);
+  const auto v = _rc_uo.getVelocity(_velocity_interp_method, *_face_info, _tid);
   const auto interp_coeffs = Moose::FV::interpCoeffs(_advected_interp_method, *_face_info, true, v);
   _ae = _normal * v * _rho(elem_face) * interp_coeffs.first;
   // Minus sign because we apply a minus sign to the residual in computeResidual

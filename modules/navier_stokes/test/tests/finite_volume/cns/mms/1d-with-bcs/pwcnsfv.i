@@ -14,8 +14,10 @@ cp=${fparse gamma*R_specific/(gamma-1)}
 
 [UserObjects]
   [rc]
-    type = INSFVRhieChowInterpolator
+    type = PINSFVRhieChowInterpolator
     u = sup_vel_x
+    pressure = pressure
+    porosity = porosity
   []
 []
 
@@ -88,8 +90,6 @@ cp=${fparse gamma*R_specific/(gamma-1)}
     variable = pressure
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    vel = 'velocity'
-    pressure = pressure
     u = sup_vel_x
     rho = ${rho}
     porosity = porosity
@@ -104,10 +104,8 @@ cp=${fparse gamma*R_specific/(gamma-1)}
     type = PINSFVMomentumAdvection
     variable = sup_vel_x
     advected_quantity = 'rhou'
-    vel = 'velocity'
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    pressure = pressure
     u = sup_vel_x
     rho = ${rho}
     porosity = porosity

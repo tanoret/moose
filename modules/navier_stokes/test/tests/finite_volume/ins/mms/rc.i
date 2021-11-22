@@ -13,6 +13,7 @@ rho=1.1
     type = INSFVRhieChowInterpolator
     u = u
     v = v
+    pressure = pressure
   []
 []
 
@@ -57,8 +58,6 @@ rho=1.1
     type = INSFVMassAdvection
     variable = pressure
     advected_interp_method = 'average'
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -78,9 +77,7 @@ rho=1.1
     type = INSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = 'velocity'
     advected_interp_method = 'average'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -109,9 +106,7 @@ rho=1.1
     type = INSFVMomentumAdvection
     variable = v
     advected_quantity = 'rhov'
-    vel = 'velocity'
     advected_interp_method = 'average'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}

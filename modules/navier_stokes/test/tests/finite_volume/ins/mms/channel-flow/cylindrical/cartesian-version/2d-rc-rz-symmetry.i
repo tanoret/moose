@@ -32,7 +32,7 @@ offset=0e0
     type = INSFVRhieChowInterpolator
     u = u
     v = v
-    standard_body_forces = false
+    pressure = pressure
   []
 []
 
@@ -112,8 +112,6 @@ offset=0e0
   [mass]
     type = INSFVMassAdvection
     variable = pressure
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -128,8 +126,6 @@ offset=0e0
     type = INSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -158,8 +154,6 @@ offset=0e0
     type = INSFVMomentumAdvection
     variable = v
     advected_quantity = 'rhov'
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}

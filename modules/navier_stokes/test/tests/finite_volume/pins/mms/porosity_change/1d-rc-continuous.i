@@ -13,13 +13,16 @@ velocity_interp_method='rc'
 []
 
 [GlobalParams]
+  smooth_porosity = true
   rhie_chow_user_object = 'rc'
 []
 
 [UserObjects]
   [rc]
-    type = INSFVRhieChowInterpolator
+    type = PINSFVRhieChowInterpolator
     u = u
+    porosity = porosity
+    pressure = pressure
   []
 []
 
@@ -83,18 +86,15 @@ velocity_interp_method='rc'
 []
 
 [FVKernels]
-  inactive = 'u_pressure_porosity u_pressure_porosity_gradient'
   [mass]
     type = PINSFVMassAdvection
     variable = pressure
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
     vel = 'velocity'
-    pressure = pressure
     u = u
     rho = ${rho}
     porosity = porosity
-    smooth_porosity = true
   []
   [mass_forcing]
     type = FVBodyForce
@@ -109,11 +109,9 @@ velocity_interp_method='rc'
     vel = 'velocity'
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    pressure = pressure
     u = u
     rho = ${rho}
     porosity = porosity
-    smooth_porosity = true
     momentum_component = 'x'
   []
   [u_viscosity]
@@ -124,28 +122,10 @@ velocity_interp_method='rc'
 
     superficial_velocity = 'velocity'
     momentum_component = 'x'
-    smooth_porosity = true
   []
 
-  # Option 1: eps * pressure gradient
   [u_pressure]
     type = PINSFVMomentumPressure
-    variable = u
-    pressure = pressure
-    porosity = porosity
-    momentum_component = 'x'
-  []
-
-  # Option 2: gradient (eps * pressure) - P * gradient(eps)
-  [u_pressure_porosity]
-    type = PINSFVMomentumPressureFlux
-    variable = u
-    pressure = pressure
-    porosity = porosity
-    momentum_component = 'x'
-  []
-  [u_pressure_porosity_gradient]
-    type = PINSFVMomentumPressurePorosityGradient
     variable = u
     pressure = pressure
     porosity = porosity

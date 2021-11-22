@@ -407,6 +407,26 @@ makeSidedFace(const SubdomainRestrictable & obj, const Elem * const elem, const 
 }
 
 /**
+ * @return the value of \p makeSidedFace called with the face info element
+ */
+template <typename SubdomainRestrictable>
+std::tuple<const libMesh::Elem *, const FaceInfo *, SubdomainID>
+elemFromFace(const SubdomainRestrictable & obj, const FaceInfo & fi)
+{
+  return makeSidedFace(obj, &fi.elem(), fi);
+}
+
+/**
+ * @return the value of \p makeSidedFace called with the face info neighbor
+ */
+template <typename SubdomainRestrictable>
+std::tuple<const libMesh::Elem *, const FaceInfo *, SubdomainID>
+neighborFromFace(const SubdomainRestrictable & obj, const FaceInfo & fi)
+{
+  return makeSidedFace(obj, fi.neighborPtr(), fi);
+}
+
+/**
  * Determine the subdomain ID pair that should be used when creating a face argument for a
  * functor. As explained in the doxygen for \p makeSidedFace these
  * subdomain IDs do not simply correspond to the subdomain IDs of the face information element pair;
@@ -418,6 +438,19 @@ faceArgSubdomains(const SubdomainRestrictable & obj, const FaceInfo & fi)
 {
   return std::make_pair(std::get<2>(makeSidedFace(obj, &fi.elem(), fi)),
                         std::get<2>(makeSidedFace(obj, fi.neighborPtr(), fi)));
+}
+
+/**
+ * Return whether the supplied face is on a boundary of the \p object's execution
+ *
+ */
+template <typename SubdomainRestrictable>
+bool
+onBoundary(const SubdomainRestrictable & obj, const FaceInfo & fi)
+{
+  const bool internal = fi.neighborPtr() && obj.hasBlocks(fi.elemSubdomainID()) &&
+                        obj.hasBlocks(fi.neighborSubdomainID());
+  return !internal;
 }
 }
 }

@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "FVMatAdvection.h"
+#include "FVFluxKernel.h"
 #include "TheWarehouse.h"
 #include "SubProblem.h"
 #include "MooseApp.h"
@@ -27,7 +27,7 @@ class INSFVPressureVariable;
  * An advection kernel that implements interpolation schemes specific to Navier-Stokes flow
  * physics
  */
-class INSFVMomentumAdvection : public FVMatAdvection,
+class INSFVMomentumAdvection : public FVFluxKernel,
                                public INSFVFluxKernelInterface,
                                public INSFVMomentumResidualObject
 {
@@ -39,17 +39,13 @@ public:
   void gatherRCData(const FaceInfo & fi) override final;
 
 protected:
-  /**
-   * interpolation overload for the velocity
-   */
-  virtual void interpolate(Moose::FV::InterpMethod m, ADRealVectorValue & interp_v);
-
   virtual ADReal computeQpResidual() override;
 
   bool skipForBoundary(const FaceInfo & fi) const override;
 
-  /// pressure variable
-  const INSFVPressureVariable * const _p_var;
+  /// The advected quantity
+  const Moose::Functor<ADReal> & _adv_quant;
+
   /// x-velocity
   const INSFVVelocityVariable * const _u_var;
   /// y-velocity
@@ -62,6 +58,9 @@ protected:
 
   /// the dimension of the simulation
   const unsigned int _dim;
+
+  /// The interpolation method to use for the advected quantity
+  Moose::FV::InterpMethod _advected_interp_method;
 
   /// The interpolation method to use for the velocity
   Moose::FV::InterpMethod _velocity_interp_method;

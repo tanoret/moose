@@ -29,6 +29,7 @@ velocity='velocity'
     u = u
     v = v
     standard_body_forces = true
+    pressure = pressure
   []
 []
 
@@ -63,8 +64,6 @@ velocity='velocity'
     variable = pressure
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    vel = ${velocity}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -79,10 +78,8 @@ velocity='velocity'
     type = INSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = ${velocity}
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -111,10 +108,8 @@ velocity='velocity'
     type = INSFVMomentumAdvection
     variable = v
     advected_quantity = 'rhov'
-    vel = ${velocity}
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -146,11 +141,9 @@ velocity='velocity'
   []
   [temp_advection]
     type = INSFVEnergyAdvection
-    vel = ${velocity}
     variable = temperature
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}

@@ -16,6 +16,9 @@
 #include "SystemBase.h"
 #include "NS.h"
 #include "Reconstructions.h"
+#include "Assembly.h"
+#include "INSFVVelocityVariable.h"
+#include "INSFVPressureVariable.h"
 
 #include "libmesh/mesh_base.h"
 #include "libmesh/elem_range.h"
@@ -40,6 +43,7 @@ INSFVRhieChowInterpolator::validParams()
   exec_enum.addAvailableFlags(EXEC_PRE_KERNELS);
   exec_enum = {EXEC_PRE_KERNELS};
   params.suppressParameter<ExecFlagEnum>("execute_on");
+  params.addRequiredParam<VariableName>(NS::pressure, "The pressure variable.");
   params.addRequiredParam<VariableName>("u", "The x-component of velocity");
   params.addParam<VariableName>("v", "The y-component of velocity");
   params.addParam<VariableName>("w", "The z-component of velocity");
@@ -53,27 +57,90 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
     BlockRestrictable(this),
     _moose_mesh(UserObject::_subproblem.mesh()),
     _mesh(_moose_mesh.getMesh()),
-    _sys(*getCheckedPointerParam<SystemBase *>("_sys")),
-    _u(UserObject::_subproblem.getVariable(0, getParam<VariableName>("u"))),
-    _v(isParamValid("v") ? &UserObject::_subproblem.getVariable(0, getParam<VariableName>("v"))
+    _dim(_moose_mesh.dimension()),
+    _vel(libMesh::n_threads()),
+    _p(dynamic_cast<INSFVPressureVariable *>(
+        &UserObject::_subproblem.getVariable(0, getParam<VariableName>(NS::pressure)))),
+    _u(dynamic_cast<INSFVVelocityVariable *>(
+        &UserObject::_subproblem.getVariable(0, getParam<VariableName>("u")))),
+    _v(isParamValid("v") ? dynamic_cast<INSFVVelocityVariable *>(
+                               &UserObject::_subproblem.getVariable(0, getParam<VariableName>("v")))
                          : nullptr),
-    _w(isParamValid("w") ? &UserObject::_subproblem.getVariable(0, getParam<VariableName>("w"))
+    _w(isParamValid("w") ? dynamic_cast<INSFVVelocityVariable *>(
+                               &UserObject::_subproblem.getVariable(0, getParam<VariableName>("w")))
                          : nullptr),
-    _example(0),
-    _standard_body_forces(getParam<bool>("standard_body_forces")),
+    _ps(libMesh::n_threads(), nullptr),
+    _us(libMesh::n_threads(), nullptr),
+    _vs(libMesh::n_threads(), nullptr),
+    _ws(libMesh::n_threads(), nullptr),
     _b(_moose_mesh, true),
     _b2(_moose_mesh, true),
+    _sys(*getCheckedPointerParam<SystemBase *>("_sys")),
+    _example(0),
+    _standard_body_forces(getParam<bool>("standard_body_forces")),
     _bx(_b, 0),
     _by(_b, 1),
     _b2x(_b2, 0),
     _b2y(_b2, 1),
     _sub_ids(blockRestricted() ? blockIDs() : _moose_mesh.meshSubdomains())
 {
-  _var_numbers.push_back(_u.number());
+  if (!_p)
+    paramError(NS::pressure, "the pressure must be a INSFVPressureVariable.");
+
+  auto fill_container = [this](const auto & name, auto & container) {
+    for (const auto tid : make_range(libMesh::n_threads()))
+    {
+      auto * const var = static_cast<MooseVariableFVReal *>(
+          &UserObject::_subproblem.getVariable(tid, getParam<VariableName>(name)));
+      container[tid] = var;
+    }
+  };
+
+  fill_container(NS::pressure, _ps);
+
+  if (!_u)
+    paramError("u", "the u velocity must be an INSFVVelocityVariable.");
+  fill_container("u", _us);
+
+  if (_dim >= 2)
+  {
+    if (!_v)
+      mooseError("In two or more dimensions, the v velocity must be supplied and it must be an "
+                 "INSFVVelocityVariable.");
+
+    fill_container("v", _vs);
+  }
+
+  if (_dim >= 3)
+  {
+    if (!_w)
+      mooseError("In three-dimensions, the w velocity must be supplied and it must be an "
+                 "INSFVVelocityVariable.");
+
+    fill_container("w", _ws);
+  }
+
+  _var_numbers.push_back(_u->number());
   if (_v)
     _var_numbers.push_back(_v->number());
   if (_w)
     _var_numbers.push_back(_w->number());
+
+  for (const auto tid : make_range(libMesh::n_threads()))
+  {
+    _vel[tid] = std::make_unique<FunctorMaterialPropertyImpl<ADRealVectorValue>>(
+        name() + std::to_string(tid));
+    auto & vel = *_vel[tid];
+    vel.setFunctor(
+        _moose_mesh, blockIDs(), [this, tid](const auto & r, const auto & t) -> ADRealVectorValue {
+          ADRealVectorValue velocity((*_us[tid])(r, t));
+          if (_dim >= 2)
+            velocity(1) = (*_vs[tid])(r, t);
+          if (_dim >= 3)
+            velocity(2) = (*_ws[tid])(r, t);
+          return velocity;
+        });
+  }
 
   if (&(UserObject::_subproblem) != &(TaggingInterface::_subproblem))
     mooseError("Different subproblems in INSFVRhieChowInterpolator!");
@@ -404,4 +471,94 @@ INSFVRhieChowInterpolator::finalize()
 {
   finalizeAData();
   finalizeBData();
+}
+
+VectorValue<ADReal>
+INSFVRhieChowInterpolator::getVelocity(const Moose::FV::InterpMethod m,
+                                       const FaceInfo & fi,
+                                       const THREAD_ID tid) const
+{
+  const Elem * const elem = &fi.elem();
+  const Elem * const neighbor = fi.neighborPtr();
+  auto & vel = *_vel[tid];
+  auto & p = *_ps[tid];
+
+  if (Moose::FV::onBoundary(*this, fi))
+  {
+    const auto sub_id =
+        hasBlocks(elem->subdomain_id()) ? elem->subdomain_id() : neighbor->subdomain_id();
+    const auto boundary_face =
+        std::make_tuple(&fi, Moose::FV::LimiterType::CentralDifference, true, sub_id);
+    return vel(boundary_face);
+  }
+
+  VectorValue<ADReal> velocity;
+
+  const auto elem_face = Moose::FV::elemFromFace(*this, fi);
+  const auto neighbor_face = Moose::FV::neighborFromFace(*this, fi);
+
+  Moose::FV::interpolate(
+      Moose::FV::InterpMethod::Average, velocity, vel(elem_face), vel(neighbor_face), fi, true);
+
+  if (m == Moose::FV::InterpMethod::Average)
+    return velocity;
+
+  mooseAssert(neighbor && this->hasBlocks(neighbor->subdomain_id()),
+              "We should be on an internal face...");
+
+  // Get pressure gradient. This is the uncorrected gradient plus a correction from cell centroid
+  // values on either side of the face
+  const VectorValue<ADReal> & grad_p = p.adGradSln(fi);
+
+  // Get uncorrected pressure gradient. This will use the element centroid gradient if we are
+  // along a boundary face
+  const VectorValue<ADReal> & unc_grad_p = p.uncorrectedAdGradSln(fi);
+
+  const Point & elem_centroid = fi.elemCentroid();
+  const Point & neighbor_centroid = fi.neighborCentroid();
+  Real elem_volume = fi.elemVolume();
+  Real neighbor_volume = fi.neighborVolume();
+
+  // Now we need to perform the computations of D
+  const VectorValue<ADReal> & elem_a = libmesh_map_find(_a, elem->id());
+
+  mooseAssert(UserObject::_subproblem.getCoordSystem(elem->subdomain_id()) ==
+                  UserObject::_subproblem.getCoordSystem(neighbor->subdomain_id()),
+              "Coordinate systems must be the same between the two elements");
+
+  Real coord;
+  coordTransformFactor(UserObject::_subproblem, elem->subdomain_id(), elem_centroid, coord);
+
+  elem_volume *= coord;
+
+  VectorValue<ADReal> elem_D = 0;
+  for (const auto i : make_range(_dim))
+  {
+    mooseAssert(elem_a(i).value() != 0, "We should not be dividing by zero");
+    elem_D(i) = elem_volume / elem_a(i);
+  }
+
+  VectorValue<ADReal> face_D;
+
+  const VectorValue<ADReal> & neighbor_a = libmesh_map_find(_a, neighbor->id());
+
+  coordTransformFactor(UserObject::_subproblem, neighbor->subdomain_id(), neighbor_centroid, coord);
+  neighbor_volume *= coord;
+
+  VectorValue<ADReal> neighbor_D = 0;
+  for (const auto i : make_range(_dim))
+  {
+    mooseAssert(neighbor_a(i).value() != 0, "We should not be dividing by zero");
+    neighbor_D(i) = neighbor_volume / neighbor_a(i);
+  }
+  Moose::FV::interpolate(Moose::FV::InterpMethod::Average, face_D, elem_D, neighbor_D, fi, true);
+
+  const auto b1 = _b(fi);
+  const auto b3 = _b2(fi);
+
+  // perform the pressure correction
+  for (const auto i : make_range(_dim))
+    velocity(i) += -face_D(i) * (grad_p(i) - unc_grad_p(i)) + face_D(i) * (b1(i) - b3(i));
+
+  return velocity;
 }

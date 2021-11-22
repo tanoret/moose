@@ -36,12 +36,11 @@ ADReal
 INSFVEnergyAdvection::computeQpResidual()
 {
   ADReal adv_quant_interface;
-  ADRealVectorValue v;
 
   const auto elem_face = elemFromFace();
   const auto neighbor_face = neighborFromFace();
 
-  this->interpolate(_velocity_interp_method, v);
+  const auto v = _rc_uo.getVelocity(_velocity_interp_method, *_face_info, _tid);
   Moose::FV::interpolate(_advected_interp_method,
                          adv_quant_interface,
                          _adv_quant(elem_face),

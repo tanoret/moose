@@ -3,7 +3,6 @@ rho = 'rho'
 k = 1
 cp = 1
 alpha = 1
-vel = 'velocity'
 velocity_interp_method = 'rc'
 advected_interp_method = 'average'
 # rayleigh=1e3
@@ -20,6 +19,7 @@ hot_temp=310
     type = INSFVRhieChowInterpolator
     u = u
     v = v
+    pressure = pressure
   []
 []
 
@@ -124,12 +124,10 @@ hot_temp=310
   [mass]
     type = INSFVMassAdvection
     variable = pressure
-    vel = ${vel}
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
     u = u
     v = v
-    pressure = pressure
     rho = ${rho}
   []
   [mean_zero_pressure]
@@ -143,10 +141,8 @@ hot_temp=310
     type = INSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = ${vel}
     velocity_interp_method = ${velocity_interp_method}
     advected_interp_method = ${advected_interp_method}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -176,10 +172,8 @@ hot_temp=310
     type = INSFVMomentumAdvection
     variable = v
     advected_quantity = 'rhov'
-    vel = ${vel}
     velocity_interp_method = ${velocity_interp_method}
     advected_interp_method = ${advected_interp_method}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -213,10 +207,8 @@ hot_temp=310
   [temp_advection]
     type = INSFVEnergyAdvection
     variable = T
-    vel = ${vel}
     velocity_interp_method = ${velocity_interp_method}
     advected_interp_method = ${advected_interp_method}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}

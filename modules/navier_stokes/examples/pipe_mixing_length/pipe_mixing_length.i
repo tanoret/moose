@@ -96,6 +96,7 @@ ref_delta_P = ${fparse f * L / D * rho * bulk_u^2 / 2}
     type = INSFVRhieChowInterpolator
     u = u
     v = v
+    pressure = pressure
   []
 []
 
@@ -125,8 +126,6 @@ ref_delta_P = ${fparse f * L / D * rho * bulk_u^2 / 2}
   [mass]
     type = INSFVMassAdvection
     variable = pressure
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -136,8 +135,6 @@ ref_delta_P = ${fparse f * L / D * rho * bulk_u^2 / 2}
     type = INSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -169,8 +166,6 @@ ref_delta_P = ${fparse f * L / D * rho * bulk_u^2 / 2}
     type = INSFVMomentumAdvection
     variable = v
     advected_quantity = 'rhov'
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}

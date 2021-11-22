@@ -22,9 +22,11 @@ rho=1.1
 
 [UserObjects]
   [rc]
-    type = INSFVRhieChowInterpolator
+    type = PINSFVRhieChowInterpolator
     u = u
     v = v
+    pressure = pressure
+    porosity = porosity
   []
 []
 
@@ -61,8 +63,6 @@ rho=1.1
   [mass]
     type = PINSFVMassAdvection
     variable = pressure
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -73,8 +73,6 @@ rho=1.1
     type = PINSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -100,8 +98,6 @@ rho=1.1
     type = PINSFVMomentumAdvection
     variable = v
     advected_quantity = 'rhov'
-    vel = 'velocity'
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}

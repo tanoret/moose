@@ -2,7 +2,6 @@ mu = 1
 rho = 1
 k = .01
 cp = 1
-vel = 'velocity'
 
 [Mesh]
   [cmg]
@@ -42,6 +41,7 @@ vel = 'velocity'
     u = u
     v = v
     block = 0
+    pressure = pressure
   []
 []
 
@@ -79,10 +79,8 @@ vel = 'velocity'
   [mass]
     type = INSFVMassAdvection
     variable = pressure
-    vel = ${vel}
     u = u
     v = v
-    pressure = pressure
     rho = ${rho}
   []
   [mean_zero_pressure]
@@ -95,8 +93,6 @@ vel = 'velocity'
     type = INSFVMomentumAdvection
     variable = u
     advected_quantity = 'rhou'
-    vel = ${vel}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -119,8 +115,6 @@ vel = 'velocity'
     type = INSFVMomentumAdvection
     variable = v
     advected_quantity = 'rhov'
-    vel = ${vel}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}
@@ -147,8 +141,6 @@ vel = 'velocity'
   [temp_advection]
     type = INSFVEnergyAdvection
     variable = T
-    vel = ${vel}
-    pressure = pressure
     u = u
     v = v
     rho = ${rho}

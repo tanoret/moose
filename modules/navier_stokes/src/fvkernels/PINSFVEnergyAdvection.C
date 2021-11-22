@@ -38,14 +38,13 @@ PINSFVEnergyAdvection::PINSFVEnergyAdvection(const InputParameters & params)
 ADReal
 PINSFVEnergyAdvection::computeQpResidual()
 {
-  ADRealVectorValue v;
   ADReal adv_quant_interface;
 
   const auto elem_face = elemFromFace();
   const auto neighbor_face = neighborFromFace();
 
   // Velocity interpolation
-  this->interpolate(_velocity_interp_method, v);
+  const auto v = _rc_uo.getVelocity(_velocity_interp_method, *_face_info, _tid);
 
   // Interpolation of advected quantity
   Moose::FV::interpolate(_advected_interp_method,

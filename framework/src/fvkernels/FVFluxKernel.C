@@ -75,9 +75,7 @@ FVFluxKernel::FVFluxKernel(const InputParameters & params)
 bool
 FVFluxKernel::onBoundary(const FaceInfo & fi) const
 {
-  const bool internal =
-      fi.neighborPtr() && hasBlocks(fi.elemSubdomainID()) && hasBlocks(fi.neighborSubdomainID());
-  return !internal;
+  return Moose::FV::onBoundary(*this, fi);
 }
 
 // Note the lack of quadrature point loops in the residual/jacobian compute
@@ -315,13 +313,13 @@ FVFluxKernel::gradUDotNormal() const
 std::tuple<const libMesh::Elem *, const FaceInfo *, SubdomainID>
 FVFluxKernel::elemFromFace() const
 {
-  return Moose::FV::makeSidedFace(*this, &_face_info->elem(), *_face_info);
+  return Moose::FV::elemFromFace(*this, *_face_info);
 }
 
 std::tuple<const libMesh::Elem *, const FaceInfo *, SubdomainID>
 FVFluxKernel::neighborFromFace() const
 {
-  return Moose::FV::makeSidedFace(*this, _face_info->neighborPtr(), *_face_info);
+  return Moose::FV::neighborFromFace(*this, *_face_info);
 }
 
 std::pair<SubdomainID, SubdomainID>

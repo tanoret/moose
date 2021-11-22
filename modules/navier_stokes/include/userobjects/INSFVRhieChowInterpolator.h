@@ -24,6 +24,8 @@
 #include <unordered_set>
 
 class MooseMesh;
+class INSFVVelocityVariable;
+class INSFVPressureVariable;
 namespace libMesh
 {
 class Elem;
@@ -40,10 +42,8 @@ public:
 
   void addToA(const libMesh::Elem * elem, unsigned int component, const ADReal & value);
   void addToB(const libMesh::Elem * elem, unsigned int component, const ADReal & value);
-  const ADReal & getB2(const libMesh::Elem & elem, unsigned int component) const;
-  VectorValue<ADReal> getB1(const FaceInfo & fi) const;
-  VectorValue<ADReal> getB3(const FaceInfo & fi) const;
-  const VectorValue<ADReal> & rcCoeff(const libMesh::Elem * elem) const;
+  virtual VectorValue<ADReal>
+  getVelocity(Moose::FV::InterpMethod m, const FaceInfo & fi, THREAD_ID tid) const;
 
   void initialSetup() override;
   void meshChanged() override;
@@ -61,10 +61,33 @@ protected:
   bool isFaceGeometricallyRelevant(const FaceInfo & fi) const;
 
   MooseMesh & _moose_mesh;
+  const libMesh::MeshBase & _mesh;
+  const unsigned int _dim;
+  /// A functor for computing the (non-RC corrected) velocity
+  std::vector<std::unique_ptr<FunctorMaterialPropertyImpl<ADRealVectorValue>>> _vel;
+
+  INSFVPressureVariable * const _p;
+  INSFVVelocityVariable * const _u;
+  INSFVVelocityVariable * const _v;
+  INSFVVelocityVariable * const _w;
+
+  std::vector<MooseVariableFVReal *> _ps;
+  std::vector<MooseVariableFVReal *> _us;
+  std::vector<MooseVariableFVReal *> _vs;
+  std::vector<MooseVariableFVReal *> _ws;
 
   std::unique_ptr<ConstElemRange> _elem_range;
 
   std::vector<const FaceInfo *> _evaluable_fi;
+
+  std::unordered_map<dof_id_type, libMesh::VectorValue<ADReal>> _a;
+  CellCenteredMapFunctor<libMesh::VectorValue<ADReal>,
+                         std::unordered_map<dof_id_type, libMesh::VectorValue<ADReal>>>
+      _b;
+  // Here the suffix on _b refers to the number of bar operations we've performed
+  CellCenteredMapFunctor<libMesh::VectorValue<ADReal>,
+                         std::unordered_map<dof_id_type, libMesh::VectorValue<ADReal>>>
+      _b2;
 
 private:
   void finalizeAData();
@@ -78,22 +101,10 @@ private:
   std::vector<unsigned int> _var_numbers;
   std::unordered_set<const Elem *> _elements_to_push_pull;
 
-  const libMesh::MeshBase & _mesh;
   SystemBase & _sys;
-  MooseVariableFieldBase & _u;
-  MooseVariableFieldBase * const _v;
-  MooseVariableFieldBase * const _w;
   const VectorValue<ADReal> _example;
   const bool _standard_body_forces;
 
-  std::unordered_map<dof_id_type, libMesh::VectorValue<ADReal>> _a;
-  CellCenteredMapFunctor<libMesh::VectorValue<ADReal>,
-                         std::unordered_map<dof_id_type, libMesh::VectorValue<ADReal>>>
-      _b;
-  // Here the suffix on _b refers to the number of bar operations we've performed
-  CellCenteredMapFunctor<libMesh::VectorValue<ADReal>,
-                         std::unordered_map<dof_id_type, libMesh::VectorValue<ADReal>>>
-      _b2;
   VectorComponentFunctor<ADReal> _bx;
   VectorComponentFunctor<ADReal> _by;
   VectorComponentFunctor<ADReal> _b2x;
@@ -108,24 +119,6 @@ private:
   /// Mutex that prevents multiple threads from saving into the 'b' coefficients  at the same time
   Threads::spin_mutex _b_mutex;
 };
-
-inline const ADReal &
-INSFVRhieChowInterpolator::getB2(const libMesh::Elem & elem, const unsigned int component) const
-{
-  return libmesh_map_find(_b2, elem.id())(component);
-}
-
-inline VectorValue<ADReal>
-INSFVRhieChowInterpolator::getB1(const FaceInfo & fi) const
-{
-  return _b(fi);
-}
-
-inline VectorValue<ADReal>
-INSFVRhieChowInterpolator::getB3(const FaceInfo & fi) const
-{
-  return _b2(fi);
-}
 
 inline void
 INSFVRhieChowInterpolator::addToA(const Elem * const elem,
@@ -152,12 +145,4 @@ INSFVRhieChowInterpolator::addToB(const Elem * const elem,
   // the balance in Moukalled assumes that the body forces are on the RHS with positive sign, e.g.
   // 0 = -\nabla p + \mathbf{B}, so we must apply a minus sign here
   _b[elem->id()](component) -= value;
-}
-
-inline const VectorValue<ADReal> &
-INSFVRhieChowInterpolator::rcCoeff(const libMesh::Elem * const elem) const
-{
-  const auto it = _a.find(elem->id());
-  mooseAssert(it != _a.end(), "Could not find the requested element with id " << elem->id());
-  return it->second;
 }

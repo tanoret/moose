@@ -22,15 +22,8 @@ public:
   PINSFVMomentumAdvection(const InputParameters & params);
 
 protected:
-  /**
-   * interpolation overload for the velocity
-   */
-  void interpolate(Moose::FV::InterpMethod m, ADRealVectorValue & interp_v) override;
-
   virtual ADReal computeQpResidual() override;
 
   /// porosity functor
   const Moose::Functor<ADReal> & _eps;
-  /// Whether the porosity field is smooth or has discontinuities
-  const bool _smooth_porosity;
 };
