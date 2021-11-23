@@ -53,8 +53,6 @@ public:
   void finalize() override final;
 
 protected:
-  virtual void interpolatorSetup();
-
   /**
    * @return whether this face is geometrically relevant to us
    */
@@ -90,6 +88,7 @@ protected:
       _b2;
 
 private:
+  void insfvSetup();
   void finalizeAData();
   VectorValue<ADReal> interpolateB(std::unordered_map<dof_id_type, VectorValue<ADReal>> & b_elem,
                                    const FaceInfo & fi);

@@ -58,10 +58,25 @@ PINSFVRhieChowInterpolator::PINSFVRhieChowInterpolator(const InputParameters & p
 }
 
 void
-PINSFVRhieChowInterpolator::interpolatorSetup()
+PINSFVRhieChowInterpolator::meshChanged()
 {
-  INSFVRhieChowInterpolator::interpolatorSetup();
+  INSFVRhieChowInterpolator::meshChanged();
+  pinsfvSetup();
+}
 
+void
+PINSFVRhieChowInterpolator::residualSetup()
+{
+  INSFVRhieChowInterpolator::residualSetup();
+  if (!_initial_setup_done)
+    pinsfvSetup();
+
+  _initial_setup_done = true;
+}
+
+void
+PINSFVRhieChowInterpolator::pinsfvSetup()
+{
   if (!_rec)
     return;
 

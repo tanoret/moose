@@ -171,7 +171,7 @@ INSFVRhieChowInterpolator::isFaceGeometricallyRelevant(const FaceInfo & fi) cons
 }
 
 void
-INSFVRhieChowInterpolator::interpolatorSetup()
+INSFVRhieChowInterpolator::insfvSetup()
 {
   _elem_range =
       std::make_unique<ConstElemRange>(_mesh.active_local_subdomain_set_elements_begin(_sub_ids),
@@ -238,13 +238,13 @@ INSFVRhieChowInterpolator::interpolatorSetup()
 void
 INSFVRhieChowInterpolator::initialSetup()
 {
-  interpolatorSetup();
+  insfvSetup();
 }
 
 void
 INSFVRhieChowInterpolator::meshChanged()
 {
-  interpolatorSetup();
+  insfvSetup();
 }
 
 void

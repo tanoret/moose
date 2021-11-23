@@ -21,9 +21,10 @@ public:
   VectorValue<ADReal>
   getVelocity(Moose::FV::InterpMethod m, const FaceInfo & fi, THREAD_ID tid) const override;
 
-protected:
-  void interpolatorSetup() override;
+  void meshChanged() override;
+  void residualSetup() override;
 
+protected:
   Moose::Functor<ADReal> & _eps;
   std::vector<const Moose::Functor<ADReal> *> _epss;
   const unsigned short _rec;
@@ -33,4 +34,8 @@ protected:
 
   /// Whether the porosity field is smooth or has discontinuities
   const bool _smooth_porosity;
+
+private:
+  void pinsfvSetup();
+  bool _initial_setup_done = false;
 };
