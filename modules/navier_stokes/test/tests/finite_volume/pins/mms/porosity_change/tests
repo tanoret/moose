@@ -21,4 +21,14 @@
     ad_indexing_type = 'global'
     required_python_packages = 'pandas matplotlib'
   []
+  [reconstructed]
+    type = PythonUnitTest
+    input = test.py
+    test_case = TestReconstructed
+    requirement = 'The system shall show second order convergence for all variables when the porosity undergoes one iteration of interpolation and reconstruction.'
+    method = '!dbg'
+    min_parallel = 8
+    ad_indexing_type = 'global'
+    required_python_packages = 'pandas matplotlib'
+  []
 []

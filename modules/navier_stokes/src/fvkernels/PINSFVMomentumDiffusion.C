@@ -109,23 +109,18 @@ PINSFVMomentumDiffusion::computeQpResidual()
     const auto & grad_eps_face =
         MetaPhysicL::raw_value(_eps.gradient(Moose::FV::makeCDFace(*_face_info)));
 
-    ADRealVectorValue term_elem = mu_elem / eps_elem / eps_elem * grad_eps_face;
-    ADRealVectorValue term_neighbor = mu_neighbor / eps_neighbor / eps_neighbor * grad_eps_face;
-
-    const auto vel_elem = (*_vel)(elem_face);
-    const auto vel_neighbor = (*_vel)(neighbor_face);
-
-    for (int i = 0; i < LIBMESH_DIM; i++)
-    {
-      term_elem(i) *= vel_elem(i);
-      term_neighbor(i) *= vel_neighbor(i);
-    }
+    const auto coeff_elem = mu_elem / eps_elem / eps_elem * _var(elem_face);
+    const auto coeff_neighbor = mu_neighbor / eps_neighbor / eps_neighbor * _var(neighbor_face);
 
     // Interpolate to get the face value
-    ADRealVectorValue term_face;
-    interpolate(
-        Moose::FV::InterpMethod::Average, term_face, term_elem, term_neighbor, *_face_info, true);
-    residual -= term_face * _normal;
+    ADReal coeff_face;
+    interpolate(Moose::FV::InterpMethod::Average,
+                coeff_face,
+                coeff_elem,
+                coeff_neighbor,
+                *_face_info,
+                true);
+    residual -= coeff_face * grad_eps_face * _normal;
   }
   return -residual;
 #else

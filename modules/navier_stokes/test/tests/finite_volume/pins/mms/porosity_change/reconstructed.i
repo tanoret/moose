@@ -11,8 +11,8 @@ velocity_interp_method='rc'
     xmax = 2
     ymin = -1
     ymax = 1
-    nx = 8
-    ny = 8
+    nx = 2
+    ny = 2
   []
 []
 
@@ -28,6 +28,7 @@ velocity_interp_method='rc'
     porosity = porosity
     pressure = pressure
     smooth_porosity = true
+    reconstructions = 1
   []
 []
 
@@ -49,24 +50,59 @@ velocity_interp_method='rc'
   []
 []
 
-[AuxVariables]
-  [porosity]
-    family = MONOMIAL
-    order = CONSTANT
-    fv = true
-  []
-[]
-
-[ICs]
-  [porosity_continuous]
-    type = FunctionIC
-    variable = porosity
-    function = smooth_jump
-  []
-[]
-
 [GlobalParams]
   porosity = porosity
+[]
+
+[AuxVariables]
+  [eps_out]
+    type = MooseVariableFVReal
+  []
+  [bx_out]
+    type = MooseVariableFVReal
+  []
+  [by_out]
+    type = MooseVariableFVReal
+  []
+  [b2x_out]
+    type = MooseVariableFVReal
+  []
+  [b2y_out]
+    type = MooseVariableFVReal
+  []
+[]
+
+[AuxKernels]
+  [eps_out]
+    type = ADFunctorElementalAux
+    variable = eps_out
+    functor = porosity
+    execute_on = 'timestep_end'
+  []
+  [bx_out]
+    type = ADFunctorElementalAux
+    variable = bx_out
+    functor = "bx"
+    execute_on = "timestep_end"
+  []
+  [by_out]
+    type = ADFunctorElementalAux
+    variable = by_out
+    functor = "by"
+    execute_on = "timestep_end"
+  []
+  [b2x_out]
+    type = ADFunctorElementalAux
+    variable = b2x_out
+    functor = "b2x"
+    execute_on = "timestep_end"
+  []
+  [b2y_out]
+    type = ADFunctorElementalAux
+    variable = b2y_out
+    functor = "b2y"
+    execute_on = "timestep_end"
+  []
 []
 
 [FVKernels]
@@ -101,7 +137,7 @@ velocity_interp_method='rc'
     variable = u
     mu = ${mu}
     porosity = porosity
-    smooth_porosity = false
+    smooth_porosity = true
     superficial_velocity = 'velocity'
     momentum_component = 'x'
   []
@@ -135,7 +171,7 @@ velocity_interp_method='rc'
     variable = v
     mu = ${mu}
     porosity = porosity
-    smooth_porosity = false
+    smooth_porosity = true
     superficial_velocity = 'velocity'
     momentum_component = 'y'
   []
@@ -198,19 +234,18 @@ velocity_interp_method='rc'
 []
 
 [Functions]
-  [smooth_jump]
-    type = ParsedFunction
-    value = '1 - 0.5 * 1 / (1 + exp(-30*(x-1))) - 0.01 * y'
+  [porosity]
+    type = ADParsedFunction
+    value = '.5 + .1 * sin(pi * x / 4) * cos(pi * y / 4)'
   []
 
-  # Output from compute-functions-2d.py
   [exact_u]
     type = ParsedFunction
     value = 'sin((1/2)*y*pi)*cos((1/2)*x*pi)'
   []
   [forcing_u]
     type = ParsedFunction
-    value = '(1/2)*pi^2*mu*sin((1/2)*y*pi)*cos((1/2)*x*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) - 0.005*pi*mu*cos((1/2)*x*pi)*cos((1/2)*y*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2 + 7.5*pi*mu*exp(30 - 30*x)*sin((1/2)*x*pi)*sin((1/2)*y*pi)/((exp(30 - 30*x) + 1)^2*(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2) - 1/2*pi*rho*sin((1/4)*x*pi)*sin((1/2)*y*pi)^2*cos((1/2)*x*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) + (1/2)*pi*rho*sin((1/4)*x*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)^2/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) - pi*rho*sin((1/2)*x*pi)*sin((1/2)*y*pi)^2*cos((1/2)*x*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) + 0.01*rho*sin((1/4)*x*pi)*sin((1/2)*y*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2 + 15.0*rho*exp(30 - 30*x)*sin((1/2)*y*pi)^2*cos((1/2)*x*pi)^2/((exp(30 - 30*x) + 1)^2*(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2) - 1/4*pi*(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))*sin((1/4)*x*pi)*sin((3/2)*y*pi)'
+    value = '-mu*(0.1*pi^2*sin((1/4)*x*pi)*sin((1/4)*y*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 + 0.025*pi^2*sin((1/4)*x*pi)*sin((1/2)*y*pi)*cos((1/2)*x*pi)*cos((1/4)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 + 0.01*pi^2*sin((1/4)*x*pi)^2*sin((1/4)*y*pi)^2*sin((1/2)*y*pi)*cos((1/2)*x*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^3 - 1/4*pi^2*sin((1/2)*y*pi)*cos((1/2)*x*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5)) - mu*(0.025*pi^2*sin((1/4)*x*pi)*sin((1/2)*y*pi)*cos((1/2)*x*pi)*cos((1/4)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 + 0.1*pi^2*sin((1/2)*x*pi)*sin((1/2)*y*pi)*cos((1/4)*x*pi)*cos((1/4)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 + 0.01*pi^2*sin((1/2)*y*pi)*cos((1/4)*x*pi)^2*cos((1/2)*x*pi)*cos((1/4)*y*pi)^2/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^3 - 1/4*pi^2*sin((1/2)*y*pi)*cos((1/2)*x*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5)) + 0.1*pi*rho*sin((1/4)*x*pi)^2*sin((1/4)*y*pi)*sin((1/2)*y*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 - 0.1*pi*rho*sin((1/2)*y*pi)^2*cos((1/4)*x*pi)*cos((1/2)*x*pi)^2*cos((1/4)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 - 1/2*pi*rho*sin((1/4)*x*pi)*sin((1/2)*y*pi)^2*cos((1/2)*x*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5) + (1/2)*pi*rho*sin((1/4)*x*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)^2/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5) - pi*rho*sin((1/2)*x*pi)*sin((1/2)*y*pi)^2*cos((1/2)*x*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5) - 1/4*pi*(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5)*sin((1/4)*x*pi)*sin((3/2)*y*pi)'
     vars = 'mu rho'
     vals = '${mu} ${rho}'
   []
@@ -220,7 +255,7 @@ velocity_interp_method='rc'
   []
   [forcing_v]
     type = ParsedFunction
-    value = '(5/16)*pi^2*mu*sin((1/4)*x*pi)*cos((1/2)*y*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) + 0.005*pi*mu*sin((1/4)*x*pi)*sin((1/2)*y*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2 - 3.75*pi*mu*exp(30 - 30*x)*cos((1/4)*x*pi)*cos((1/2)*y*pi)/((exp(30 - 30*x) + 1)^2*(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2) - pi*rho*sin((1/4)*x*pi)^2*sin((1/2)*y*pi)*cos((1/2)*y*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) - 1/2*pi*rho*sin((1/4)*x*pi)*sin((1/2)*x*pi)*sin((1/2)*y*pi)*cos((1/2)*y*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) + (1/4)*pi*rho*sin((1/2)*y*pi)*cos((1/4)*x*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1)) + 0.01*rho*sin((1/4)*x*pi)^2*cos((1/2)*y*pi)^2/(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2 + 15.0*rho*exp(30 - 30*x)*sin((1/4)*x*pi)*sin((1/2)*y*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)/((exp(30 - 30*x) + 1)^2*(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))^2) + (3/2)*pi*(-0.01*y + 1 - 0.5/(exp(30 - 30*x) + 1))*cos((1/4)*x*pi)*cos((3/2)*y*pi)'
+    value = '-mu*(-0.1*pi^2*sin((1/4)*x*pi)^2*sin((1/4)*y*pi)*sin((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 + 0.025*pi^2*sin((1/4)*x*pi)^2*cos((1/4)*y*pi)*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 + 0.01*pi^2*sin((1/4)*x*pi)^3*sin((1/4)*y*pi)^2*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^3 - 1/4*pi^2*sin((1/4)*x*pi)*cos((1/2)*y*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5)) - mu*(0.025*pi^2*sin((1/4)*x*pi)^2*cos((1/4)*y*pi)*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 - 0.05*pi^2*cos((1/4)*x*pi)^2*cos((1/4)*y*pi)*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 + 0.01*pi^2*sin((1/4)*x*pi)*cos((1/4)*x*pi)^2*cos((1/4)*y*pi)^2*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^3 - 1/16*pi^2*sin((1/4)*x*pi)*cos((1/2)*y*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5)) + 0.1*pi*rho*sin((1/4)*x*pi)^3*sin((1/4)*y*pi)*cos((1/2)*y*pi)^2/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 - 0.1*pi*rho*sin((1/4)*x*pi)*sin((1/2)*y*pi)*cos((1/4)*x*pi)*cos((1/2)*x*pi)*cos((1/4)*y*pi)*cos((1/2)*y*pi)/(0.2*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 1)^2 - pi*rho*sin((1/4)*x*pi)^2*sin((1/2)*y*pi)*cos((1/2)*y*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5) - 1/2*pi*rho*sin((1/4)*x*pi)*sin((1/2)*x*pi)*sin((1/2)*y*pi)*cos((1/2)*y*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5) + (1/4)*pi*rho*sin((1/2)*y*pi)*cos((1/4)*x*pi)*cos((1/2)*x*pi)*cos((1/2)*y*pi)/(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5) + (3/2)*pi*(0.1*sin((1/4)*x*pi)*cos((1/4)*y*pi) + 0.5)*cos((1/4)*x*pi)*cos((3/2)*y*pi)'
     vars = 'mu rho'
     vals = '${mu} ${rho}'
   []
