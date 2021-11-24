@@ -22,17 +22,36 @@ namespace Moose
 {
 namespace FV
 {
+/**
+ * Takes an input functor that can be evaluated at faces, typically by linearly interpolating
+ * between adjacent cell center values, and then creates an output functor whose cell-center
+ * evaluations will correspond to weighted averages of the input functor's surrounding face
+ * evaluations
+ * @param output_functor the output functor
+ * @param input_functor the input functor
+ * @param num_int_recs the total number of interpolation and reconstruction operations to perform.
+ * If this number is greater than 1, then this function will recurse
+ * @param two_term_expansion whether the cell center value reconstruction should consider the face
+ * gradients in addition to the face values
+ * @param weight_with_sf when reconstructing the cell center value, decides whether the face values
+ * (and maybe gradients) are weighted with the surface vector. If this is false, then the weights
+ * are simply unity
+ * @param faces the mesh faces we will be looping over for the interpolations and reconstructions
+ * @param consumer the object that needs the reconstructed field. This argument is useful for
+ * determining what are "external" faces and hence faces around which we should carefully choose the
+ * subdomains we want to evaluate our \p input_functor on
+ */
 template <typename T, typename Map, typename Consumer>
 void
-reconstruct(CellCenteredMapFunctor<T, Map> & output_functor,
-            const FunctorImpl<T> & input_functor,
-            const unsigned int num_reconstructions,
-            const bool two_term_expansion,
-            const bool weight_with_sf,
-            const std::vector<const FaceInfo *> & faces,
-            const Consumer & consumer)
+interpolateReconstruct(CellCenteredMapFunctor<T, Map> & output_functor,
+                       const FunctorImpl<T> & input_functor,
+                       const unsigned int num_int_recs,
+                       const bool two_term_expansion,
+                       const bool weight_with_sf,
+                       const std::vector<const FaceInfo *> & faces,
+                       const Consumer & consumer)
 {
-  if (!num_reconstructions)
+  if (!num_int_recs)
     return;
 
   std::unordered_map<dof_id_type, std::pair<T, Real>> elem_to_num_denom;
@@ -72,13 +91,13 @@ reconstruct(CellCenteredMapFunctor<T, Map> & output_functor,
     output_functor[pr.first] = data_pr.first / data_pr.second;
   }
 
-  reconstruct(output_functor,
-              output_functor,
-              num_reconstructions - 1,
-              two_term_expansion,
-              weight_with_sf,
-              faces,
-              consumer);
+  interpolateReconstruct(output_functor,
+                         output_functor,
+                         num_int_recs - 1,
+                         two_term_expansion,
+                         weight_with_sf,
+                         faces,
+                         consumer);
 }
 }
 }

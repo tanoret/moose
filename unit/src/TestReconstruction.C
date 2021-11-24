@@ -140,10 +140,10 @@ testReconstruction(const Moose::CoordinateSystemType coord_type)
     };
 
     AllBlocks consumer;
-    Moose::FV::reconstruct(up, u, 1, true, true, faces, consumer);
-    Moose::FV::reconstruct(up_weller, u, 1, false, true, faces, consumer);
-    Moose::FV::reconstruct(up_linear, u_linear, 1, true, true, faces, consumer);
-    Moose::FV::reconstruct(up_tano, u, 1, false, false, faces, consumer);
+    Moose::FV::interpolateReconstruct(up, u, 1, true, true, faces, consumer);
+    Moose::FV::interpolateReconstruct(up_weller, u, 1, false, true, faces, consumer);
+    Moose::FV::interpolateReconstruct(up_linear, u_linear, 1, true, true, faces, consumer);
+    Moose::FV::interpolateReconstruct(up_tano, u, 1, false, false, faces, consumer);
 
     Real error = 0;
     Real weller_error = 0;
@@ -180,7 +180,7 @@ testReconstruction(const Moose::CoordinateSystemType coord_type)
     tano_errors.push_back(tano_error);
 
     up_tano.clear();
-    Moose::FV::reconstruct(up_tano, u, 2, false, false, faces, consumer);
+    Moose::FV::interpolateReconstruct(up_tano, u, 2, false, false, faces, consumer);
 
     tano_error = 0;
     for (auto * const elem : lm_mesh.active_element_ptr_range())

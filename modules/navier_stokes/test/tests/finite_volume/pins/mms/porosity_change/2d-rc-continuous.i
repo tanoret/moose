@@ -27,7 +27,7 @@ velocity_interp_method='rc'
     v = v
     porosity = porosity
     pressure = pressure
-    smooth_porosity = true
+    force_rc_correction = true
   []
 []
 

@@ -27,8 +27,8 @@ velocity_interp_method='rc'
     v = v
     porosity = porosity
     pressure = pressure
-    smooth_porosity = true
-    reconstructions = 1
+    force_rc_correction = true
+    smoothing_layers = 1
   []
 []
 

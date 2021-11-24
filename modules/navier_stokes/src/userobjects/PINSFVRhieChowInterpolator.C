@@ -21,16 +21,24 @@ PINSFVRhieChowInterpolator::validParams()
                              "porosity and computes the Rhie-Chow face velocities.");
   params.addRequiredParam<MooseFunctorName>(NS::porosity, "The porosity");
   params.addParam<unsigned short>(
-      "reconstructions", 0, "The number of reconstructions to perform on the porosity");
+      "smoothing_layers",
+      0,
+      "The number of interpolation-reconstruction operations to perform on the porosity");
   params.addRelationshipManager(
       "ElementSideNeighborLayers",
       Moose::RelationshipManagerType::GEOMETRIC,
       [](const InputParameters & obj_params, InputParameters & rm_params) {
-        rm_params.set<unsigned short>("layers") = obj_params.get<unsigned short>("reconstructions");
+        rm_params.set<unsigned short>("layers") =
+            obj_params.get<unsigned short>("smoothing_layers");
         rm_params.set<bool>("use_displaced_mesh") = obj_params.get<bool>("use_displaced_mesh");
       });
   params.addParam<bool>(
-      "smooth_porosity", false, "Whether the porosity field is smooth or has discontinuities");
+      "force_rc_correction",
+      false,
+      "Whether to force the Rhie-Chow correction of velocity in regions of porosity gradients. "
+      "This parameter will probably be removed soon since we now have the ability to smooth the "
+      "porosity using successive interpolations and reconstructions such that we should always do "
+      "the RC correction");
   return params;
 }
 
@@ -38,20 +46,20 @@ PINSFVRhieChowInterpolator::PINSFVRhieChowInterpolator(const InputParameters & p
   : INSFVRhieChowInterpolator(params),
     _eps(const_cast<Moose::Functor<ADReal> &>(getFunctor<ADReal>(NS::porosity))),
     _epss(libMesh::n_threads(), nullptr),
-    _rec(getParam<unsigned short>("reconstructions")),
-    _reconstructed_eps(_moose_mesh, true),
-    _smooth_porosity(getParam<bool>("smooth_porosity"))
+    _smoothing_layers(getParam<unsigned short>("smoothing_layers")),
+    _smoothed_eps(_moose_mesh, true),
+    _force_rc_correction(getParam<bool>("force_rc_correction"))
 {
-  if (_rec && _eps.wrapsType<MooseVariableBase>())
+  if (_smoothing_layers && _eps.wrapsType<MooseVariableBase>())
     paramError(
         NS::porosity,
         "If we are reconstructing porosity, then the input porosity to this user object cannot "
         "be a Moose variable. There are issues with reconstructing Moose variables: 1) initial "
         "conditions are run after use object initial setup 2) reconstructing from a variable "
         "requires ghosting the solution vectors 3) it's difficult to restrict the face "
-        "informations we evaluate reconstructions on such that we never query an algebraically "
-        "remote element due to things like two-term extrapolated boundary faces which trigger "
-        "gradient evaluations which trigger neighbor element evaluation");
+        "informations we evaluate interpolations and reconstructions on such that we never query "
+        "an algebraically remote element due to things like two-term extrapolated boundary faces "
+        "which trigger gradient evaluations which trigger neighbor element evaluation");
 
   const auto porosity_name = deduceFunctorName(NS::porosity);
 
@@ -79,7 +87,7 @@ PINSFVRhieChowInterpolator::residualSetup()
 void
 PINSFVRhieChowInterpolator::pinsfvSetup()
 {
-  if (!_rec)
+  if (!_smoothing_layers)
     return;
 
   const auto & all_fi = _moose_mesh.allFaceInfo();
@@ -93,20 +101,21 @@ PINSFVRhieChowInterpolator::pinsfvSetup()
 
   const auto saved_do_derivatives = ADReal::do_derivatives;
   ADReal::do_derivatives = true;
-  _reconstructed_eps.mapFilled(false);
+  _smoothed_eps.mapFilled(false);
 
-  Moose::FV::reconstruct(_reconstructed_eps, _eps, _rec, false, false, _geometric_fi, *this);
+  Moose::FV::interpolateReconstruct(
+      _smoothed_eps, _eps, _smoothing_layers, false, false, _geometric_fi, *this);
   ADReal::do_derivatives = saved_do_derivatives;
-  _reconstructed_eps.mapFilled(true);
+  _smoothed_eps.mapFilled(true);
 
-  _eps.assign(_reconstructed_eps);
+  _eps.assign(_smoothed_eps);
 
   const auto porosity_name = deduceFunctorName(NS::porosity);
   for (const auto tid : make_range((unsigned int)(1), libMesh::n_threads()))
   {
     auto & other_epss = const_cast<Moose::Functor<ADReal> &>(
         UserObject::_subproblem.getFunctor<ADReal>(porosity_name, tid, name()));
-    other_epss.assign(_reconstructed_eps);
+    other_epss.assign(_smoothed_eps);
   }
 }
 
@@ -143,7 +152,7 @@ PINSFVRhieChowInterpolator::getVelocity(const Moose::FV::InterpMethod m,
 
   // Avoid computing a pressure gradient near porosity jumps. We may remove this soon; see
   // https://github.com/idaholab/moose/issues/19425
-  if (!_smooth_porosity)
+  if (!_force_rc_correction)
     if (MetaPhysicL::raw_value(eps.gradient(elem)).norm() > 1e-12 ||
         MetaPhysicL::raw_value(eps.gradient(neighbor)).norm() > 1e-12)
       return velocity;

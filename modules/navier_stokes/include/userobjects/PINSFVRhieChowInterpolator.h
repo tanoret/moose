@@ -27,13 +27,16 @@ public:
 protected:
   Moose::Functor<ADReal> & _eps;
   std::vector<const Moose::Functor<ADReal> *> _epss;
-  const unsigned short _rec;
+  const unsigned short _smoothing_layers;
   std::vector<const FaceInfo *> _geometric_fi;
 
-  CellCenteredMapFunctor<ADReal, std::unordered_map<dof_id_type, ADReal>> _reconstructed_eps;
+  CellCenteredMapFunctor<ADReal, std::unordered_map<dof_id_type, ADReal>> _smoothed_eps;
 
-  /// Whether the porosity field is smooth or has discontinuities
-  const bool _smooth_porosity;
+  /// Whether to force the Rhie-Chow correction of velocity in regions of porosity gradients. This
+  /// data member will probably be removed soon since we now have the ability to smooth the porosity
+  /// using successive interpolations and reconstructions such that we should always do the RC
+  /// correction
+  const bool _force_rc_correction;
 
 private:
   void pinsfvSetup();

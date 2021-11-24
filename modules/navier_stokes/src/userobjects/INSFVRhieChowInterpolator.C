@@ -383,7 +383,7 @@ INSFVRhieChowInterpolator::computeFirstAndSecondOverBars()
     return;
   }
 
-  Moose::FV::reconstruct(_b2, _b, 1, false, false, _evaluable_fi, *this);
+  Moose::FV::interpolateReconstruct(_b2, _b, 1, false, false, _evaluable_fi, *this);
 }
 
 void
