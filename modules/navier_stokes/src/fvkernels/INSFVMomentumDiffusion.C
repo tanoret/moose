@@ -20,6 +20,8 @@ INSFVMomentumDiffusion::validParams()
   auto params = FVFluxKernel::validParams();
   params += INSFVMomentumResidualObject::validParams();
   params.addRequiredParam<MaterialPropertyName>(NS::mu, "The viscosity");
+  params.addClassDescription(
+      "Implements the Laplace form of the viscous strees in the Navier-Stokes equation.");
   params.set<unsigned short>("ghost_layers") = 2;
   return params;
 }

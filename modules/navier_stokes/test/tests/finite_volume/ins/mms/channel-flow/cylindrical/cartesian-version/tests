@@ -1,4 +1,6 @@
 [Tests]
+  issues = '#15640'
+  design = 'navier_stokes/insfv.md'
   [two_term]
     type = PythonUnitTest
     input = 'test.py'

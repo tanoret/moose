@@ -48,6 +48,8 @@ INSFVRhieChowInterpolator::validParams()
   params.addParam<VariableName>("v", "The y-component of velocity");
   params.addParam<VariableName>("w", "The z-component of velocity");
   params.addParam<bool>("standard_body_forces", false, "Whether to just apply normal body forces");
+  params.addClassDescription("Performs interpolations and reconstructions of body forces and "
+                             "computes the Rhie-Chow face velocities.");
   return params;
 }
 
