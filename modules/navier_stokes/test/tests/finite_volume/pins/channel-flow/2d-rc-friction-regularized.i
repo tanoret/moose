@@ -25,8 +25,8 @@ zero_vel = 0
 [UserObjects]
   [rc]
     type = PINSFVRhieChowInterpolator
-    u = u_reg
-    v = v_reg
+    u = u
+    v = v
     pressure = pressure
     porosity = porosity
   []
