@@ -118,6 +118,7 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
   fill_container("u", _us);
   check_blocks(*_u);
   _var_numbers.push_back(_u->number());
+  std::cout <<  _var_numbers << std::endl;
 
   if (_dim >= 2)
   {

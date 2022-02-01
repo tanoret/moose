@@ -31,7 +31,7 @@ public:
   void computeJacobian(const FaceInfo &) override final {}
 
 protected:
-  ADReal computeQpResidual() override final
+  ADReal computeQpResidual() override //final
   {
     mooseError("INSFVFluxKernels must implement gatherRCData and not computeQpResidual");
   }
