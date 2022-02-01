@@ -126,14 +126,28 @@ protected:
   /// The thread 0 copy of the pressure variable
   INSFVPressureVariable * const _p;
 
-  /// The thread 0 copy of the x-velocity variable
+  /// The thread 0 copy of the x-velocity variable used for composing the advecting velocity
   INSFVVelocityVariable * const _u;
 
-  /// The thread 0 copy of the y-velocity variable (null if the problem is 1D)
+  /// The thread 0 copy of the y-velocity variable used for composing the advecting velocity (null
+  /// if the problem is 1D)
   INSFVVelocityVariable * const _v;
 
-  /// The thread 0 copy of the z-velocity variable (null if the problem is not 3D)
+  /// The thread 0 copy of the z-velocity variable used for composing the advecting velocity (null
+  /// if the problem is not 3D)
   INSFVVelocityVariable * const _w;
+
+  /// The thread 0 copy of the x-velocity variable whose residual objects will be queried for
+  /// Rhie-Chow data
+  const MooseVariableFieldBase * const _u_ro;
+
+  /// The thread 0 copy of the y-velocity variable whose residual objects will be queried for
+  /// Rhie-Chow data
+  const MooseVariableFieldBase * const _v_ro;
+
+  /// The thread 0 copy of the z-velocity variable whose residual objects will be queried for
+  /// Rhie-Chow data
+  const MooseVariableFieldBase * const _w_ro;
 
   /// All the thread copies of the pressure variable
   std::vector<MooseVariableFVReal *> _ps;

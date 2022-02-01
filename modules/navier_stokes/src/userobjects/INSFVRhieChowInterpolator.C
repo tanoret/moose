@@ -45,9 +45,24 @@ INSFVRhieChowInterpolator::validParams()
   exec_enum = {EXEC_PRE_KERNELS};
   params.suppressParameter<ExecFlagEnum>("execute_on");
   params.addRequiredParam<VariableName>(NS::pressure, "The pressure variable.");
-  params.addRequiredParam<VariableName>("u", "The x-component of velocity");
-  params.addParam<VariableName>("v", "The y-component of velocity");
-  params.addParam<VariableName>("w", "The z-component of velocity");
+  params.addRequiredParam<VariableName>(
+      "u", "The x-component of velocity that will be used for creating the advecting velocity");
+  params.addParam<VariableName>(
+      "v", "The y-component of velocity that will be used for creating the advecting velocity");
+  params.addParam<VariableName>(
+      "w", "The z-component of velocity that will be used for creating the advecting velocity");
+  params.addParam<VariableName>("u_ro",
+                                "The x-component of velocity whose residual objects will be "
+                                "queried for 'a' and 'b' Rhie-Chow data. If this parameter is not "
+                                "supplied, then the parameter value of 'u' will be used.");
+  params.addParam<VariableName>("v_ro",
+                                "The y-component of velocity whose residual objects will be "
+                                "queried for 'a' and 'b' Rhie-Chow data. If this parameter is not "
+                                "supplied, then the parameter value of 'v' will be used.");
+  params.addParam<VariableName>("w_ro",
+                                "The z-component of velocity whose residual objects will be "
+                                "queried for 'a' and 'b' Rhie-Chow data. If this parameter is not "
+                                "supplied, then the parameter value of 'w' will be used.");
   params.addParam<bool>("standard_body_forces", false, "Whether to just apply normal body forces");
   params.addClassDescription("Performs interpolations and reconstructions of body forces and "
                              "computes face velocities.");
@@ -72,6 +87,15 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
     _w(isParamValid("w") ? dynamic_cast<INSFVVelocityVariable *>(
                                &UserObject::_subproblem.getVariable(0, getParam<VariableName>("w")))
                          : nullptr),
+    _u_ro(isParamValid("u_ro")
+              ? &UserObject::_subproblem.getVariable(0, getParam<VariableName>("u_ro"))
+              : _u),
+    _v_ro(isParamValid("v_ro")
+              ? &UserObject::_subproblem.getVariable(0, getParam<VariableName>("v_ro"))
+              : _v),
+    _w_ro(isParamValid("w_ro")
+              ? &UserObject::_subproblem.getVariable(0, getParam<VariableName>("w_ro"))
+              : _w),
     _ps(libMesh::n_threads(), nullptr),
     _us(libMesh::n_threads(), nullptr),
     _vs(libMesh::n_threads(), nullptr),
@@ -92,7 +116,8 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
   if (!_p)
     paramError(NS::pressure, "the pressure must be a INSFVPressureVariable.");
 
-  auto fill_container = [this](const auto & name, auto & container) {
+  auto fill_container = [this](const auto & name, auto & container)
+  {
     for (const auto tid : make_range(libMesh::n_threads()))
     {
       auto * const var = static_cast<MooseVariableFVReal *>(
@@ -101,7 +126,8 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
     }
   };
 
-  auto check_blocks = [this](const auto & var) {
+  auto check_blocks = [this](const auto & var)
+  {
     if (blockIDs() != var.blockIDs())
       mooseError("Block restriction of interpolator user object '",
                  this->name(),
@@ -117,8 +143,7 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
     paramError("u", "the u velocity must be an INSFVVelocityVariable.");
   fill_container("u", _us);
   check_blocks(*_u);
-  _var_numbers.push_back(_u->number());
-  std::cout <<  _var_numbers << std::endl;
+  _var_numbers.push_back(_u_ro->number());
 
   if (_dim >= 2)
   {
@@ -128,7 +153,7 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
 
     fill_container("v", _vs);
     check_blocks(*_v);
-    _var_numbers.push_back(_v->number());
+    _var_numbers.push_back(_v_ro->number());
   }
 
   if (_dim >= 3)
@@ -139,7 +164,7 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
 
     fill_container("w", _ws);
     check_blocks(*_w);
-    _var_numbers.push_back(_w->number());
+    _var_numbers.push_back(_w_ro->number());
   }
 
   if (&(UserObject::_subproblem) != &(TaggingInterface::_subproblem))
@@ -149,7 +174,8 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
   {
     _vel[tid] = std::make_unique<PiecewiseByBlockLambdaFunctor<ADRealVectorValue>>(
         name() + std::to_string(tid),
-        [this, tid](const auto & r, const auto & t) -> ADRealVectorValue {
+        [this, tid](const auto & r, const auto & t) -> ADRealVectorValue
+        {
           ADRealVectorValue velocity((*_us[tid])(r, t));
           if (_dim >= 2)
             velocity(1) = (*_vs[tid])(r, t);
@@ -258,11 +284,13 @@ INSFVRhieChowInterpolator::insfvSetup()
     dof_maps[i] = &sys.get_dof_map();
   }
 
-  auto is_fi_evaluable = [this, &dof_maps](const FaceInfo & fi) {
+  auto is_fi_evaluable = [this, &dof_maps](const FaceInfo & fi)
+  {
     if (!isFaceGeometricallyRelevant(fi))
       return false;
 
-    auto is_elem_evaluable = [&dof_maps](const Elem & elem) {
+    auto is_elem_evaluable = [&dof_maps](const Elem & elem)
+    {
       for (const auto * const dof_map : dof_maps)
         if (!dof_map->is_evaluable(elem))
           return false;
@@ -381,8 +409,9 @@ INSFVRhieChowInterpolator::finalizeAData()
 
   // First push
   {
-    auto action_functor = [this](const processor_id_type libmesh_dbg_var(pid),
-                                 const std::vector<Datum> & sent_data) {
+    auto action_functor =
+        [this](const processor_id_type libmesh_dbg_var(pid), const std::vector<Datum> & sent_data)
+    {
       mooseAssert(pid != this->processor_id(), "We do not send messages to ourself here");
       for (const auto & pr : sent_data)
         _a[pr.first] += pr.second;
@@ -394,7 +423,8 @@ INSFVRhieChowInterpolator::finalizeAData()
   {
     auto gather_functor = [this](const processor_id_type libmesh_dbg_var(pid),
                                  const std::vector<dof_id_type> & elem_ids,
-                                 std::vector<VectorValue<ADReal>> & data_to_fill) {
+                                 std::vector<VectorValue<ADReal>> & data_to_fill)
+    {
       mooseAssert(pid != this->processor_id(), "We shouldn't be gathering from ourselves.");
       data_to_fill.resize(elem_ids.size());
       for (const auto i : index_range(elem_ids))
@@ -408,7 +438,8 @@ INSFVRhieChowInterpolator::finalizeAData()
 
     auto action_functor = [this](const processor_id_type libmesh_dbg_var(pid),
                                  const std::vector<dof_id_type> & elem_ids,
-                                 const std::vector<VectorValue<ADReal>> & filled_data) {
+                                 const std::vector<VectorValue<ADReal>> & filled_data)
+    {
       mooseAssert(pid != this->processor_id(), "The request filler shouldn't have been ourselves");
       mooseAssert(elem_ids.size() == filled_data.size(), "I think these should be the same size");
       for (const auto i : index_range(elem_ids))
@@ -501,7 +532,8 @@ INSFVRhieChowInterpolator::finalizeBData()
 
     auto gather_functor = [this](const processor_id_type libmesh_dbg_var(pid),
                                  const std::vector<dof_id_type> & elem_ids,
-                                 std::vector<VectorValue<ADReal>> & data_to_fill) {
+                                 std::vector<VectorValue<ADReal>> & data_to_fill)
+    {
       mooseAssert(pid != this->processor_id(), "We shouldn't be gathering from ourselves.");
       data_to_fill.resize(elem_ids.size());
       for (const auto i : index_range(elem_ids))
@@ -513,7 +545,8 @@ INSFVRhieChowInterpolator::finalizeBData()
 
     auto action_functor = [this](const processor_id_type libmesh_dbg_var(pid),
                                  const std::vector<dof_id_type> & elem_ids,
-                                 const std::vector<VectorValue<ADReal>> & filled_data) {
+                                 const std::vector<VectorValue<ADReal>> & filled_data)
+    {
       mooseAssert(pid != this->processor_id(), "The request filler shouldn't have been ourselves");
       mooseAssert(elem_ids.size() == filled_data.size(), "I think these should be the same size");
       for (const auto i : index_range(elem_ids))

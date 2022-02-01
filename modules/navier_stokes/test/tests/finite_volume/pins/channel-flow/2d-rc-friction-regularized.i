@@ -1,9 +1,7 @@
 mu=0.1
 rho=1
-alpha=1000.0
 advected_interp_method='average'
 velocity_interp_method='rc'
-zero_vel = 0
 
 [Mesh]
   [gen]
@@ -27,6 +25,8 @@ zero_vel = 0
     type = PINSFVRhieChowInterpolator
     u = u
     v = v
+    u_ro = u_reg
+    v_ro = v_reg
     pressure = pressure
     porosity = porosity
   []
@@ -79,10 +79,7 @@ zero_vel = 0
     variable = pressure
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    u = u_reg
-    v = v_reg
     rho = ${rho}
-    porosity = porosity
   []
 
   [u_advection]
@@ -90,8 +87,6 @@ zero_vel = 0
     variable = u_reg
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    u = zero_vel
-    v = zero_vel
     rho = ${rho}
     porosity = porosity
     momentum_component = 'x'
@@ -138,8 +133,6 @@ zero_vel = 0
     variable = v_reg
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
-    u = zero_vel
-    v = zero_vel
     rho = ${rho}
     porosity = porosity
     momentum_component = 'y'
