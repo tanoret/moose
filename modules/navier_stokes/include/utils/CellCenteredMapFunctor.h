@@ -13,6 +13,20 @@
 #include "GreenGaussGradient.h"
 #include "MathFVUtils.h"
 #include "libmesh/utility.h"
+#include "libmesh/type_tensor.h"
+#include "libmesh/compare_types.h"
+#include "libmesh/threads.h"
+
+template <typename T, typename T2, typename std::enable_if<ScalarTraits<T>::value, int>::type = 0>
+inline TypeVector<typename CompareTypes<T, T2>::supertype>
+outer_product(const T & a, const TypeVector<T2> & b)
+{
+  TypeVector<typename CompareTypes<T, T2>::supertype> ret;
+  for (unsigned int i = 0; i < LIBMESH_DIM; i++)
+    ret(i) = a * b(i);
+
+  return ret;
+}
 
 /**
  * A functor whose evaluation relies on querying a map where the keys are element ids and the values
