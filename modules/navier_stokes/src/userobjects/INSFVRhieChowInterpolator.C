@@ -63,6 +63,8 @@ INSFVRhieChowInterpolator::validParams()
                                 "The z-component of velocity whose residual objects will be "
                                 "queried for 'a' and 'b' Rhie-Chow data. If this parameter is not "
                                 "supplied, then the parameter value of 'w' will be used.");
+  params.addRangeCheckedParam<Real>(
+      "beta", 0, "0<=beta<=1", "Regularization parameter for advection weight in the RC interpolation");
   params.addParam<bool>("standard_body_forces", false, "Whether to just apply normal body forces");
   params.addClassDescription("Performs interpolations and reconstructions of body forces and "
                              "computes face velocities.");
@@ -100,6 +102,9 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
     _us(libMesh::n_threads(), nullptr),
     _vs(libMesh::n_threads(), nullptr),
     _ws(libMesh::n_threads(), nullptr),
+    _us_complement(libMesh::n_threads(), nullptr),
+    _vs_complement(libMesh::n_threads(), nullptr),
+    _ws_complement(libMesh::n_threads(), nullptr),
     _sub_ids(blockRestricted() ? blockIDs() : _moose_mesh.meshSubdomains()),
     _b(_moose_mesh, _sub_ids),
     _b2(_moose_mesh, _sub_ids),
@@ -111,7 +116,8 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
     _bz(_b, 2),
     _b2x(_b2, 0),
     _b2y(_b2, 1),
-    _b2z(_b2, 2)
+    _b2z(_b2, 2),
+    _beta(getParam<Real>("beta"))
 {
   if (!_p)
     paramError(NS::pressure, "the pressure must be a INSFVPressureVariable.");
@@ -142,6 +148,11 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
   if (!_u)
     paramError("u", "the u velocity must be an INSFVVelocityVariable.");
   fill_container("u", _us);
+  if(isParamValid("u_ro")){
+    fill_container("u_ro", _us_complement);
+  } else{
+    fill_container("u", _us_complement);
+  }
   check_blocks(*_u);
   _var_numbers.push_back(_u_ro->number());
 
@@ -152,6 +163,11 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
                  "INSFVVelocityVariable.");
 
     fill_container("v", _vs);
+    if(isParamValid("v_ro")){
+      fill_container("v_ro", _vs_complement);
+    } else{
+      fill_container("v", _vs_complement);
+    }
     check_blocks(*_v);
     _var_numbers.push_back(_v_ro->number());
   }
@@ -163,6 +179,11 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
                  "INSFVVelocityVariable.");
 
     fill_container("w", _ws);
+    if(isParamValid("w_ro")){
+      fill_container("w_ro", _ws_complement);
+    } else{
+      fill_container("w", _ws_complement);
+    }
     check_blocks(*_w);
     _var_numbers.push_back(_w_ro->number());
   }
@@ -176,11 +197,11 @@ INSFVRhieChowInterpolator::INSFVRhieChowInterpolator(const InputParameters & par
         name() + std::to_string(tid),
         [this, tid](const auto & r, const auto & t) -> ADRealVectorValue
         {
-          ADRealVectorValue velocity((*_us[tid])(r, t));
+          ADRealVectorValue velocity(_beta*(*_us[tid])(r, t) + (1.0 - _beta)*(*_us_complement[tid])(r, t));
           if (_dim >= 2)
-            velocity(1) = (*_vs[tid])(r, t);
+            velocity(1) = _beta*(*_vs[tid])(r, t) + (1.0 - _beta)*(*_vs_complement[tid])(r, t);
           if (_dim >= 3)
-            velocity(2) = (*_ws[tid])(r, t);
+            velocity(2) = _beta*(*_ws[tid])(r, t) + (1.0 - _beta)*(*_ws_complement[tid])(r, t);
           return velocity;
         },
         std::set<ExecFlagType>({EXEC_ALWAYS}),
@@ -588,8 +609,11 @@ INSFVRhieChowInterpolator::getVelocity(const Moose::FV::InterpMethod m,
   auto & vel = *_vel[tid];
   auto & p = *_ps[tid];
   auto * const u = _us[tid];
+  auto * const u_comp = _us_complement[tid];
   MooseVariableFVReal * const v = _v ? _vs[tid] : nullptr;
+  MooseVariableFVReal * const v_comp = _v ? _vs_complement[tid] : nullptr;
   MooseVariableFVReal * const w = _w ? _ws[tid] : nullptr;
+  MooseVariableFVReal * const w_comp = _w ? _ws_complement[tid] : nullptr;
 
   // Check if skewness-correction is necessary
   const bool correct_skewness =
@@ -611,11 +635,11 @@ INSFVRhieChowInterpolator::getVelocity(const Moose::FV::InterpMethod m,
   VectorValue<ADReal> velocity;
 
   // Create the average face velocity (not corrected using RhieChow yet)
-  velocity(0) = u->getInternalFaceValue(fi, correct_skewness);
+  velocity(0) = _beta*u->getInternalFaceValue(fi, correct_skewness) + (1.0 - _beta)*u_comp->getInternalFaceValue(fi, correct_skewness);
   if (v)
-    velocity(1) = v->getInternalFaceValue(fi, correct_skewness);
+    velocity(1) = _beta*v->getInternalFaceValue(fi, correct_skewness) + (1.0 - _beta)*v_comp->getInternalFaceValue(fi, correct_skewness);
   if (w)
-    velocity(2) = w->getInternalFaceValue(fi, correct_skewness);
+    velocity(2) = _beta*w->getInternalFaceValue(fi, correct_skewness) + (1.0 - _beta)*w_comp->getInternalFaceValue(fi, correct_skewness);
 
   // Return if Rhie-Chow was not requested
   if (m == Moose::FV::InterpMethod::Average)

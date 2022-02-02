@@ -1,7 +1,15 @@
-mu=0.1
+mu=0.001
 rho=1
 advected_interp_method='average'
 velocity_interp_method='rc'
+alpha=1.0
+beta=0.2
+
+sigma_k = 1.0
+sigma_eps = 1.3
+C1_eps = 1.44
+C2_eps = 1.92
+C_mu = 0.09
 
 [Mesh]
   [gen]
@@ -29,6 +37,7 @@ velocity_interp_method='rc'
     v_ro = v_reg
     pressure = pressure
     porosity = porosity
+    beta = ${beta}
   []
 []
 
@@ -53,6 +62,14 @@ velocity_interp_method='rc'
   [pressure]
     type = INSFVPressureVariable
   []
+  [k]
+    type = INSFVEnergyVariable
+    initial_condition = 1.0
+  []
+  [epsilon]
+    type = INSFVEnergyVariable
+    initial_condition = 1.0
+  []
   [lambda]
     family = SCALAR
     order = FIRST
@@ -66,14 +83,16 @@ velocity_interp_method='rc'
     fv = true
     initial_condition = 0.5
   []
-  [zero_vel]
-    type = PINSFVSuperficialVelocityVariable
-    initial_condition = 0.0
+  [mu_t]
+    family = MONOMIAL
+    order = CONSTANT
+    fv = true
+    initial_condition = 1.0
   []
 []
 
 [FVKernels]
-  inactive = 'mean-pressure'
+  inactive = 'mean-pressure u_friction v_friction TKED_source_sink'
   [mass]
     type = PINSFVMassAdvection
     variable = pressure
@@ -98,6 +117,13 @@ velocity_interp_method='rc'
     porosity = porosity
     momentum_component = 'x'
   []
+  [u_viscosity_turbulent]
+    type = PINSFVMomentumDiffusion
+    variable = u_reg
+    mu = mu_t
+    porosity = porosity
+    momentum_component = 'x'
+  []
   [u_pressure]
     type = PINSFVMomentumPressure
     variable = u_reg
@@ -115,19 +141,6 @@ velocity_interp_method='rc'
     rho = ${rho}
   []
 
-  # [u_regularization]
-  #   type = INSFVMomentumRegularization
-  #   variable = u
-  #   momentum_component = 'x'
-  #   filter_scaling = ${alpha}
-  # []
-  [u_regularization_source]
-    type = INSFVMomentumRegularizationSource
-    variable = u
-    momentum_component = 'x'
-    var_reg = u_reg
-  []
-
   [v_advection]
     type = PINSFVMomentumAdvection
     variable = v_reg
@@ -141,6 +154,13 @@ velocity_interp_method='rc'
     type = PINSFVMomentumDiffusion
     variable = v_reg
     mu = ${mu}
+    porosity = porosity
+    momentum_component = 'y'
+  []
+  [v_viscosity_turbulent]
+    type = PINSFVMomentumDiffusion
+    variable = v_reg
+    mu = mu_t
     porosity = porosity
     momentum_component = 'y'
   []
@@ -161,17 +181,100 @@ velocity_interp_method='rc'
     rho = ${rho}
   []
 
-  # [v_regularization]
-  #   type = INSFVMomentumRegularization
-  #   variable = v
-  #   momentum_component = 'y'
-  #   filter_scaling = ${alpha}
-  # []
+  [u_regularization]
+    type = INSFVMomentumRegularization
+    variable = u
+    filter_scaling = ${alpha}
+  []
+  [u_regularization_source]
+    type = INSFVMomentumRegularizationSource
+    variable = u
+    momentum_component = 'x'
+    var_reg = u_reg
+  []
+
+  [v_regularization]
+    type = INSFVMomentumRegularization
+    variable = v
+    filter_scaling = ${alpha}
+  []
   [v_regularization_source]
     type = INSFVMomentumRegularizationSource
     variable = v
     momentum_component = 'x'
     var_reg = v_reg
+  []
+
+  [TKE_source_sink]
+    type = PINSFVTKESourceSink
+    variable = k
+    u = u
+    v = v
+    rho = ${rho}
+    mu_t = mu_t
+    epsilon = epsilon
+    porosity = porosity
+    effective_balance = false
+  []
+  [TKE_diffusion]
+    type = PINSFVTurbulentDiffusion
+    variable = k
+    mu_t = mu_t
+    porosity = porosity
+    turb_coef = ${sigma_k}
+    effective_diffusivity = false
+  []
+  [TKE_diffusion_laminar]
+    type = PINSFVTurbulentDiffusion
+    variable = k
+    mu_t = ${mu}
+    porosity = porosity
+    turb_coef = ${sigma_k}
+    effective_diffusivity = false
+  []
+  [TKE_advection]
+    type = PINSFVTurbulentAdvection
+    variable = k
+    velocity_interp_method = ${velocity_interp_method}
+    advected_interp_method = ${advected_interp_method}
+    rho = ${rho}
+  []
+
+  [TKED_source_sink]
+    type = PINSFVTKEDSourceSink
+    variable = epsilon
+    u = u
+    v = v
+    rho = ${rho}
+    mu_t = mu_t
+    k = k
+    porosity = porosity
+    effective_balance = false
+    C1_eps = ${C1_eps}
+    C2_eps = ${C2_eps}
+  []
+  [TKED_diffusion]
+    type = PINSFVTurbulentDiffusion
+    variable = epsilon
+    mu_t = mu_t
+    porosity = porosity
+    turb_coef = ${sigma_eps}
+    effective_diffusivity = false
+  []
+  [TKED_diffusion_laminar]
+    type = PINSFVTurbulentDiffusion
+    variable = epsilon
+    mu_t = ${mu}
+    porosity = porosity
+    turb_coef = ${sigma_eps}
+    effective_diffusivity = false
+  []
+  [TKED_advection]
+    type = PINSFVTurbulentAdvection
+    variable = epsilon
+    velocity_interp_method = ${velocity_interp_method}
+    advected_interp_method = ${advected_interp_method}
+    rho = ${rho}
   []
 
   [mean-pressure]
@@ -182,8 +285,20 @@ velocity_interp_method='rc'
   []
 []
 
+[AuxKernels]
+  [compute_mu_t]
+    type = kEpsilonViscosity
+    variable = mu_t
+    k = k
+    epsilon = epsilon
+    rho = ${rho}
+    C_mu = ${C_mu}
+  []
+[]
+
+
 [FVBCs]
-  inactive = 'free-slip-reg-u free-slip-reg-v free-slip-u free-slip-v'
+  inactive = 'free-slip-reg-u free-slip-reg-v free-slip-u free-slip-v free-slip-k free-slip-eps'
   [inlet-reg-u]
     type = INSFVInletVelocityBC
     boundary = 'left'
@@ -207,6 +322,18 @@ velocity_interp_method='rc'
     boundary = 'left'
     variable = v
     function = 0
+  []
+  [inlet-k]
+    type = FVDirichletBC
+    boundary = 'left'
+    variable = k
+    value = 1
+  []
+  [inlet-eps]
+    type = FVDirichletBC
+    boundary = 'left'
+    variable = epsilon
+    value = 1
   []
 
   [no-slip-reg-u]
@@ -233,6 +360,19 @@ velocity_interp_method='rc'
     variable = v
     function = 0
   []
+  [no-slip-k]
+    type = INSFVNoSlipWallBC
+    boundary = 'top'
+    variable = k
+    function = '1'
+  []
+  [no-slip-eps]
+    type = INSFVNoSlipWallBC
+    boundary = 'top'
+    variable = epsilon
+    function = '1'
+  []
+
   [free-slip-reg-u]
     type = INSFVNaturalFreeSlipBC
     boundary = 'top'
@@ -256,6 +396,18 @@ velocity_interp_method='rc'
     boundary = 'top'
     variable = v
     momentum_component = 'y'
+  []
+  [free-slip-k]
+    type = INSFVNaturalFreeSlipBC
+    boundary = 'top'
+    variable = k
+    function = '1'
+  []
+  [free-slip-eps]
+    type = INSFVNaturalFreeSlipBC
+    boundary = 'top'
+    variable = epsilon
+    function = '1'
   []
 
   [symmetry-reg-u]
@@ -294,7 +446,6 @@ velocity_interp_method='rc'
     mu = ${mu}
     momentum_component = 'y'
   []
-
   [symmetry-p]
     type = INSFVSymmetryPressureBC
     boundary = 'bottom'

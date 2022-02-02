@@ -161,6 +161,15 @@ protected:
   /// All the thread copies of the z-velocity variable
   std::vector<MooseVariableFVReal *> _ws;
 
+  /// All the thread copies of the x-velocity variable
+  std::vector<MooseVariableFVReal *> _us_complement;
+
+  /// All the thread copies of the y-velocity variable
+  std::vector<MooseVariableFVReal *> _vs_complement;
+
+  /// All the thread copies of the z-velocity variable
+  std::vector<MooseVariableFVReal *> _ws_complement;
+
   /// All the active and elements local to this process that exist on this object's subdomains
   std::unique_ptr<ConstElemRange> _elem_range;
 
@@ -268,6 +277,8 @@ private:
 
   /// A unity functor used in the epsilon virtual method
   const Moose::ConstantFunctor<ADReal> _unity_functor{1};
+
+  const Real _beta;
 };
 
 inline const Moose::FunctorBase<ADReal> & INSFVRhieChowInterpolator::epsilon(THREAD_ID) const

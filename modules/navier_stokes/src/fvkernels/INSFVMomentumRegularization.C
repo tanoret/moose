@@ -17,16 +17,16 @@ registerMooseObject("NavierStokesApp", INSFVMomentumRegularization);
 InputParameters
 INSFVMomentumRegularization::validParams()
 {
-  auto params = INSFVFluxKernel::validParams();
+  auto params = FVFluxKernel::validParams();
   params.addRequiredParam<MooseFunctorName>("filter_scaling", "alpha-regularization parameter for the NS equation");
   params.addClassDescription(
-      "Implements a mesh-based regularization kernel for the NAvier Stokes equation.");
+      "Implements a mesh-based regularization kernel for the Navier Stokes equation.");
   params.set<unsigned short>("ghost_layers") = 2;
   return params;
 }
 
 INSFVMomentumRegularization::INSFVMomentumRegularization(const InputParameters & params)
-  : INSFVFluxKernel(params), _filter_scaling(getFunctor<ADReal>("filter_scaling"))
+  : FVFluxKernel(params), _filter_scaling(getFunctor<ADReal>("filter_scaling"))
 {
 }
 
