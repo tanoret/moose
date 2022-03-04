@@ -1,4 +1,4 @@
-mu=0.001
+mu=1e-5
 rho=1
 advected_interp_method='average'
 velocity_interp_method='rc'
@@ -479,7 +479,9 @@ C_mu = 0.09
   type = Steady
   solve_type = 'NEWTON'
   petsc_options_iname = '-pc_type -ksp_gmres_restart -sub_pc_type -sub_pc_factor_shift_type'
-  petsc_options_value = 'asm      200                lu           NONZERO'
+  petsc_options_value = 'asm      200                ilu          NONZERO'
+  #petsc_options_iname = '-pc_type -pc_hypre_type'
+  #petsc_options_value = 'hypre boomeramg'
   line_search = 'none'
   nl_rel_tol = 1e-11
   nl_abs_tol = 1e-14
