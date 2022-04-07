@@ -271,12 +271,12 @@ INSFVRhieChowInterpolator::initialSetup()
         .template condition<AttribResidualObject>(true)
         .template condition<AttribSysNum>(_u->sys().number())
         .queryInto(var_objects);
-    for (auto * const var_object : var_objects)
-      if (!dynamic_cast<INSFVMomentumResidualObject *>(var_object))
-        mooseError("Object ",
-                   var_object->name(),
-                   " is not a INSFVMomentumResidualObject. Make sure that all the objects applied "
-                   "to the momentum equation are INSFV or derived objects.");
+    // for (auto * const var_object : var_objects)
+      // if (!dynamic_cast<INSFVMomentumResidualObject *>(var_object))
+      //   mooseError("Object ",
+      //              var_object->name(),
+      //              " is not a INSFVMomentumResidualObject. Make sure that all the objects applied "
+      //              "to the momentum equation are INSFV or derived objects.");
     if (var_objects.size() == 0 && !_a_data_provided)
       mooseError(
           "No INSFVKernels detected for the velocity variables. "
