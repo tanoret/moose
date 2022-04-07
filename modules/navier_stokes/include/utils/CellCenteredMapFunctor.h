@@ -19,7 +19,7 @@
 
 template <typename T, typename T2, typename std::enable_if<ScalarTraits<T>::value, int>::type = 0>
 inline TypeVector<typename CompareTypes<T, T2>::supertype>
-outer_product(const T & a, const TypeVector<T2> & b)
+outer_product_loc(const T & a, const TypeVector<T2> & b)
 {
   TypeVector<typename CompareTypes<T, T2>::supertype> ret;
   for (unsigned int i = 0; i < LIBMESH_DIM; i++)
@@ -143,10 +143,14 @@ private:
       const auto neighbor_arg = face.makeNeighbor();
       const auto linear_interp_gradient =
           fi.gC() * elem_gradient + (1 - fi.gC()) * this->gradient(neighbor_arg);
-      return linear_interp_gradient +
-             outer_product(((*this)(neighbor_arg) - (*this)(elem_arg)) / fi.dCFMag() -
-                               linear_interp_gradient * fi.eCF(),
-                           fi.eCF());
+
+      const auto a = ((*this)(neighbor_arg) - (*this)(elem_arg)) / fi.dCFMag() -
+                        linear_interp_gradient * fi.eCF();
+      const auto b = fi.eCF();
+      auto ret = fi.eCF();
+      for (unsigned int i = 0; i < LIBMESH_DIM; i++)
+        ret(i) = a * b(i);
+      return ret;
     }
 
     // One term expansion
