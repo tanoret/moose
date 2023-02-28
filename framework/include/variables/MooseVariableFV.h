@@ -210,6 +210,7 @@ public:
 
   const FieldVariableValue & uDot() const { return _element_data->uDot(); }
   const FieldVariableValue & sln() const override { return _element_data->sln(Moose::Current); }
+  const FieldVariableValue & slnPreviousNL() const { return _element_data->sln(Moose::PreviousNL); }
   const FieldVariableValue & slnOld() const override { return _element_data->sln(Moose::Old); }
   const FieldVariableValue & slnOlder() const override { return _element_data->sln(Moose::Older); }
   const FieldVariableGradient & gradSln() const override
