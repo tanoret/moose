@@ -53,4 +53,11 @@ protected:
 
   using DerivativeMaterialPropertyNameInterface::derivativePropertyNameFirst;
   using UserObjectInterface::getUserObject;
+
+  /// Parameters to perturb
+  const Real & _perturb_density;
+  const Real & _perturb_viscosity;
+  const Real & _perturb_cp;
+  const Real & _perturb_thermal_cond;
+
 };

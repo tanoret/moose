@@ -137,6 +137,11 @@ top_side_temperature = 150
     # For porous flow
     characteristic_length = 1
     porosity = 'porosity'
+
+    perturbation_cp = 1
+    perturbation_density = 1
+    perturbation_viscosity = 1
+    perturbation_thermal_cond = 1
   []
 []
 
@@ -153,8 +158,7 @@ top_side_temperature = 150
     type = ParsedAux
     variable = 'velocity_norm'
     coupled_variables = 'superficial_vel_x superficial_vel_y porosity'
-    expression = 'sqrt(superficial_vel_x*superficial_vel_x + superficial_vel_y*superficial_vel_y) / '
-               'porosity'
+    expression = 'sqrt(superficial_vel_x*superficial_vel_x + superficial_vel_y*superficial_vel_y) / porosity'
   []
 []
 
