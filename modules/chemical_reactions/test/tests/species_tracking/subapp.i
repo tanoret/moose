@@ -24,20 +24,18 @@
 []
 
 [UserObjects]
-  [isotopes_tracker]
+  [something]
     type = MagicBookSpecies
     isotopes_name = 'H1 H2 H3 Be4 Be5'
     # initial_value_isotopes = 2.0
-    intial_values_isotopes = '2.0 2.0 2.0 2.0 2.0'
-    uo_function = 'elements_to_isotopes'
-    link_via_multiapp = true
+    # intial_values_isotopes = '2.0 2.0 2.0 2.0 2.0'
+    uo_function = 'isotopes_to_elements'
     sub_filenames = 'subapp.i'
-    multiapp_execute_on = 'initial'
   []
 []
 
 [Postprocessors]
-  [average_h1]
+  [average_h1_sub]
     type = ElementAverageValue
     variable = H1
   []
@@ -55,7 +53,7 @@
   exodus = true
   [csv]
     type = CSV
-    file_base = 'main_app'
+    file_base = 'sub_app'
     time_data = true
   []
 []

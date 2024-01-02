@@ -68,4 +68,11 @@ private:
 
   // Enumerator to determine UO function
   MooseEnum _uo_function;
+
+  // MultiApp Related Parameters
+  bool _link_via_multiapp;
+  const std::vector<FileName> _sub_filenames;
+  ExecFlagEnum _execute_multiapp_instance;
+  std::vector<ExecFlagEnum> _execute_transfers_instance;
+  std::vector<MooseEnum> _transfer_type;
 };

@@ -9,7 +9,11 @@
 
 #include "MagicBookSpecies.h"
 #include "MooseVariableFV.h"
+#include "TransientMultiApp.h"
+#include "FullSolveMultiApp.h"
 #include "SystemBase.h"
+#include "MultiAppTransfer.h"
+#include "MultiAppCopyTransfer.h"
 
 registerMooseObject("ChemicalReactionsApp", MagicBookSpecies);
 
@@ -25,7 +29,6 @@ MagicBookSpecies::validParams()
                                      "Vector of initial values for all isotopes.");
 
   MooseEnum uo_function("isotopes_to_elements elements_to_isotopes", "isotopes_to_elements");
-
   params.addParam<MooseEnum>(
       "uo_function",
       uo_function,
@@ -33,6 +36,23 @@ MagicBookSpecies::validParams()
       "'isotopes_to_elements' computes elements concentrations from isotopes concentration. "
       "'elements_to_isotopes' computes isotopes concentrations from updates in element "
       "concentrations.");
+
+  params.addParam<bool>(
+      "link_via_multiapp", false, "Flag to determine if UO must be built via a MultiApp.");
+  params.addParam<std::vector<FileName>>("sub_filenames", "This is the filename of the sub.i file");
+  ExecFlagEnum exec_enum = MooseUtils::getDefaultExecFlagEnum();
+  exec_enum = {EXEC_INITIAL, EXEC_NONLINEAR, EXEC_TIMESTEP_END, EXEC_FINAL};
+  params.addParam<ExecFlagEnum>(
+      "multiapp_execute_on", exec_enum, "When will the multiapp be executed.");
+  params.addParam<std::vector<ExecFlagEnum>>(
+      "transfers_execute_on", {}, "When will each transfer be executed.");
+  MooseEnum transfer_type("isotopes elements all", "all");
+  params.addParam<std::vector<MooseEnum>>("transfer_type",
+                                          {transfer_type},
+                                          "What data to transfer between apps. "
+                                          "'isotopes: will only transfer isotopes. "
+                                          "'elements: will only transfer elements. '"
+                                          "'all: will transfer isotopes and elements.'");
   return params;
 }
 
@@ -48,7 +68,12 @@ MagicBookSpecies::MagicBookSpecies(const InputParameters & parameters)
     _initial_values_isotopes(parameters.isParamValid("intial_values_isotopes")
                                  ? getParam<std::vector<Real>>("intial_values_isotopes")
                                  : std::vector<Real>{}),
-    _uo_function(getParam<MooseEnum>("uo_function"))
+    _uo_function(getParam<MooseEnum>("uo_function")),
+    _link_via_multiapp(getParam<bool>("link_via_multiapp")),
+    _sub_filenames(getParam<std::vector<FileName>>("sub_filenames")),
+    _execute_multiapp_instance(getParam<ExecFlagEnum>("multiapp_execute_on")),
+    _execute_transfers_instance(getParam<std::vector<ExecFlagEnum>>("transfers_execute_on")),
+    _transfer_type(getParam<std::vector<MooseEnum>>("transfer_type"))
 {
   if (_isotopes_name.empty())
     mooseWarning("No isotope names were provided");
@@ -143,6 +168,140 @@ MagicBookSpecies::MagicBookSpecies(const InputParameters & parameters)
                  " is different that the number of ",
                  _initial_values_isotopes.size(),
                  " initial values provided");
+
+  // Setup MultiApps
+  if (_link_via_multiapp)
+  {
+    if (UserObject::_fe_problem.isTransient())
+    {
+      InputParameters multiapp_params = TransientMultiApp::validParams();
+      ExecFlagEnum execute_options = MooseUtils::getDefaultExecFlagEnum();
+      multiapp_params.set<ExecFlagEnum>("execute_on") =
+          _execute_multiapp_instance; // execute_options;
+      multiapp_params.set<std::vector<FileName>>("input_files") = _sub_filenames;
+      multiapp_params.addPrivateParam("_moose_app", &getMooseApp());
+      // multiapp_params.set<unsigned int>("max_procs_per_app") = 1;
+      // multiapp_params.set<std::vector<Point>>("positions") = {Point()};
+      UserObject::_fe_problem.addMultiApp(
+          "TransientMultiApp", "UOsharedTransfers", multiapp_params);
+    }
+    else
+    {
+      // Seting up MultiApp
+      InputParameters multiapp_params = FullSolveMultiApp::validParams();
+      ExecFlagEnum execute_options = MooseUtils::getDefaultExecFlagEnum();
+      multiapp_params.set<ExecFlagEnum>("execute_on") =
+          _execute_multiapp_instance; // execute_options;
+      multiapp_params.set<std::vector<FileName>>("input_files") = _sub_filenames;
+      multiapp_params.addPrivateParam("_moose_app", &getMooseApp());
+      // multiapp_params.set<unsigned int>("max_procs_per_app") = 1;
+      // multiapp_params.set<std::vector<Point>>("positions") = {Point()};
+      UserObject::_fe_problem.addMultiApp(
+          "FullSolveMultiApp", "UOsharedTransfers", multiapp_params);
+    }
+
+    // Setting up Trasnfers
+    // std::shared_ptr<MultiApp> getMultiApp(const std::string & multi_app_name);
+    const std::shared_ptr<MultiApp> to_multi_app =
+        UserObject::_fe_problem.getMultiApp("UOsharedTransfers");
+
+    // Make loop for many siblings
+    for (unsigned int i = 0; i < to_multi_app->numGlobalApps(); i++)
+    {
+
+      MooseEnum _loc_transfer_type = _transfer_type[i];
+
+      if (_loc_transfer_type == "isotopes" || _loc_transfer_type == "all")
+      {
+        InputParameters transfer_params = MultiAppCopyTransfer::validParams();
+        // const ExecFlagType execute_options_transfer = EXEC_TRANSFER;
+        if (_execute_transfers_instance.empty())
+          transfer_params.set<ExecFlagEnum>("execute_on") = _execute_multiapp_instance;
+        else
+          transfer_params.set<ExecFlagEnum>("execute_on") = _execute_transfers_instance[i];
+
+        transfer_params.addPrivateParam("_moose_app", &getMooseApp());
+
+        std::vector<AuxVariableName> isotope_names_aux_var;
+        isotope_names_aux_var.reserve(_isotopes_name.size());
+        std::transform(_isotopes_name.begin(),
+                       _isotopes_name.end(),
+                       std::back_inserter(isotope_names_aux_var),
+                       [](const std::string & name_str) { return AuxVariableName(name_str); });
+        transfer_params.set<std::vector<AuxVariableName>>("variable") = isotope_names_aux_var;
+
+        std::vector<VariableName> isotope_names_var;
+        isotope_names_var.reserve(_isotopes_name.size());
+        std::transform(_isotopes_name.begin(),
+                       _isotopes_name.end(),
+                       std::back_inserter(isotope_names_var),
+                       [](const std::string & name_str) { return VariableName(name_str); });
+        transfer_params.set<std::vector<VariableName>>("source_variable") = isotope_names_var;
+
+        transfer_params.set<MultiAppName>("from_multi_app") = "UOsharedTransfers";
+        transfer_params.set<MultiAppName>("to_multi_app") = "UOsharedTransfers";
+        UserObject::_fe_problem.addTransfer(
+            "MultiAppCopyTransfer", "isotopes_transfer", transfer_params);
+      }
+
+      if (_loc_transfer_type == "elements" || _loc_transfer_type == "all")
+      {
+        InputParameters transfer_params = MultiAppCopyTransfer::validParams();
+        // const ExecFlagType execute_options_transfer = EXEC_TRANSFER;
+        if (_execute_transfers_instance.empty())
+          transfer_params.set<ExecFlagEnum>("execute_on") = _execute_multiapp_instance;
+        else
+          transfer_params.set<ExecFlagEnum>("execute_on") = _execute_transfers_instance[i];
+
+        transfer_params.addPrivateParam("_moose_app", &getMooseApp());
+
+        std::vector<AuxVariableName> element_names_aux_var;
+        element_names_aux_var.reserve(_elements_name.size());
+        std::transform(_elements_name.begin(),
+                       _elements_name.end(),
+                       std::back_inserter(element_names_aux_var),
+                       [](const std::string & name_str) { return AuxVariableName(name_str); });
+        transfer_params.set<std::vector<AuxVariableName>>("variable") = element_names_aux_var;
+
+        std::vector<VariableName> element_names_var;
+        element_names_var.reserve(_elements_name.size());
+        std::transform(_elements_name.begin(),
+                       _elements_name.end(),
+                       std::back_inserter(element_names_var),
+                       [](const std::string & name_str) { return VariableName(name_str); });
+        transfer_params.set<std::vector<VariableName>>("source_variable") = element_names_var;
+
+        transfer_params.set<MultiAppName>("from_multi_app") = "UOsharedTransfers";
+        transfer_params.set<MultiAppName>("to_multi_app") = "UOsharedTransfers";
+        UserObject::_fe_problem.addTransfer(
+            "MultiAppCopyTransfer", "elements_transfer", transfer_params);
+      }
+    }
+  }
+
+  // To multiapp
+  // // std::shared_ptr<MultiApp> getMultiApp(const std::string & multi_app_name);
+  // const std::shared_ptr<MultiApp> to_multi_app =
+  //     UserObject::_fe_problem.getMultiApp("UOsharedTransfers");
+
+  // // Make loop for many siblings
+  // for (unsigned int i = 0; i < to_multi_app->numGlobalApps(); i++)
+  // {
+
+  //   FEProblemBase & app_problem = to_multi_app->appProblemBase(i);
+  //   if (app_problem.hasUserObject("isotopes_tracker"))
+  //   {
+  //     const auto & sibling_uo = app_problem.getUserObject<MagicBookSpecies>("isotopes_tracker");
+  //   }
+  // }
+
+  // auto params = _factory.getValidParams("SamplerParameterTransfer");
+  // params.set<MultiAppName>("to_multi_app") = multiappName();
+  // params.set<SamplerName>("sampler") = samplerName();
+  // params.set<std::vector<std::string>>("parameters") = _parameters;
+  // _problem->addTransfer("SamplerParameterTransfer", parameterTransferName(), params);
+  // if (_show_objects)
+  //   showObject("SamplerParameterTransfer", parameterTransferName(), params);
 }
 
 void
@@ -198,16 +357,17 @@ MagicBookSpecies::initialSetup()
 void
 MagicBookSpecies::execute()
 {
-  if (_uo_function == "isotopes_to_elements")
-    this->updateElementConcentrationFromIsotopes();
-
-  if (_uo_function == "elements_to_isotopes")
-    this->updateIsotopeConecentrationFromElements();
+  _console << "Tu vieja - problem: " << &_isotopes << std::endl;
 }
 
 void
 MagicBookSpecies::finalize()
 {
+  if (_uo_function == "isotopes_to_elements")
+    this->updateElementConcentrationFromIsotopes();
+
+  if (_uo_function == "elements_to_isotopes")
+    this->updateIsotopeConecentrationFromElements();
 }
 
 void
