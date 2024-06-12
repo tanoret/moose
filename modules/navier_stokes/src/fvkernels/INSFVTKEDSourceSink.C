@@ -161,6 +161,7 @@ INSFVTKEDSourceSink::computeQpResidual()
 
     residual = _var(makeElemArg(_current_elem), state) - destruction;
   }
+
   else
   {
     const auto & grad_u = _u_var.gradient(elem_arg, state);
@@ -226,8 +227,10 @@ INSFVTKEDSourceSink::computeQpResidual()
     // Apply production limiter
     production_k = min(production_k, production_limit);
 
-    const auto time_scale = raw_value(TKE_old) / raw_value(eps_old);
+    const auto time_scale = raw_value(_k(elem_arg, old_state) / _var(elem_arg, old_state));
+
     production = _C1_eps * production_k / time_scale;
+
     destruction = _C2_eps * rho * _var(elem_arg, state) / time_scale;
 
     residual = destruction - production;
