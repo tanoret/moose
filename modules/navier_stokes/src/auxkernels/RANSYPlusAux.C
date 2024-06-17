@@ -97,18 +97,22 @@ RANSYPlusAux::computeValue()
           velocity - velocity * face_info_vec[i]->normal() * face_info_vec[i]->normal());
       const auto distance = distance_vec[i];
 
-      if (_wall_treatment == NS::WallTreatmentEnum::NEQ)
-        // Non-equilibrium / Non-iterative
-        y_plus = std::pow(_C_mu, 0.25) * distance * std::sqrt((*_k)(elem_arg, state)) * rho / mu;
-      else
+      if (_wall_treatment == NS::WallTreatmentEnum::NEQ) // Non-equilibrium / Non-iterative
+        y_plus = std::pow(_C_mu, 0.25) * distance * std::sqrt(_k(elem_arg, state)) * rho / mu;
+    }
+    else
         // Equilibrium / Iterative
         y_plus = NS::findyPlus<Real>(mu, rho, std::max(parallel_speed, 1e-10), distance);
 
-      y_plus_vec.push_back(y_plus);
-    }
-    // Return average of y+ for cells with multiple wall faces
-    return std::accumulate(y_plus_vec.begin(), y_plus_vec.end(), 0.0) / y_plus_vec.size();
+<<<<<<< HEAD
+    y_plus_vec.push_back(y_plus);
   }
-  else
-    return 0.;
+=======
+    y_plus_vec.push_back(raw_value(y_plus));
+
+>>>>>>> 35ff4aa59e (Apply suggestions from code review @tanoret #27800 #27887 #27888)
+  // Return average of y+ for cells with multiple wall faces
+  return std::accumulate(y_plus_vec.begin(), y_plus_vec.end(), 0.0) / y_plus_vec.size();
+}
+else return 0.;
 }
