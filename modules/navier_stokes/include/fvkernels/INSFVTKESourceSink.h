@@ -39,7 +39,10 @@ protected:
   const Moose::Functor<ADReal> * _w_var;
 
   /// epsilon - dissipation rate of TKE
-  const Moose::Functor<ADReal> & _epsilon;
+  const Moose::Functor<ADReal> * _epsilon;
+
+  /// omega - dissipation rate of TKE
+  const Moose::Functor<ADReal> * _omega;
 
   /// Density
   const Moose::Functor<ADReal> & _rho;
@@ -53,17 +56,20 @@ protected:
   /// Wall boundaries
   const std::vector<BoundaryName> & _wall_boundary_names;
 
-  /// Maximum mixing length allowed for the domain
-  const Real _max_mixing_length;
-
   /// Linearized model?
   const bool _linearized_model;
 
-  /// No equilibrium treatement
-  const bool _non_equilibrium_treatment;
+  /// Method used for wall treatment
+  const MooseEnum _wall_treatment;
 
   /// C_mu constant
   const Real _C_mu;
+
+  // Production Limiter Constant
+  const Real _C_pl;
+
+  /// F1 blending function
+  const Moose::Functor<ADReal> * _F1;
 
   ///@{
   /// Maps for wall treatement
@@ -71,4 +77,9 @@ protected:
   std::map<const Elem *, std::vector<Real>> _dist;
   std::map<const Elem *, std::vector<const FaceInfo *>> _face_infos;
   ///@}
+
+  // Closure coefficients for kOmega SST model
+  static constexpr Real _beta_infty = 0.09;
+  static constexpr Real _beta_i_1 = 0.075;
+  static constexpr Real _beta_R = 8.0;
 };

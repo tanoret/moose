@@ -10,9 +10,9 @@
 ##########################################################
 
 H = 1 #halfwidth of the channel
-L = 30
+L = 120
 
-Re = 13700
+Re = 22250
 
 rho = 1
 bulk_u = 1
@@ -37,19 +37,16 @@ eps_init = '${fparse C_mu^0.75 * k_init^1.5 / H}'
 ### Modeling parameters ###
 bulk_wall_treatment = false
 walls = 'top'
-wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized, neq
+wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
 
 [Mesh]
   [gen]
-    type = GeneratedMeshGenerator
+    type = CartesianMeshGenerator
     dim = 2
-    xmin = 0
-    xmax = ${L}
-    ymin = 0
-    ymax = ${H}
-    nx = 20
-    ny = 5
-    bias_y = 0.7
+    dx = '${L}'
+    dy = '0.84 0.16'
+    ix = '400'
+    iy = '35 1'
   []
 []
 
@@ -204,6 +201,7 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     mu_t = 'mu_t'
     walls = ${walls}
     wall_treatment = ${wall_treatment}
+    F1 = 1.0
   []
 
   [TKED_advection]
@@ -239,6 +237,7 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     walls = ${walls}
     wall_treatment = ${wall_treatment}
   []
+
 []
 
 [FVBCs]
@@ -280,6 +279,12 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     v = vel_y
     intensity = ${intensity}
   []
+  # [inlet_TKE]
+  #   type = FVDirichletBC
+  #   boundary = 'left'
+  #   variable = TKE
+  #   value = 1.5e-4
+  # []
   [inlet_TKED]
     type = INSFVMixingLengthTKEDBC
     boundary = 'left'
@@ -287,6 +292,12 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     k = TKE
     characteristic_length = '${fparse 2*H}'
   []
+  # [inlet_TKED]
+  #   type = FVDirichletBC
+  #   boundary = 'left'
+  #   variable = TKED
+  #   value = 1.18e-6
+  # []
   [walls_mu_t]
     type = INSFVTurbulentViscosityWallFunction
     boundary = 'top'
@@ -305,7 +316,7 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     variable = vel_x
     u = vel_x
     v = vel_y
-    mu = 'mu_t'
+    mu = mu_eff #'mu_t'
     momentum_component = x
   []
   [sym-v]
@@ -314,7 +325,7 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     variable = vel_y
     u = vel_x
     v = vel_y
-    mu = 'mu_t'
+    mu = mu_eff #'mu_t'
     momentum_component = y
   []
   [symmetry_pressure]
@@ -340,6 +351,10 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     initial_condition = '${fparse rho * C_mu * ${k_init}^2 / eps_init}'
     two_term_boundary_expansion = false
   []
+  [mu_eff]
+    type = MooseVariableFVReal
+    two_term_boundary_expansion = false
+  []
   # [yplus]
   #   type = MooseVariableFVReal
   #   two_term_boundary_expansion = false
@@ -362,6 +377,12 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     wall_treatment = ${wall_treatment}
     execute_on = 'NONLINEAR'
   []
+  [compute_mu_eff]
+    type = ParsedAux
+    variable = mu_eff
+    coupled_variables = 'mu_t'
+    expression = '${mu} + mu_t'
+  []
   # [compute_y_plus]
   #   type = RANSYPlusAux
   #   variable = yplus
@@ -371,7 +392,6 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
   #   u = vel_x
   #   v = vel_y
   #   walls = ${walls}
-  #   wall_treatment = ${wall_treatment}
   #   execute_on = 'NONLINEAR'
   # []
 []
@@ -387,7 +407,7 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
   momentum_equation_relaxation = 0.7
   pressure_variable_relaxation = 0.3
   turbulence_equation_relaxation = '0.25 0.25'
-  num_iterations = 1000
+  num_iterations = 500
   pressure_absolute_tolerance = 1e-12
   momentum_absolute_tolerance = 1e-12
   turbulence_absolute_tolerance = '1e-12 1e-12'

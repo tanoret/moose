@@ -9,28 +9,26 @@
 
 #pragma once
 
-#include "FVElementalKernel.h"
-#include "MathFVUtils.h"
-#include "INSFVMomentumResidualObject.h"
+#include "AuxKernel.h"
 #include "INSFVVelocityVariable.h"
 
 /**
- * Computes the source and sink terms for the turbulent kinetic energy dissipation rate.
+ * Computes the turbuent viscosity for the k-Epsilon model.
+ * Implements two near-wall treatments: equilibrium and non-equilibrium wall functions.
  */
-class INSFVTKEDSourceSink : public FVElementalKernel
+class kOmegaSSTViscosityAux : public AuxKernel
 {
 public:
   static InputParameters validParams();
 
   virtual void initialSetup() override;
 
-  INSFVTKEDSourceSink(const InputParameters & parameters);
+  kOmegaSSTViscosityAux(const InputParameters & parameters);
 
 protected:
-  ADReal computeQpResidual() override;
+  virtual Real computeValue() override;
 
-protected:
-  /// The dimension of the simulation
+  /// The dimension of the domain
   const unsigned int _dim;
 
   /// x-velocity
@@ -42,49 +40,40 @@ protected:
 
   /// Turbulent kinetic energy
   const Moose::Functor<ADReal> & _k;
+  /// Turbulent kinetic energy specific dissipation rate
+  const Moose::Functor<ADReal> & _omega;
 
   /// Density
   const Moose::Functor<ADReal> & _rho;
-
   /// Dynamic viscosity
   const Moose::Functor<ADReal> & _mu;
 
-  /// Turbulent dynamic viscosity
-  const Moose::Functor<ADReal> & _mu_t;
+  /// F2 blending function
+  const Moose::Functor<ADReal> & _F2;
 
   /// Wall boundaries
   const std::vector<BoundaryName> & _wall_boundary_names;
 
-  /// If the user wants to use the linearized model
-  const bool _linearized_model;
+  /// If the user wants to enable bulk wall treatment
+  const bool _bulk_wall_treatment;
 
   /// Method used for wall treatment
   const MooseEnum _wall_treatment;
 
-  /// Value of the first epsilon closure coefficient
-  const Real _C1_eps;
-
-  /// Value of the second epsilon closure coefficient
-  const Real _C2_eps;
-
-  /// C_mu constant
-  const Real _C_mu;
-
-  // Production Limiter Constant
-  const Real _C_pl;
-
-  /// Stored strain rate
-  std::map<const Elem *, Real> _symmetric_strain_tensor_norm_old;
-  /// Map for the previous destruction field
-  std::map<const Elem *, Real> _old_destruction;
-
-  /// Map for the previous nonlienar iterate
-  std::map<const Elem *, Real> _pevious_nl_sol;
+  /// Method used to limit the k-e time scale
+  const MooseEnum _scale_limiter;
 
   ///@{
-  /** Maps for wall treatment */
+  /// Maps for wall bounded elements
   std::map<const Elem *, bool> _wall_bounded;
   std::map<const Elem *, std::vector<Real>> _dist;
   std::map<const Elem *, std::vector<const FaceInfo *>> _face_infos;
   ///@}
+
+  /// Model constants
+  static constexpr Real _C_mu = 0.09;
+  static constexpr Real _R_k = 6.0;
+  static constexpr Real _alpha_0_star = 0.072 / 3.0;
+  static constexpr Real _alpha_infty_star = 1.0;
+  static constexpr Real _a_1 = 0.31;
 };

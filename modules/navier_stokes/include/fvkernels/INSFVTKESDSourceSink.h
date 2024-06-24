@@ -17,14 +17,14 @@
 /**
  * Computes the source and sink terms for the turbulent kinetic energy dissipation rate.
  */
-class INSFVTKEDSourceSink : public FVElementalKernel
+class INSFVTKESDSourceSink : public FVElementalKernel
 {
 public:
   static InputParameters validParams();
 
   virtual void initialSetup() override;
 
-  INSFVTKEDSourceSink(const InputParameters & parameters);
+  INSFVTKESDSourceSink(const InputParameters & parameters);
 
 protected:
   ADReal computeQpResidual() override;
@@ -61,17 +61,8 @@ protected:
   /// Method used for wall treatment
   const MooseEnum _wall_treatment;
 
-  /// Value of the first epsilon closure coefficient
-  const Real _C1_eps;
-
-  /// Value of the second epsilon closure coefficient
-  const Real _C2_eps;
-
-  /// C_mu constant
-  const Real _C_mu;
-
-  // Production Limiter Constant
-  const Real _C_pl;
+  /// F1 blending function
+  const Moose::Functor<ADReal> & _F1;
 
   /// Stored strain rate
   std::map<const Elem *, Real> _symmetric_strain_tensor_norm_old;
@@ -87,4 +78,23 @@ protected:
   std::map<const Elem *, std::vector<Real>> _dist;
   std::map<const Elem *, std::vector<const FaceInfo *>> _face_infos;
   ///@}
+
+  /// Model constants
+  static constexpr Real _C_mu = 0.09;
+  static constexpr Real _beta_R = 8.0;
+  static constexpr Real _beta_i_1 = 0.075;
+  static constexpr Real _beta_i_2 = 0.0828;
+  static constexpr Real _chi_star = 1.5;
+  static constexpr Real _beta_infty = 0.09;
+  static constexpr Real _alpha_0 = 1.0 / 9.0;
+  static constexpr Real _alpha_infty_star = 1.0;
+  static constexpr Real _R_k = 6.0;
+  static constexpr Real _R_omega = 2.95;
+  static constexpr Real _sigma_omega_1 = 2.000;
+  static constexpr Real _sigma_omega_2 = 1.168;
+
+  static constexpr Real _alpha_infty_1 =
+      _beta_i_1 / _beta_infty - 0.1681 / (_sigma_omega_1 * std::sqrt(_beta_infty));
+  static constexpr Real _alpha_infty_2 =
+      _beta_i_2 / _beta_infty - 0.1681 / (_sigma_omega_2 * std::sqrt(_beta_infty));
 };

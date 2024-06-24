@@ -7,16 +7,16 @@
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
-#include "kEpsilonViscosityAux.h"
+#include "kOmegaSSTViscosityAux.h"
 #include "NavierStokesMethods.h"
 #include "NS.h"
 #include "NonlinearSystemBase.h"
 #include "libmesh/nonlinear_solver.h"
 
-registerMooseObject("NavierStokesApp", kEpsilonViscosityAux);
+registerMooseObject("NavierStokesApp", kOmegaSSTViscosityAux);
 
 InputParameters
-kEpsilonViscosityAux::validParams()
+kOmegaSSTViscosityAux::validParams()
 {
   InputParameters params = AuxKernel::validParams();
   params.addClassDescription(
@@ -25,10 +25,11 @@ kEpsilonViscosityAux::validParams()
   params.addParam<MooseFunctorName>("v", "The velocity in the y direction.");
   params.addParam<MooseFunctorName>("w", "The velocity in the z direction.");
   params.addRequiredParam<MooseFunctorName>(NS::TKE, "Coupled turbulent kinetic energy.");
-  params.addRequiredParam<MooseFunctorName>(NS::TKED,
-                                            "Coupled turbulent kinetic energy dissipation rate.");
+  params.addRequiredParam<MooseFunctorName>(
+      NS::TKESD, "Coupled turbulent kinetic energy specific dissipation rate.");
   params.addRequiredParam<MooseFunctorName>(NS::density, "Density");
   params.addRequiredParam<MooseFunctorName>(NS::mu, "Dynamic viscosity.");
+  params.addRequiredParam<MooseFunctorName>("F2", "The F2 blending function.");
   params.addParam<Real>("C_mu", "Coupled turbulent kinetic energy closure.");
   params.addParam<std::vector<BoundaryName>>(
       "walls", {}, "Boundaries that correspond to solid walls.");
@@ -46,17 +47,17 @@ kEpsilonViscosityAux::validParams()
   return params;
 }
 
-kEpsilonViscosityAux::kEpsilonViscosityAux(const InputParameters & params)
+kOmegaSSTViscosityAux::kOmegaSSTViscosityAux(const InputParameters & params)
   : AuxKernel(params),
     _dim(_subproblem.mesh().dimension()),
     _u_var(getFunctor<ADReal>("u")),
     _v_var(params.isParamValid("v") ? &(getFunctor<ADReal>("v")) : nullptr),
     _w_var(params.isParamValid("w") ? &(getFunctor<ADReal>("w")) : nullptr),
     _k(getFunctor<ADReal>(NS::TKE)),
-    _epsilon(getFunctor<ADReal>(NS::TKED)),
+    _omega(getFunctor<ADReal>(NS::TKESD)),
     _rho(getFunctor<ADReal>(NS::density)),
     _mu(getFunctor<ADReal>(NS::mu)),
-    _C_mu(getParam<Real>("C_mu")),
+    _F2(getFunctor<ADReal>("F2")),
     _wall_boundary_names(getParam<std::vector<BoundaryName>>("walls")),
     _bulk_wall_treatment(getParam<bool>("bulk_wall_treatment")),
     _wall_treatment(getParam<MooseEnum>("wall_treatment")),
@@ -65,7 +66,7 @@ kEpsilonViscosityAux::kEpsilonViscosityAux(const InputParameters & params)
 }
 
 void
-kEpsilonViscosityAux::initialSetup()
+kOmegaSSTViscosityAux::initialSetup()
 {
   if (!_wall_boundary_names.empty())
   {
@@ -78,12 +79,13 @@ kEpsilonViscosityAux::initialSetup()
 }
 
 Real
-kEpsilonViscosityAux::computeValue()
+kOmegaSSTViscosityAux::computeValue()
 {
   // Convenient Arguments
   const Elem & elem = *_current_elem;
   const auto current_argument = makeElemArg(_current_elem);
-  const Moose::StateArg state = determineState();
+  const Moose::StateArg state =
+      Moose::StateArg(1, Moose::SolutionIterationType::Nonlinear); // determineState();
   const auto rho = _rho(makeElemArg(_current_elem), state);
   const auto mu = _mu(makeElemArg(_current_elem), state);
   const auto nu = mu / rho;
@@ -181,21 +183,85 @@ kEpsilonViscosityAux::computeValue()
   }
   else
   {
-    ADReal time_scale;
-    if (_scale_limiter == "standard")
+
+    // Useful variables
+    const auto rho = _rho(current_argument, state);
+    const auto TKE = _k(current_argument, state);
+    const auto omega_capped = std::max(_omega(current_argument, state), 1e-10);
+
+    // Computing bulk scaling
+    // const auto Re_shear = rho * TKE / (_mu(current_argument, state) * omega_capped);
+    // const auto Re_k_alpha_ratio = Re_shear / _R_k;
+    // const auto inv_alpha_star =
+    //     (1.0 + Re_k_alpha_ratio) / (_alpha_infty_star * (_alpha_0_star + Re_k_alpha_ratio));
+
+    // Computing wall scaling
+    const auto & grad_u = _u_var.gradient(current_argument, state);
+    const auto Sij_xx = 2.0 * grad_u(0);
+    ADReal Sij_xy = 0.0;
+    ADReal Sij_xz = 0.0;
+    ADReal Sij_yy = 0.0;
+    ADReal Sij_yz = 0.0;
+    ADReal Sij_zz = 0.0;
+
+    const auto grad_xx = grad_u(0);
+    ADReal grad_xy = 0.0;
+    ADReal grad_xz = 0.0;
+    ADReal grad_yx = 0.0;
+    ADReal grad_yy = 0.0;
+    ADReal grad_yz = 0.0;
+    ADReal grad_zx = 0.0;
+    ADReal grad_zy = 0.0;
+    ADReal grad_zz = 0.0;
+
+    auto trace = Sij_xx / 3.0;
+
+    if (_dim >= 2)
     {
-      time_scale =
-          std::max(_k(current_argument, state) / (_epsilon(current_argument, state) + 1e-15),
-                   std::sqrt(nu / (_epsilon(current_argument, state) + 1e-15)));
-    }
-    else
-    {
-      time_scale = _k(current_argument, state) / (_epsilon(current_argument, state) + 1e-15);
+      const auto & grad_v = (*_v_var).gradient(current_argument, state);
+      Sij_xy = grad_u(1) + grad_v(0);
+      Sij_yy = 2.0 * grad_v(1);
+
+      grad_xy = grad_u(1);
+      grad_yx = grad_v(0);
+      grad_yy = grad_v(1);
+
+      trace += Sij_yy / 3.0;
+
+      if (_dim >= 3)
+      {
+        const auto & grad_w = (*_w_var).gradient(current_argument, state);
+
+        Sij_xz = grad_u(2) + grad_w(0);
+        Sij_yz = grad_v(2) + grad_w(1);
+        Sij_zz = 2.0 * grad_w(2);
+
+        grad_xz = grad_u(2);
+        grad_yz = grad_v(2);
+        grad_zx = grad_w(0);
+        grad_zy = grad_w(1);
+        grad_zz = grad_w(2);
+
+        trace += Sij_zz / 3.0;
+      }
     }
 
-    const ADReal mu_t_nl =
-        _rho(current_argument, state) * _C_mu * _k(current_argument, state) * time_scale;
-    mu_t = mu_t_nl.value();
+    const auto symmetric_strain_tensor_norm =
+        std::sqrt((Sij_xx - trace) * grad_xx + Sij_xy * grad_xy + Sij_xz * grad_xz +
+                  Sij_xy * grad_yx + (Sij_yy - trace) * grad_yy + Sij_yz * grad_yz +
+                  Sij_xz * grad_zx + Sij_yz * grad_zy + (Sij_zz - trace) * grad_zz);
+
+    // const auto inv_wall_strain_rate =
+    //     symmetric_strain_tensor_norm * _F2(current_argument, state) / _a_1 / omega_capped;
+
+    // // Returning viscosity
+    // const auto base_mut = rho * TKE / omega_capped;
+    // const ADReal mu_t_nl = base_mut / std::max(inv_alpha_star, inv_wall_strain_rate);
+    // mu_t = mu_t_nl.value();
+
+    const auto T = std::min(1.0 / omega_capped,
+                            _a_1 / symmetric_strain_tensor_norm / _F2(current_argument, state));
+    mu_t = (rho * TKE * T).value();
   }
 
   return mu_t;

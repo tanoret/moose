@@ -7,26 +7,24 @@
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
-#include "INSFVTKESourceSink.h"
+#include "INSFVTKESDSourceSink.h"
 #include "NS.h"
 #include "NonlinearSystemBase.h"
 #include "NavierStokesMethods.h"
 #include "libmesh/nonlinear_solver.h"
 
-registerMooseObject("NavierStokesApp", INSFVTKESourceSink);
+registerMooseObject("NavierStokesApp", INSFVTKESDSourceSink);
 
 InputParameters
-INSFVTKESourceSink::validParams()
+INSFVTKESDSourceSink::validParams()
 {
   InputParameters params = FVElementalKernel::validParams();
   params.addClassDescription("Elemental kernel to compute the production and destruction "
-                             " terms of turbulent kinetic energy (TKE).");
+                             " terms of turbulent kinetic energy dissipation (TKESD).");
   params.addRequiredParam<MooseFunctorName>("u", "The velocity in the x direction.");
   params.addParam<MooseFunctorName>("v", "The velocity in the y direction.");
   params.addParam<MooseFunctorName>("w", "The velocity in the z direction.");
-  params.addParam<MooseFunctorName>(NS::TKED, "Coupled turbulent kinetic energy dissipation rate.");
-  params.addParam<MooseFunctorName>(NS::TKESD,
-                                    "Coupled specific turbulent kinetic energy dissipation rate.");
+  params.addRequiredParam<MooseFunctorName>(NS::TKE, "Coupled turbulent kinetic energy.");
   params.addRequiredParam<MooseFunctorName>(NS::density, "fluid density");
   params.addRequiredParam<MooseFunctorName>(NS::mu, "Dynamic viscosity.");
   params.addRequiredParam<MooseFunctorName>(NS::mu_t, "Turbulent viscosity.");
@@ -35,54 +33,41 @@ INSFVTKESourceSink::validParams()
   params.addParam<bool>(
       "linearized_model",
       true,
-      "Boolean to determine if the problem should be use in a linear or nonlinear solve.");
+      "Boolean to determine if the problem should be used in a linear or nonlinear solve");
   MooseEnum wall_treatment("eq_newton eq_incremental eq_linearized neq", "eq_newton");
   params.addParam<MooseEnum>("wall_treatment",
                              wall_treatment,
                              "The method used for computing the wall functions "
                              "'eq_newton', 'eq_incremental', 'eq_linearized', 'neq'");
-  params.addParam<Real>("C_mu", 0.09, "Coupled turbulent kinetic energy closure.");
-  params.addParam<Real>("C_pl", 10.0, "Production Limiter Constant Multiplier.");
   params.addRequiredParam<MooseFunctorName>("F1", "The F1 blending function.");
   params.set<unsigned short>("ghost_layers") = 2;
-
   return params;
 }
 
-INSFVTKESourceSink::INSFVTKESourceSink(const InputParameters & params)
+INSFVTKESDSourceSink::INSFVTKESDSourceSink(const InputParameters & params)
   : FVElementalKernel(params),
     _dim(_subproblem.mesh().dimension()),
     _u_var(getFunctor<ADReal>("u")),
     _v_var(params.isParamValid("v") ? &(getFunctor<ADReal>("v")) : nullptr),
     _w_var(params.isParamValid("w") ? &(getFunctor<ADReal>("w")) : nullptr),
-    _epsilon(params.isParamValid(NS::TKED) ? &(getFunctor<ADReal>(NS::TKED)) : nullptr),
-    _omega(params.isParamValid(NS::TKESD) ? &(getFunctor<ADReal>(NS::TKESD)) : nullptr),
+    _k(getFunctor<ADReal>(NS::TKE)),
     _rho(getFunctor<ADReal>(NS::density)),
     _mu(getFunctor<ADReal>(NS::mu)),
     _mu_t(getFunctor<ADReal>(NS::mu_t)),
     _wall_boundary_names(getParam<std::vector<BoundaryName>>("walls")),
     _linearized_model(getParam<bool>("linearized_model")),
     _wall_treatment(getParam<MooseEnum>("wall_treatment")),
-    _C_mu(getParam<Real>("C_mu")),
-    _C_pl(getParam<Real>("C_pl")),
-    _F1(params.isParamValid("F1") ? &(getFunctor<ADReal>("F1")) : nullptr)
+    _F1(getFunctor<ADReal>("F1"))
 {
   if (_dim >= 2 && !_v_var)
     paramError("v", "In two or more dimensions, the v velocity must be supplied!");
 
   if (_dim >= 3 && !_w_var)
     paramError("w", "In three or more dimensions, the w velocity must be supplied!");
-
-  if (_epsilon && _omega)
-    mooseError("Both epsilon and omega where provided to the TKESourceSink kernel, only one of "
-               "them can be provided.");
-
-  if (!(_epsilon || _omega))
-    mooseError("Neither epsilon, nor omega where provided to the TKESourceSink kernel.");
 }
 
 void
-INSFVTKESourceSink::initialSetup()
+INSFVTKESDSourceSink::initialSetup()
 {
   NS::getWallBoundedElements(
       _wall_boundary_names, _fe_problem, _subproblem, blockIDs(), _wall_bounded);
@@ -91,22 +76,23 @@ INSFVTKESourceSink::initialSetup()
 }
 
 ADReal
-INSFVTKESourceSink::computeQpResidual()
+INSFVTKESDSourceSink::computeQpResidual()
 {
   ADReal residual = 0.0;
   ADReal production = 0.0;
   ADReal destruction = 0.0;
-
-  const auto state = determineState();
   const auto elem_arg = makeElemArg(_current_elem);
+  const auto state = determineState();
   const auto old_state =
       _linearized_model ? Moose::StateArg(1, Moose::SolutionIterationType::Nonlinear) : state;
-  const auto rho = _rho(elem_arg, state);
   const auto mu = _mu(elem_arg, state);
+  const auto rho = _rho(elem_arg, state);
+  const auto TKE = _k(elem_arg, old_state);
+  ADReal y_plus;
 
   if (_wall_bounded.find(_current_elem) != _wall_bounded.end())
   {
-    std::vector<ADReal> y_plus_vec, velocity_grad_norm_vec;
+    std::vector<ADReal> y_plus_vec;
 
     Real tot_weight = 0.0;
 
@@ -121,43 +107,23 @@ INSFVTKESourceSink::computeQpResidual()
 
     for (unsigned int i = 0; i < distance_vec.size(); i++)
     {
-      const auto parallel_speed = NS::computeSpeed(
-          velocity - velocity * face_info_vec[i]->normal() * face_info_vec[i]->normal());
       const auto distance = distance_vec[i];
 
-      ADReal y_plus;
       if (_wall_treatment == "neq")
       {
         // Non-equilibrium / Non-iterative
-        y_plus = distance * std::sqrt(std::sqrt(_C_mu) * _var(elem_arg, old_state)) * rho / mu;
+        y_plus = distance * std::sqrt(std::sqrt(_C_mu) * TKE) * rho / mu;
       }
       else
       {
         // Equilibrium / Iterative
+        const auto parallel_speed = NS::computeSpeed(
+            velocity - velocity * face_info_vec[i]->normal() * face_info_vec[i]->normal());
+
         y_plus = NS::findyPlus(mu, rho, std::max(parallel_speed, 1e-10), distance);
       }
 
       y_plus_vec.push_back(y_plus);
-
-      const ADReal velocity_grad_norm = parallel_speed / distance;
-
-      /// Do not erase!!
-      // More complete expansion for velocity gradient. Leave commented for now.
-      // Will be useful later when doing two-phase or compressible flow
-      // ADReal velocity_grad_norm_sq =
-      //     Utility::pow<2>(_u_var->gradient(elem_arg, state) *
-      //                     _normal[_current_elem][i]);
-      // if (_dim >= 2)
-      //   velocity_grad_norm_sq +=
-      //       Utility::pow<2>(_v_var->gradient(elem_arg, state) *
-      //                       _normal[_current_elem][i]);
-      // if (_dim >= 3)
-      //   velocity_grad_norm_sq +=
-      //       Utility::pow<2>(_w_var->gradient(elem_arg, state) *
-      //                       _normal[_current_elem][i]);
-      // ADReal velocity_grad_norm = std::sqrt(velocity_grad_norm_sq);
-
-      velocity_grad_norm_vec.push_back(velocity_grad_norm);
 
       tot_weight += 1.0;
     }
@@ -165,37 +131,35 @@ INSFVTKESourceSink::computeQpResidual()
     for (unsigned int i = 0; i < y_plus_vec.size(); i++)
     {
       const auto y_plus = y_plus_vec[i];
-
+      const auto u_tau_2 = std::sqrt(_C_mu) * TKE;
       const auto fi = face_info_vec[i];
       const bool defined_on_elem_side = _var.hasFaceSide(*fi, true);
       const Elem * const loc_elem = defined_on_elem_side ? &fi->elem() : fi->neighborPtr();
       const Moose::FaceArg facearg = {
           fi, Moose::FV::LimiterType::CentralDifference, false, false, loc_elem};
-      const ADReal wall_mut = _mu_t(facearg, state);
-      const ADReal wall_mu = _mu(facearg, state);
 
-      const auto destruction_visc =
-          2.0 * wall_mu / rho / Utility::pow<2>(distance_vec[i]) / tot_weight;
-      const auto destruction_log = std::pow(_C_mu, 0.75) * rho *
-                                   std::pow(_var(elem_arg, old_state), 0.5) /
-                                   (NS::von_karman_constant * distance_vec[i]) / tot_weight;
-      const auto tau_w = (wall_mut + wall_mu) * velocity_grad_norm_vec[i];
-
-      if (y_plus < 11.25)
-        destruction += destruction_visc;
-      else
-      {
-        destruction += destruction_log;
-        production += tau_w * std::pow(_C_mu, 0.25) / std::sqrt(_var(elem_arg, old_state) + 1e-10) /
-                      (NS::von_karman_constant * distance_vec[i]) / tot_weight;
-      }
+      if (y_plus <= 11.25)
+        destruction += 6.0 * _mu(facearg, state) / _rho(facearg, state) / _beta_i_1 /
+                       Utility::pow<2>(distance_vec[i]) / tot_weight;
+      // 6.0 * _rho(facearg, state) * u_tau_2 / _mu(facearg, state) / _beta_i_1 /
+      //                Utility::pow<2>(y_plus_vec[i]) / tot_weight;
+      else // if (y_plus >= 30.0)
+        destruction += std::sqrt(TKE) / std::pow(_C_mu, 0.25) /
+                       (NS::von_karman_constant * distance_vec[i]) / tot_weight;
+      // else
+      // {
+      //   const auto des_l = 6.0 / _beta_i_1 / Utility::pow<2>(y_plus_vec[i]) / tot_weight;
+      //   const auto des_t =
+      //       1.0 / std::sqrt(_beta_infty) / NS::von_karman_constant / y_plus_vec[i] / tot_weight;
+      //   destruction +=
+      //       _rho(facearg, state) * u_tau_2 / _mu(facearg, state) * std::sqrt(des_l + des_t);
+      // }
     }
 
-    residual = (destruction - production) * _var(elem_arg, state);
+    residual = _var(makeElemArg(_current_elem), state) - destruction;
   }
   else
   {
-
     const auto & grad_u = _u_var.gradient(elem_arg, state);
     const auto Sij_xx = 2.0 * grad_u(0);
     ADReal Sij_xy = 0.0;
@@ -251,38 +215,64 @@ INSFVTKESourceSink::computeQpResidual()
         (Sij_yy - trace) * grad_yy + Sij_yz * grad_yz + Sij_xz * grad_zx + Sij_yz * grad_zy +
         (Sij_zz - trace) * grad_zz;
 
-    production = _mu_t(elem_arg, state) * symmetric_strain_tensor_sq_norm;
+    // Production of k
+    // ADReal production_k = _mu_t(elem_arg, old_state) * symmetric_strain_tensor_sq_norm;
 
-    if (_epsilon)
-    {
-      const auto time_scale =
-          raw_value(_var(elem_arg, old_state) / ((*_epsilon)(elem_arg, old_state) + 1e-15) + 1e-15);
+    // // Capped production of k
+    // const auto omega_capped = std::max(_var(elem_arg, old_state), 1e-12);
+    // const auto Re_shear = rho * TKE / (mu * omega_capped);
+    // const auto Re_beta_ratio_4 = Utility::pow<4>(Re_shear / _beta_R);
+    // const auto _beta_star =
+    //     _beta_infty * ((4.0 / 15.0 + Re_beta_ratio_4) / (1.0 + Re_beta_ratio_4));
+    // const auto production_k_top_bound = rho * _beta_star * TKE * _var(elem_arg, old_state);
+    // production_k = std::min(production_k, 10.0 * production_k_top_bound);
 
-      destruction = rho * _var(elem_arg, state) / time_scale;
+    // // Production of omega
+    // const auto F1 = _F1(elem_arg, old_state);
+    // const auto Re_k_alpha_ratio = Re_shear / _R_k;
+    // const auto beta_i = F1 * _beta_i_1 + (1.0 - F1) * _beta_i_2;
+    // const auto alpha_0_star = beta_i / 3.0;
+    // const auto alpha_star =
+    //     _alpha_infty_star * (alpha_0_star + Re_k_alpha_ratio) / (1.0 + Re_k_alpha_ratio);
+    // const auto alpha_infty = F1 * _alpha_infty_1 + (1.0 - F1) * _alpha_infty_2;
+    // const auto Re_omega_alpha_ratio = Re_shear / _R_omega;
+    // const auto alpha =
+    //     alpha_infty / alpha_star * (_alpha_0 + Re_omega_alpha_ratio) / (1.0 +
+    //     Re_omega_alpha_ratio);
+    // production = alpha * rho / _mu_t(elem_arg, old_state) * production_k;
 
-      // k-Production limiter (needed for flows with stagnation zones)
-      ADReal production_limit = _C_pl * rho * (*_epsilon)(elem_arg, old_state);
+    // // Destruction of omega
+    // destruction = rho * beta_i * _var(elem_arg, old_state) * _var(elem_arg, state);
 
-      // Apply production limiter
-      production = std::min(production, production_limit);
-    }
-    else if (_omega)
-    {
-      const auto omega_capped = std::max((*_omega)(elem_arg, old_state), 1e-10);
+    // // Cross diffusion term
+    // const auto & grad_k = _k.gradient(elem_arg, old_state);
+    // const auto & grad_omega = _var.gradient(elem_arg, old_state);
+    // auto cross_diffusion = grad_k(0) * grad_omega(0);
+    // if (_dim > 1)
+    //   cross_diffusion += grad_k(1) * grad_omega(1);
+    // if (_dim > 2)
+    //   cross_diffusion += grad_k(2) * grad_omega(2);
+    // cross_diffusion *= 2.0 * (1.0 - F1) * rho * _sigma_omega_2 / omega_capped;
 
-      // const auto Re_shear = rho * _var(elem_arg, old_state) / (mu * omega_capped);
-      // const auto Re_ratio_4 = Utility::pow<4>(Re_shear / _beta_R);
-      // const auto beta_star = _beta_infty * ((4.0 / 15.0 + Re_ratio_4) / (1.0 + Re_ratio_4));
+    const auto gamma_1 = 0.075 / 0.09 - 0.5 * std::pow(0.41, 2) / std::sqrt(0.09);
+    const auto gamma_2 = 0.0828 / 0.09 - 0.856 * std::pow(0.41, 2) / std::sqrt(0.09);
+    const auto F1 = _F1(elem_arg, old_state);
+    const auto gamma = F1 * gamma_1 + (1.0 - F1) * gamma_2;
+    production = rho * gamma * symmetric_strain_tensor_sq_norm;
 
-      // destruction = rho * beta_star * _var(elem_arg, state) * (*_omega)(elem_arg, old_state);
-      // production = std::min(production, 10.0 * destruction);
+    const auto beta_star = F1 * 0.075 + (1.0 - F1) * 0.0828;
+    destruction = rho * beta_star * _var(elem_arg, old_state) * _var(elem_arg, state);
 
-      const auto beta_star =
-          (*_F1)(elem_arg, state) * 0.09 + (1.0 - (*_F1)(elem_arg, state)) * 0.09;
-      destruction = rho * beta_star * _var(elem_arg, state) * (*_omega)(elem_arg, old_state);
-    }
+    const auto & grad_k = _k.gradient(elem_arg, old_state);
+    const auto & grad_omega = _var.gradient(elem_arg, old_state);
+    auto cross_diffusion = grad_k(0) * grad_omega(0);
+    if (_dim > 1)
+      cross_diffusion += grad_k(1) * grad_omega(1);
+    if (_dim > 2)
+      cross_diffusion += grad_k(2) * grad_omega(2);
+    cross_diffusion *= 2.0 * (1.0 - F1) * rho * 0.856 / std::max(_var(elem_arg, old_state), 1e-12);
 
-    residual = destruction - production;
+    residual = destruction - production - cross_diffusion;
   }
 
   return residual;

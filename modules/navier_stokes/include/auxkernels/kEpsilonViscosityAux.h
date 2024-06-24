@@ -1,5 +1,3 @@
-
-
 //* This file is part of the MOOSE framework
 //* https://www.mooseframework.org
 //*
@@ -30,10 +28,6 @@ public:
 protected:
   virtual Real computeValue() override;
 
-  /// Local method to find friction velocity.
-  /// This method may need to be reimplemented for each new turbulence model
-  ADReal findUStarLocalMethod(const ADReal & u, const Real & dist);
-
   /// The dimension of the domain
   const unsigned int _dim;
 
@@ -60,22 +54,14 @@ protected:
   /// Wall boundaries
   const std::vector<BoundaryName> & _wall_boundary_names;
 
-  /// If the user wants the linearized computation of y_plus
-  const bool _linearized_yplus;
-
   /// If the user wants to enable bulk wall treatment
   const bool _bulk_wall_treatment;
 
-  /// IF the user requested non-equilibrium wall treatment
-  const bool _non_equilibrium_treatment;
+  /// Method used for wall treatment
+  const MooseEnum _wall_treatment;
 
-  // -- Parameters of the wall function method
-
-  /// Maximum number of iterations to find the friction velocity
-  static constexpr int _MAX_ITERS_U_TAU{50};
-
-  /// Relative tolerance to find the friction velocity
-  static constexpr Real _REL_TOLERANCE{1e-4};
+  /// Method used to limit the k-e time scale
+  const MooseEnum _scale_limiter;
 
   ///@{
   /// Maps for wall bounded elements

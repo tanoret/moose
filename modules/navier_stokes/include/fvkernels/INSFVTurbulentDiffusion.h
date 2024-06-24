@@ -22,6 +22,7 @@
 /// compute k on the face. Cross-diffusion correction factors are currently not
 /// implemented for the "grad_u*n" term.
 /// The specialty of this kernel is that it takes into account the wall treatment of the variable with respect to turbulence.
+
 class INSFVTurbulentDiffusion : public FVDiffusion
 {
 public:
