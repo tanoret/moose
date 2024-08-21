@@ -42,7 +42,6 @@ SIMPLESolveBase::validParams()
       "0.0<momentum_equation_relaxation<=1.0",
       "The relaxation which should be used for the momentum equation. (=1 for no relaxation, "
       "diagonal dominance will still be enforced)");
-
   params.addParam<MultiMooseEnum>("momentum_petsc_options",
                                   Moose::PetscSupport::getCommonPetscFlags(),
                                   "Singleton PETSc options for the momentum equation");
