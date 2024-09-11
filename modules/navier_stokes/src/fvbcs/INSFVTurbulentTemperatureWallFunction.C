@@ -125,7 +125,6 @@ INSFVTurbulentTemperatureWallFunction::computeQpResidual()
     u_tau = parallel_speed /
             (log(max(NS::E_turb_constant * y_plus, 1.0 + 1e-4)) / NS::von_karman_constant);
   }
-
   ADReal alpha;
   if (y_plus <= 5.0) // sub-laminar layer
   {
