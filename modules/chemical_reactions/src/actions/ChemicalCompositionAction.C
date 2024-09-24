@@ -73,6 +73,10 @@ ChemicalCompositionAction::validParams()
       {},
       "List of chemical elements for which chemical potentials are requested");
   params.addParam<std::vector<std::string>>(
+      "output_species_potentials",
+      {},
+      "List of chemical species for which chemical potentials are requested");
+  params.addParam<std::vector<std::string>>(
       "output_vapor_pressures",
       {},
       "List of gas phase species for which vapor pressures are requested");
@@ -274,6 +278,64 @@ ChemicalCompositionAction::ChemicalCompositionAction(const InputParameters & par
           paramError(
               "output_species", "Species '", tokens[1], "' was not found in the simulation.");
         _tokenized_species[i] = std::make_pair(tokens[0], tokens[1]);
+      }
+  }
+
+  if (isParamValid("output_chemical_potential"))
+  {
+    auto species = getParam<std::vector<std::string>>("output_chemical_potential");
+    auto db_phases = Thermochimica::getPhaseNamesSystem();
+    auto n_db_species = Thermochimica::getNumberSpeciesSystem();
+    auto db_species = Thermochimica::getSpeciesSystem();
+    for (auto i : index_range(n_db_species))
+      if (Thermochimica::isPhaseMQM(i))
+      {
+        auto [pairs, quads, idbg] =
+            Thermochimica::getMqmqaNumberPairsQuads(Thermochimica::getPhaseNamesSystem()[i]);
+        n_db_species[i] = pairs;
+      }
+
+    if (species.size() == 1 && species[0] == "ALL")
+    {
+      if (!n_db_species.empty())
+        species.resize(n_db_species.back());
+      else
+        mooseInfo("ChemicalCompositionAction species: 'ALL' specified in input file. Thermochimica "
+                  "returned no possible species.");
+
+      species.clear();
+      _tokenized_chemical_potential.clear();
+      for (const auto i : make_range(db_species.size()))
+        for (const auto j : index_range(db_species[i]))
+        {
+          species.push_back(db_phases[i] + ":" + db_species[i][j]);
+          _tokenized_chemical_potential.push_back(std::make_pair(db_phases[i], db_species[i][j]));
+        }
+      mooseInfo("ChemicalCompositionAction species: 'ALL' specified in input file. Using: ",
+                Moose::stringify(species));
+    }
+    else
+      for (const auto i : index_range(species))
+      {
+        _tokenized_chemical_potential.resize(species.size());
+        std::vector<std::string> tokens;
+        MooseUtils::tokenize(species[i], tokens, 1, ":");
+        if (tokens.size() == 1)
+          paramError("output_species", "No ':' separator found in variable '", species[i], "'");
+
+        auto phase_index = std::find(db_phases.begin(), db_phases.end(), tokens[0]);
+        if (phase_index == db_phases.end())
+          paramError("output_species",
+                     "Phase '",
+                     tokens[0],
+                     "' of output species '",
+                     species[i],
+                     "' not found in the simulation.");
+        auto sp = db_species[std::distance(db_phases.begin(), phase_index)];
+        if (std::find(sp.begin(), sp.end(), tokens[1]) == sp.end())
+          paramError(
+              "output_species", "Species '", tokens[1], "' was not found in the simulation.");
+        _tokenized_chemical_potential[i] = std::make_pair(tokens[0], tokens[1]);
       }
   }
 

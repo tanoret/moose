@@ -1,0 +1,281 @@
+F = 96485.3321
+epsilon_0 = 8.854e-12
+epsilon_r = 80
+Foeps = ${fparse F/(epsilon_0*epsilon_r)}
+
+[Mesh]
+  [cmg]
+    type = CartesianMeshGenerator
+    dim = 2
+    dx = '0.1 1.0'
+    dy = '1.0'
+    ix = '20 100'
+    iy = '10'
+    subdomain_id = '1 2'
+  []
+  [solid_liquid_interface]
+    type = SideSetsBetweenSubdomainsGenerator
+    input = cmg
+    new_boundary = 'solid_liquid_interface'
+    primary_block = '1'
+    paired_block = '2'
+  []
+[]
+
+[Variables]
+  [Zn_s]
+    type = MooseVariableFVReal
+    initial_condition = 1.0
+    block = '1'
+  []
+  [Zn]
+    type = MooseVariableFVReal
+    initial_condition = 1.0
+    block = '2'
+  []
+  [Ni_s]
+    type = MooseVariableFVReal
+    initial_condition = 1.0
+    block = '1'
+  []
+  [Ni]
+    type = MooseVariableFVReal
+    initial_condition = 1.0
+    block = '2'
+  []
+  [phi]
+    type = MooseVariableFVReal
+    initial_condition = 0.0
+    block = '1 2'
+  []
+[]
+
+[FVKernels]
+
+  [Zn_s_time]
+    type = FVTimeKernel
+    variable = 'Zn_s'
+  []
+  [diffusion_solid_Zn]
+    type = FVDiffusion
+    variable = 'Zn_s'
+    coeff = 'diff_coef'
+    block = '1'
+  []
+  [electrophoresis_Zn_s]
+    type = FVElectrophoresisSource
+    variable = 'Zn_s'
+    temperature = 300.0
+    D = 'diff_coef'
+    phi = 'phi'
+  []
+  [Zn_time]
+    type = FVTimeKernel
+    variable = 'Zn'
+  []
+  [diffusion_liquid_Zn]
+    type = FVDiffusion
+    variable = 'Zn'
+    coeff = 'diff_coef'
+    block = '2'
+  []
+  [electrophoresis_Zn]
+    type = FVElectrophoresisSource
+    variable = 'Zn'
+    temperature = 300.0
+    D = 'diff_coef'
+    phi = 'phi'
+  []
+
+  [Ni_s_time]
+    type = FVTimeKernel
+    variable = 'Ni_s'
+  []
+  [diffusion_solid_Ni]
+    type = FVDiffusion
+    variable = 'Ni_s'
+    coeff = 'diff_coef'
+    block = '1'
+  []
+  [electrophoresis_Ni_s]
+    type = FVElectrophoresisSource
+    variable = 'Ni_s'
+    temperature = 300.0
+    D = 'diff_coef'
+    phi = 'phi'
+  []
+  [Ni_time]
+    type = FVTimeKernel
+    variable = 'Ni'
+  []
+  [diffusion_liquid_Ni]
+    type = FVDiffusion
+    variable = 'Ni'
+    coeff = 'diff_coef'
+    block = '2'
+  []
+  [electrophoresis_Ni]
+    type = FVElectrophoresisSource
+    variable = 'Ni'
+    temperature = 300.0
+    D = 'diff_coef'
+    phi = 'phi'
+  []
+
+  [laplace_phi]
+    type = FVDiffusion
+    variable = 'phi'
+    coeff = '1.0'
+    block = '1 2'
+  []
+  [Ni_source]
+    type = FVCoupledForce
+    variable = 'phi'
+    v = 'Zn_ex'
+    coef = '${Foeps}'
+    block = '2'
+  []
+  [Zn_source]
+    type = FVCoupledForce
+    variable = 'phi'
+    v = 'Ni_ex'
+    coef = '${fparse 2.0*Foeps}'
+    block = '2'
+  []
+[]
+
+[FVInterfaceKernels]
+  [interface_Zn]
+    type = FVButlerBolmerInterface
+    variable1 = 'Zn'
+    variable2 = 'Zn_s'
+    c = 'Zn'
+    c_solid = 'Zn_s'
+    c_E = '-0.76'
+    c_Z = '2'
+    c_k0 = 1e-10
+    boundary = 'solid_liquid_interface'
+    phi = 'phi'
+    temperature = 300.0
+    subdomain1 = '2'
+    subdomain2 = '1'
+    wall_cell_is_bulk = true
+  []
+  [interface_Ni]
+    type = FVButlerBolmerInterface
+    variable1 = 'Ni'
+    variable2 = 'Ni_s'
+    c = 'Ni'
+    c_solid = 'Ni_s'
+    c_E = '-0.23'
+    c_Z = '2'
+    c_k0 = 1e-10
+    boundary = 'solid_liquid_interface'
+    phi = 'phi'
+    temperature = 300.0
+    subdomain1 = '2'
+    subdomain2 = '1'
+    wall_cell_is_bulk = true
+  []
+[]
+
+[FVBCs]
+  # [left_Zn]
+  #   type = FVDirichletBC
+  #   variable = 'Zn_s'
+  #   boundary = 'left'
+  #   value = 1.0
+  # []
+  # [right_Zn]
+  #   type = FVDirichletBC
+  #   variable = 'Zn'
+  #   boundary = 'right'
+  #   value = 1.0
+  # []
+
+  # [left_Ni]
+  #   type = FVDirichletBC
+  #   variable = 'Ni_s'
+  #   boundary = 'left'
+  #   value = 1.0
+  # []
+  # [right_Ni]
+  #   type = FVDirichletBC
+  #   variable = 'Ni'
+  #   boundary = 'right'
+  #   value = 1.0
+  # []
+
+  [phi]
+    type = FVDirichletBC
+    variable = 'phi'
+    boundary = 'left right'
+    value = 0.0
+  []
+[]
+
+[FunctorMaterials]
+  [diff_coef]
+    type = PiecewiseByBlockFunctorMaterial
+    prop_name = 'diff_coef'
+    subdomain_to_prop_value = '1 1e-10
+                               2 1e-3'
+  []
+  [Zn_ex]
+    type = ADParsedFunctorMaterial
+    property_name = 'Zn_ex'
+    functor_names = 'Zn'
+    functor_symbols = 'Zn'
+    expression = 'Zn - 1.0'
+  []
+  [Ni_ex]
+    type = ADParsedFunctorMaterial
+    property_name = 'Ni_ex'
+    functor_names = 'Ni'
+    functor_symbols = 'Ni'
+    expression = 'Ni - 1.0'
+  []
+[]
+
+[Preconditioning]
+  [smp]
+    type = SMP
+    full = true
+  []
+[]
+
+[Executioner]
+  type = Transient
+  start_time = 0.0
+  [TimeStepper]
+    type = IterationAdaptiveDT
+    dt = 0.1
+    optimal_iterations = 100
+    iteration_window = 2
+    # timestep_limiting_postprocessor = max_dt
+  []
+  end_time = 1e10
+  solve_type = 'NEWTON'
+  petsc_options_iname = '-pc_type -pc_factor_shift_type'
+  petsc_options_value = 'lu NONZERO'
+  automatic_scaling = true
+  off_diagonals_in_auto_scaling = true
+  compute_scaling_once = false
+  residual_and_jacobian_together = true
+  nl_abs_tol = 1e-12
+  nl_rel_tol = 1e-12
+  nl_max_its = 50
+  steady_state_detection = true
+  steady_state_tolerance = 1e-12
+[]
+
+[Postprocessors]
+  # [max_dt]
+  #   type = Receiver
+  #   default = 1e10
+  # []
+[]
+
+[Outputs]
+  exodus = true
+[]

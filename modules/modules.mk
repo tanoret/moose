@@ -67,6 +67,10 @@ ifeq ($(NAVIER_STOKES),yes)
         RDG                         := yes
 endif
 
+ifeq ($(CHEMICAL_REACTIONS),yes)
+        NAVIER_STOKES               := yes
+endif
+
 ifeq ($(SOLID_PROPERTIES),yes)
         HEAT_TRANSFER               := yes
 endif
@@ -141,13 +145,6 @@ GEN_REVISION  := no
 
 # The modules that follow do not have any dependencies, so they're just
 # ordered alphabetically.
-
-ifeq ($(CHEMICAL_REACTIONS),yes)
-  APPLICATION_DIR    := $(MOOSE_DIR)/modules/chemical_reactions
-  APPLICATION_NAME   := chemical_reactions
-  SUFFIX             := cr
-  include $(FRAMEWORK_DIR)/app.mk
-endif
 
 ifeq ($(ELECTROMAGNETICS),yes)
   APPLICATION_DIR    := $(MOOSE_DIR)/modules/electromagnetics
@@ -260,6 +257,15 @@ ifeq ($(NAVIER_STOKES),yes)
   APPLICATION_NAME   := navier_stokes
   DEPEND_MODULES     := fluid_properties rdg heat_transfer
   SUFFIX             := ns
+  include $(FRAMEWORK_DIR)/app.mk
+endif
+
+# Depends on Navier Stokes
+ifeq ($(CHEMICAL_REACTIONS),yes)
+  APPLICATION_DIR    := $(MOOSE_DIR)/modules/chemical_reactions
+  APPLICATION_NAME   := chemical_reactions
+  DEPEND_MODULES     := navier_stokes
+  SUFFIX             := cr
   include $(FRAMEWORK_DIR)/app.mk
 endif
 

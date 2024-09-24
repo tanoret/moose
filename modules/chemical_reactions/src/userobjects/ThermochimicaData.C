@@ -48,6 +48,7 @@ ThermochimicaDataBase<is_nodal>::validParams()
       "reinit_type", reinit_type, "Reinitialization scheme to use with Thermochimica");
 
   params.addCoupledVar("output_element_potentials", "Chemical potentials of elements");
+  params.addCoupledVar("output_chemical_potentials", "Chemical potentials of species");
   params.addCoupledVar("output_phases", "Amounts of phases to be output");
   params.addCoupledVar("output_species", "Amounts of species to be output");
   params.addCoupledVar("output_vapor_pressures", "Vapour pressures of species to be output");
@@ -80,6 +81,7 @@ ThermochimicaDataBase<is_nodal>::ThermochimicaDataBase(const InputParameters & p
     _temperature(coupledValue("temperature")),
     _n_phases(coupledComponents("output_phases")),
     _n_species(coupledComponents("output_species")),
+    _n_chemical_potentials(coupledComponents("output_chemical_potentials")),
     _n_elements(coupledComponents("elements")),
     _n_vapor_species(coupledComponents("output_vapor_pressures")),
     _n_phase_elements(coupledComponents("output_element_phases")),
@@ -92,6 +94,7 @@ ThermochimicaDataBase<is_nodal>::ThermochimicaDataBase(const InputParameters & p
     _ph_names(_action.phases()),
     _element_potentials(_action.elementPotentials()),
     _species_phase_pairs(_action.speciesPhasePairs()),
+    _chemical_potential_pairs(_action.chemicalPotentialPairs()),
     _vapor_phase_pairs(_action.vaporPhasePairs()),
     _phase_element_pairs(_action.phaseElementPairs()),
     _output_element_potentials(isCoupled("output_element_potentials")),
@@ -129,6 +132,16 @@ ThermochimicaDataBase<is_nodal>::ThermochimicaDataBase(const InputParameters & p
       _sp[i] = &writableVariable("output_species", i);
   }
 
+  if (isParamValid("output_chemical_potentials"))
+  {
+    if (_chemical_potential_pairs.size() != _n_chemical_potentials)
+      mooseError(
+          "Chemical potential name vector size does not match number of chemical potentials.");
+
+    for (const auto i : make_range(_n_chemical_potentials))
+      _chem_pot[i] = &writableVariable("output_chemical_potentials", i);
+  }
+
   if (isParamValid("output_vapor_pressures"))
   {
     if (_vapor_phase_pairs.size() != _n_vapor_species)
@@ -161,7 +174,7 @@ ThermochimicaDataBase<is_nodal>::ThermochimicaDataBase(const InputParameters & p
   const auto real_size =
       std::max(/* send */ 2 + _n_elements,
                /* receive */ _n_phases + _n_species + _element_potentials.size() +
-                   _n_vapor_species + _n_phase_elements);
+                   _n_chemical_potentials + _n_vapor_species + _n_phase_elements);
 
   // set up shared memory for communication with child process
   auto shared_mem =
@@ -454,6 +467,25 @@ ThermochimicaDataBase<is_nodal>::server()
 
   if (_output_element_potentials)
     for (const auto i : index_range(_element_potentials))
+    {
+      auto [potential, idbg] = Thermochimica::getOutputChemPot(_element_potentials[i]);
+      if (idbg == 0)
+        _shared_real_mem[idx] = potential;
+      else if (idbg == 1)
+        // element not present, just leave this at 0 for now
+        _shared_real_mem[idx] = 0.0;
+#ifndef NDEBUG
+      else if (idbg == -1)
+        mooseError("Failed to get element potential for element '",
+                   _element_potentials[i],
+                   "'. Thermochimica returned ",
+                   idbg);
+#endif
+      idx++;
+    }
+
+  if (_output_chemical_potentials)
+    for (const auto i : make_range(_n_chemical_potentials))
     {
       auto [potential, idbg] = Thermochimica::getOutputChemPot(_element_potentials[i]);
       if (idbg == 0)
