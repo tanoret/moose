@@ -42,6 +42,11 @@ public:
 
   const std::vector<std::pair<std::string, std::string>> & phaseElementPairs() const
   {
+    return _tokenized_chemical_potential;
+  }
+
+  const std::vector<std::pair<std::string, std::string>> & chemicalPotentialPairs() const
+  {
     return _tokenized_phase_elements;
   }
 
@@ -64,6 +69,7 @@ protected:
 
   /// Tokenized versions of the output variables to avoid redoing tokenization
   std::vector<std::pair<std::string, std::string>> _tokenized_species;
+  std::vector<std::pair<std::string, std::string>> _tokenized_chemical_potential;
   std::vector<std::string> _tokenized_element_potentials;
   std::vector<std::pair<std::string, std::string>> _tokenized_vapor_species;
   std::vector<std::pair<std::string, std::string>> _tokenized_phase_elements;

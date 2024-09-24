@@ -11,6 +11,7 @@
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
+#include "NavierStokesApp.h"
 
 InputParameters
 ChemicalReactionsApp::validParams()
@@ -50,6 +51,7 @@ associateSyntaxInner(Syntax & syntax, ActionFactory & /*action_factory*/)
 void
 ChemicalReactionsApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
+  NavierStokesApp::registerAll(f, af, s);
   Registry::registerObjectsTo(f, {"ChemicalReactionsApp"});
   Registry::registerActionsTo(af, {"ChemicalReactionsApp"});
   associateSyntaxInner(s, af);
@@ -59,12 +61,14 @@ void
 ChemicalReactionsApp::registerApps()
 {
   registerApp(ChemicalReactionsApp);
+  NavierStokesApp::registerApps();
 }
 
 void
 ChemicalReactionsApp::registerObjects(Factory & factory)
 {
   mooseDeprecated("use registerAll instead of registerObjects");
+  NavierStokesApp::registerObjects(factory);
   Registry::registerObjectsTo(factory, {"ChemicalReactionsApp"});
 }
 
@@ -72,6 +76,7 @@ void
 ChemicalReactionsApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory)
 {
   mooseDeprecated("use registerAll instead of associateSyntax");
+  NavierStokesApp::associateSyntax(syntax, action_factory);
   Registry::registerActionsTo(action_factory, {"ChemicalReactionsApp"});
   associateSyntaxInner(syntax, action_factory);
 }

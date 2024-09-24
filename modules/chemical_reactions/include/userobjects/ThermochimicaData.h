@@ -87,6 +87,7 @@ protected:
 
   const std::size_t _n_phases;
   const std::size_t _n_species;
+  const std::size_t _n_chemical_potentials;
   const std::size_t _n_elements;
   const std::size_t _n_vapor_species;
   const std::size_t _n_phase_elements;
@@ -103,6 +104,7 @@ protected:
   const std::vector<std::string> & _ph_names;
   const std::vector<std::string> & _element_potentials;
   const std::vector<std::pair<std::string, std::string>> & _species_phase_pairs;
+  const std::vector<std::pair<std::string, std::string>> & _chemical_potential_pairs;
   const std::vector<std::pair<std::string, std::string>> & _vapor_phase_pairs;
   const std::vector<std::pair<std::string, std::string>> & _phase_element_pairs;
 
@@ -126,6 +128,9 @@ protected:
 
   /// Writable chemical potential variables for each element
   std::vector<MooseWritableVariable *> _el_pot;
+
+  /// Writable chemical potential variables for each element
+  std::vector<MooseWritableVariable *> _chem_pot;
 
   /// Writable variable for molar amounts of each element in specified phase
   std::vector<MooseWritableVariable *> _el_ph;
