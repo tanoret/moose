@@ -22,6 +22,8 @@ RANSYPlusAux::validParams()
   params.addRequiredCoupledVar("u", "The velocity in the x direction.");
   params.addCoupledVar("v", "The velocity in the y direction.");
   params.addCoupledVar("w", "The velocity in the z direction.");
+  params.addParam<MooseFunctorName>("k", "Turbulent kinetic energy functor.");
+  params.deprecateParam("k", NS::TKE, "01/01/2025");
   params.addParam<MooseFunctorName>(NS::TKE, "Turbulent kinetic energy functor.");
   params.addRequiredParam<MooseFunctorName>(NS::density, "Fluid density.");
   params.addRequiredParam<MooseFunctorName>(NS::mu, "Dynamic viscosity.");
@@ -103,14 +105,8 @@ RANSYPlusAux::computeValue()
     else
         // Equilibrium / Iterative
         y_plus = NS::findyPlus<Real>(mu, rho, std::max(parallel_speed, 1e-10), distance);
-
-<<<<<<< HEAD
-    y_plus_vec.push_back(y_plus);
   }
-=======
-    y_plus_vec.push_back(raw_value(y_plus));
-
->>>>>>> 35ff4aa59e (Apply suggestions from code review @tanoret #27800 #27887 #27888)
+  y_plus_vec.push_back(raw_value(y_plus));
   // Return average of y+ for cells with multiple wall faces
   return std::accumulate(y_plus_vec.begin(), y_plus_vec.end(), 0.0) / y_plus_vec.size();
 }
