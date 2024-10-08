@@ -294,15 +294,17 @@ INSFVTKESourceSink::computeQpResidual()
     // *************************************** //
     if (_epsilon) // epsilon-based formulation
     {
-      // Computing time scale
-      const auto time_scale =
-          raw_value(_var(elem_arg, old_state) / (*_epsilon)(elem_arg, old_state));
+      const auto tke_old_raw = raw_value(TKE);
+      const auto epsilon_old = (*_epsilon)(elem_arg, old_state);
 
-      // Computing destruction
-      destruction = rho * _var(elem_arg, state) / time_scale;
+      if (MooseUtils::absoluteFuzzyEqual(tke_old_raw, 0))
+        destruction = rho * epsilon_old;
+      else
+        destruction = rho * _var(elem_arg, state) / tke_old_raw * raw_value(epsilon_old);
 
       // k-Production limiter (needed for flows with stagnation zones)
-      const ADReal production_limit = _C_pl * rho * (*_epsilon)(elem_arg, old_state);
+      const ADReal production_limit =
+          _C_pl * rho * (_newton_solve ? std::max(epsilon_old, ADReal(0)) : epsilon_old);
 
       // Apply production limiter
       production = std::min(production, production_limit);

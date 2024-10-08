@@ -153,7 +153,7 @@
                  no_wall_log_layer_side_bottom_0001.csv       no_wall_log_layer_side_right_0001.csv no_wall_log_layer_vertical_center_0001.csv'
       detail = 'and reach converged results with segregated solvers.'
       abs_zero = 1e-6
-      cli_args = 'lid_velocity=10.0 Executioner/num_iterations=2000 Mesh/gen/nx=8 Mesh/gen/ny=8 Outputs/file_base=no_wall_log_layer'
+      cli_args = 'lid_velocity=1.0 Executioner/num_iterations=2000 Mesh/gen/nx=8 Mesh/gen/ny=8 Outputs/file_base=no_wall_log_layer'
       heavy = true
     []
     [run]
@@ -163,7 +163,7 @@
                  no_wall_log_layer_short_side_bottom_0001.csv       no_wall_log_layer_short_side_right_0001.csv no_wall_log_layer_short_vertical_center_0001.csv'
       detail = 'and pass debugging checks.'
       abs_zero = 1e-6
-      cli_args = 'Executioner/num_iterations=10 lid_velocity=10.0 Mesh/gen/nx=8 Mesh/gen/ny=8 Outputs/file_base=no_wall_log_layer_short'
+      cli_args = 'Executioner/num_iterations=10 lid_velocity=1.0 Mesh/gen/nx=8 Mesh/gen/ny=8 Outputs/file_base=no_wall_log_layer_short'
     []
   []
   [lid_driven_turb_no_wall]
@@ -314,5 +314,50 @@
       abs_zero = 1e-6
       cli_args = 'Executioner/num_iterations=10 Outputs/file_base=lid-driven-turb-capped_short'
     []
+<<<<<<< HEAD
+=======
+    [result_physics]
+      type = 'Exodiff'
+      input = 'lid-driven-turb-capped-physics.i'
+      exodiff = 'lid-driven-turb-capped-physics_out.e'
+      detail = 'using the Navier Stokes Physics shorthand syntax.'
+      abs_zero = 1e-6
+      cli_args = 'Outputs/file_base=lid-driven-turb-capped-physics_out'
+      custom_cmp = 'lid-driven-low-turb.cmp'
+    []
+  []
+  [lid_driven_turb_std_wall_nonlinear]
+    requirement = 'The system shall be able to run fluid flow with k-epsilon turbulence model in enclosures with standard wall functions, '
+    [result]
+      type = 'Exodiff'
+      input = 'lid-driven-turb-std-wall-nonlinear.i'
+      exodiff = 'lid-driven-turb-std-wall-nonlinear_out.e'
+      detail = 'and reach converged results with monolithic nonlinear solvers.'
+      abs_zero = 1e-6
+      heavy = true
+      cli_args = 'Outputs/execute_on=final'
+      min_parallel = 4
+    []
+    [run]
+      type = 'Exodiff'
+      input = 'lid-driven-turb-std-wall-nonlinear.i'
+      exodiff = 'lid-driven-turb-std-wall-nonlinear_short.e'
+      detail = 'and pass debugging checks,'
+      abs_zero = 1e-6
+      cli_args = 'Executioner/num_steps=3 Outputs/file_base=lid-driven-turb-std-wall-nonlinear_short'
+      min_parallel = 4
+    []
+    [result_physics]
+      type = 'Exodiff'
+      input = 'lid-driven-turb-std-wall-nonlinear-physics.i'
+      exodiff = 'lid-driven-turb-std-wall-nonlinear-physics_out.e'
+      detail = 'using the Navier Stokes Physics shorthand syntax.'
+      abs_zero = 1e-6
+      cli_args = 'Outputs/execute_on=final Outputs/file_base=lid-driven-turb-std-wall-nonlinear-physics_out'
+      min_parallel = 4
+      custom_cmp = 'ignore_lambda.cmp'
+      heavy = true
+    []
+>>>>>>> 377d6175b3 (rebasing on branch with nonlinear phsyics for k-epsilon and regolding - golds may not be correct here #28130)
   []
 []
