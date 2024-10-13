@@ -19,6 +19,14 @@
 
 class FaceInfo;
 
+struct ElementMetrics
+{
+  Real skewness_angle;
+  Real eigenvalue_dominance_ratio;
+
+  ElementMetrics() : skewness_angle(0.0), eigenvalue_dominance_ratio(1.0) {}
+};
+
 /// Class used for caching additional information for elements
 /// such as the volume and centroid. This also supports the
 /// ghost elements used in the finite volume setting (for the time being).
@@ -58,4 +66,6 @@ protected:
   /// Furthermore, if the current variable is not active on the subdomain or if it
   /// is an FE variable of this element, we return an invalid_dof_index.
   std::vector<std::vector<dof_id_type>> _dof_indices;
+  /// Cached metrics for this element
+  ElementMetrics _metrics;
 };
