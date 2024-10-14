@@ -27,7 +27,9 @@ public:
   T limit(const T & phi_upwind,
           const T & phi_downwind,
           const VectorValue<T> * grad_phi_upwind,
-          const RealVectorValue & dCD) const override final
+          const RealVectorValue & dCD,
+          const Real & max_val = 0.0,
+          const Real & min_val = 0.0) const override final
   {
     mooseAssert(grad_phi_upwind, "SOU limiter requires a gradient");
     const auto r_f = Moose::FV::rF(phi_upwind, phi_downwind, *grad_phi_upwind, dCD);

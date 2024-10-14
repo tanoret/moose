@@ -476,14 +476,82 @@ interpCoeffs(const Limiter<T> & limiter,
              const bool fi_elem_is_upwind)
 {
   // Using beta, w_f, g nomenclature from Greenshields
-  const auto beta = limiter(
-      phi_upwind, phi_downwind, grad_phi_upwind, fi_elem_is_upwind ? fi.dCN() : Point(-fi.dCN()));
+  const auto beta = limiter(phi_upwind,
+                            phi_downwind,
+                            grad_phi_upwind,
+                            fi_elem_is_upwind ? fi.dCN() : Point(-fi.dCN()),
+                            0.0,
+                            0.0);
 
   const auto w_f = fi_elem_is_upwind ? fi.gC() : (1. - fi.gC());
 
+  // const auto g = beta * (1. - w_f);
   const auto g = beta * (1. - w_f);
 
   return std::make_pair(1. - g, g);
+}
+
+/**
+ * Limited face interpolation
+ */
+template <typename T>
+T
+interpCoeffsFaceValue(const Limiter<T> & /*limiter*/,
+                      const T & phi_upwind,
+                      const T & phi_downwind,
+                      const VectorValue<T> * const grad_phi_upwind,
+                      const FaceInfo & fi,
+                      const bool fi_elem_is_upwind)
+{
+  const auto face_centroid = fi.faceCentroid();
+  const auto cell_centroid = fi_elem_is_upwind ? fi.elemCentroid() : fi.neighborCentroid();
+
+  auto face_value = phi_upwind + (*grad_phi_upwind) * (face_centroid - cell_centroid);
+
+  const auto max_value = std::max(phi_upwind, phi_downwind);
+  const auto min_value = std::min(phi_upwind, phi_downwind);
+
+  face_value = std::min(std::max(face_value, min_value), max_value);
+
+  return face_value;
+}
+
+/**
+ * Limited face interpolation
+ * With external min-max values
+ */
+template <typename T>
+T
+interpCoeffsFaceValue(const Limiter<T> & /*limiter*/,
+                      const T & phi_upwind,
+                      const T & phi_downwind,
+                      const VectorValue<T> * const grad_phi_upwind,
+                      const FaceInfo & fi,
+                      const bool fi_elem_is_upwind,
+                      const T & max_value,
+                      const T & min_value)
+{
+  const auto face_centroid = fi.faceCentroid();
+  const auto cell_centroid = fi_elem_is_upwind ? fi.elemCentroid() : fi.neighborCentroid();
+
+  const auto delta_face = (*grad_phi_upwind) * (face_centroid - cell_centroid);
+  const auto delta_max = max_value - phi_upwind + 1e-10;
+  const auto delta_min = min_value - phi_upwind + 1e-10;
+
+  const auto rf = delta_face >= 0 ? delta_face / delta_max : delta_face / delta_min;
+
+  // const auto limiter = (2 * rf + 1.0) / (rf * (2 * rf + 1.0) + 1.0);
+  // const auto limiter = std::min(1.0, 1.0 / rf);
+  const auto limiter = (rf * (2 * rf + 1.0) + 1.0) / (rf * (rf * (2 * rf + 1.0) + 1.0) + 1.0);
+
+  auto face_value = phi_upwind + limiter * delta_face;
+
+  // const auto max_value_local = std::max(phi_upwind, phi_downwind);
+  // const auto min_value_local = std::min(phi_upwind, phi_downwind);
+
+  // face_value = std::min(std::max(face_value, min_value_local), max_value_local);
+
+  return face_value;
 }
 
 /**
@@ -500,8 +568,11 @@ interpolate(const Limiter<Scalar> & limiter,
             const FaceInfo & fi,
             const bool fi_elem_is_upwind)
 {
-  auto pr = interpCoeffs(limiter, phi_upwind, phi_downwind, grad_phi_upwind, fi, fi_elem_is_upwind);
-  return pr.first * phi_upwind + pr.second * phi_downwind;
+  // auto pr = interpCoeffs(limiter, phi_upwind, phi_downwind, grad_phi_upwind, fi,
+  // fi_elem_is_upwind); return pr.first * phi_upwind + pr.second * phi_downwind;
+
+  return interpCoeffsFaceValue(
+      limiter, phi_upwind, phi_downwind, grad_phi_upwind, fi, fi_elem_is_upwind);
 }
 
 /**
@@ -600,8 +671,69 @@ interpolate(const FunctorBase<T> & functor, const FaceArg & face, const StateArg
   if (face.limiter_type == LimiterType::CentralDifference)
     return linearInterpolation<T, FEK>(functor, face, time);
 
-  const auto [interp_coeffs, advected] = interpCoeffsAndAdvected<T, FEK>(functor, face, time);
-  return interp_coeffs.first * advected.first + interp_coeffs.second * advected.second;
+  // const auto [interp_coeffs, advected] = interpCoeffsAndAdvected<T, FEK>(functor, face, time);
+  // return interp_coeffs.first * advected.first + interp_coeffs.second * advected.second;
+
+  constexpr FunctorEvaluationKind GFEK = FunctorGradientEvaluationKind<FEK>::value;
+  typedef typename FunctorBase<T>::GradientType GradientType;
+  static const GradientType zero(0);
+  const auto limiter = Limiter<typename LimiterValueType<T>::value_type>::build(face.limiter_type);
+
+  const auto upwind_arg = face.elem_is_upwind ? face.makeElem() : face.makeNeighbor();
+  const auto downwind_arg = face.elem_is_upwind ? face.makeNeighbor() : face.makeElem();
+  auto phi_upwind = functor.template genericEvaluate<FEK>(upwind_arg, time);
+  auto phi_downwind = functor.template genericEvaluate<FEK>(downwind_arg, time);
+
+  T max_value(0), min_value(1e10);
+  for (auto neighbor : (*face.fi).elem().neighbor_ptr_range())
+  {
+    // If not a valid neighbor
+    if (neighbor == nullptr)
+      continue;
+    else
+    {
+      const ElemArg local_cell_arg = {neighbor, false};
+      const auto value = functor.template genericEvaluate<FEK>(local_cell_arg, time);
+      max_value = std::max(max_value, value);
+      min_value = std::min(min_value, value);
+    }
+  }
+  for (auto neighbor : (*face.fi).neighbor().neighbor_ptr_range())
+  {
+    // If not a valid neighbor
+    if (neighbor == nullptr)
+      continue;
+    else
+    {
+      const ElemArg local_cell_arg = {neighbor, false};
+      const auto value = functor.template genericEvaluate<FEK>(local_cell_arg, time);
+      max_value = std::max(max_value, value);
+      min_value = std::min(min_value, value);
+    }
+  }
+
+  T interp_value;
+  if (face.limiter_type == LimiterType::Upwind ||
+      face.limiter_type == LimiterType::CentralDifference)
+    // interp_coeffs =
+    //     interpCoeffs(*limiter, phi_upwind, phi_downwind, &zero, *face.fi, face.elem_is_upwind);
+    interp_value = interpCoeffsFaceValue(
+        *limiter, phi_upwind, phi_downwind, &zero, *face.fi, face.elem_is_upwind);
+  else
+  {
+    const auto grad_phi_upwind = functor.template genericEvaluate<GFEK>(upwind_arg, time);
+    // interp_coeffs = interpCoeffs(
+    //     *limiter, phi_upwind, phi_downwind, &grad_phi_upwind, *face.fi, face.elem_is_upwind);
+    interp_value = interpCoeffsFaceValue(*limiter,
+                                         phi_upwind,
+                                         phi_downwind,
+                                         &grad_phi_upwind,
+                                         *face.fi,
+                                         face.elem_is_upwind,
+                                         max_value,
+                                         min_value);
+  }
+  return interp_value;
 }
 
 template <typename T>
@@ -629,13 +761,20 @@ interpolate(const FunctorBase<VectorValue<T>> & functor,
     for (unsigned int i = 0; i < LIBMESH_DIM; ++i)
     {
       const auto &component_upwind = phi_upwind(i), component_downwind = phi_downwind(i);
-      std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(*limiter,
-                                                            component_upwind,
-                                                            component_downwind,
-                                                            &grad_zero,
-                                                            *face.fi,
-                                                            face.elem_is_upwind);
-      ret(i) = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
+      // std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(*limiter,
+      //                                                       component_upwind,
+      //                                                       component_downwind,
+      //                                                       &grad_zero,
+      //                                                       *face.fi,
+      //                                                       face.elem_is_upwind);
+      // ret(i) = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
+
+      ret(i) = interpCoeffsFaceValue(*limiter,
+                                     component_upwind,
+                                     component_downwind,
+                                     &grad_zero,
+                                     *face.fi,
+                                     face.elem_is_upwind);
     }
   }
   else
@@ -645,9 +784,12 @@ interpolate(const FunctorBase<VectorValue<T>> & functor,
     {
       const auto &component_upwind = phi_upwind(i), component_downwind = phi_downwind(i);
       const VectorValue<T> grad = grad_phi_upwind.row(i);
-      std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(
+      // std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(
+      //     *limiter, component_upwind, component_downwind, &grad, *face.fi, face.elem_is_upwind);
+      // ret(i) = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
+
+      ret(i) = interpCoeffsFaceValue(
           *limiter, component_upwind, component_downwind, &grad, *face.fi, face.elem_is_upwind);
-      ret(i) = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
     }
   }
 
@@ -680,13 +822,20 @@ containerInterpolate(const FunctorBase<T> & functor, const FaceArg & face, const
     for (const auto i : index_range(ret))
     {
       const auto &component_upwind = phi_upwind[i], component_downwind = phi_downwind[i];
-      std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(*limiter,
-                                                            component_upwind,
-                                                            component_downwind,
-                                                            example_gradient,
-                                                            *face.fi,
-                                                            face.elem_is_upwind);
-      ret[i] = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
+      // std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(*limiter,
+      //                                                       component_upwind,
+      //                                                       component_downwind,
+      //                                                       example_gradient,
+      //                                                       *face.fi,
+      //                                                       face.elem_is_upwind);
+      // ret[i] = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
+
+      ret[i] = interpCoeffsFaceValue(*limiter,
+                                     component_upwind,
+                                     component_downwind,
+                                     example_gradient,
+                                     *face.fi,
+                                     face.elem_is_upwind);
     }
   }
   else
@@ -696,9 +845,12 @@ containerInterpolate(const FunctorBase<T> & functor, const FaceArg & face, const
     {
       const auto &component_upwind = phi_upwind[i], component_downwind = phi_downwind[i];
       const auto & grad = grad_phi_upwind[i];
-      std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(
+      // std::tie(coeff_upwind, coeff_downwind) = interpCoeffs(
+      //     *limiter, component_upwind, component_downwind, &grad, *face.fi, face.elem_is_upwind);
+      // ret[i] = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
+
+      ret[i] = interpCoeffsFaceValue(
           *limiter, component_upwind, component_downwind, &grad, *face.fi, face.elem_is_upwind);
-      ret[i] = coeff_upwind * component_upwind + coeff_downwind * component_downwind;
     }
   }
 
