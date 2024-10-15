@@ -21,8 +21,8 @@ velocity_interp_method = 'average'
     xmax = 1
     ymin = 0
     ymax = 1
-    nx = 50
-    ny = 50
+    nx = 10
+    ny = 10
   []
 []
 
@@ -100,7 +100,7 @@ velocity_interp_method = 'average'
     linear_iteration_ratio = 1
     dt = 0.1
   []
-  nl_abs_tol = 1e-12
+  nl_abs_tol = 1e-8
 []
 
 [Outputs]

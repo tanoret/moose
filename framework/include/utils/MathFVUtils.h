@@ -554,6 +554,39 @@ interpCoeffsFaceValue(const Limiter<T> & /*limiter*/,
   return face_value;
 }
 
+
+template <typename T>
+T
+interpCoeffsFaceValue(const Limiter<T> & /*limiter*/,
+                      const T & phi_upwind,
+                      const T & phi_downwind,
+                      const VectorValue<T> * const grad_phi_upwind,
+                      const VectorValue<T> * const grad_phi_downwind,
+                      const FaceInfo & fi,
+                      const bool fi_elem_is_upwind)
+{
+
+  // const auto rf = ((*grad_phi_upwind) * fi.dCN()) / (((*grad_phi_downwind) * fi.dCN()) + 1e-10);
+  const auto grad_elem = (*grad_phi_upwind) * fi.dCN();
+  const auto grad_face = (*grad_phi_downwind) * fi.dCN();
+  const auto grad_ratio = grad_elem / (grad_face + 1e-10);
+  // const auto rf_limit = std::min(grad_elem, grad_face) / (std::min(grad_elem, grad_face)  + 1e-10);
+
+  const auto face_centroid = fi.faceCentroid();
+  const auto cell_centroid = fi_elem_is_upwind ? fi.elemCentroid() : fi.neighborCentroid();
+  const auto delta_face = (*grad_phi_upwind) * (face_centroid - cell_centroid);
+
+  const auto rf = std::max(2.0 * grad_ratio - 1.0, 0.0);
+
+  const auto limiter = (rf + std::abs(rf)) / (1.0 + std::abs(rf));
+
+  // const auto limiter = std::max(std::min(rf, 1.0), 0.0);
+
+  auto face_value = phi_upwind + MetaPhysicL::raw_value(limiter * delta_face);
+
+  return face_value;
+}
+
 /**
  * Interpolates with a limiter
  */
@@ -721,17 +754,26 @@ interpolate(const FunctorBase<T> & functor, const FaceArg & face, const StateArg
         *limiter, phi_upwind, phi_downwind, &zero, *face.fi, face.elem_is_upwind);
   else
   {
-    const auto grad_phi_upwind = functor.template genericEvaluate<GFEK>(upwind_arg, time);
+    const auto time_arg = Moose::StateArg(1, Moose::SolutionIterationType::Time);
+    const auto grad_phi_upwind = functor.template genericEvaluate<GFEK>(upwind_arg, time_arg);
     // interp_coeffs = interpCoeffs(
     //     *limiter, phi_upwind, phi_downwind, &grad_phi_upwind, *face.fi, face.elem_is_upwind);
+    // interp_value = interpCoeffsFaceValue(*limiter,
+    //                                      phi_upwind,
+    //                                      phi_downwind,
+    //                                      &grad_phi_upwind,
+    //                                      *face.fi,
+    //                                      face.elem_is_upwind,
+    //                                      max_value,
+    //                                      min_value);
+    const auto grad_phi_downwind = functor.template genericEvaluate<GFEK>(face, time_arg);
     interp_value = interpCoeffsFaceValue(*limiter,
                                          phi_upwind,
                                          phi_downwind,
                                          &grad_phi_upwind,
+                                         &grad_phi_downwind,
                                          *face.fi,
-                                         face.elem_is_upwind,
-                                         max_value,
-                                         min_value);
+                                         face.elem_is_upwind);
   }
   return interp_value;
 }
