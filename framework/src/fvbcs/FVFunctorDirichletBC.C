@@ -58,11 +58,13 @@ FVFunctorDirichletBCTempl<is_ad>::boundaryValue(const FaceInfo & fi) const
   if (!_use_other_side)
     return _functor(sfa, determineState());
   else if (fi.elemPtr() == sfa.face_side)
-    return _functor({&fi, Moose::FV::LimiterType::CentralDifference, true, false, fi.neighborPtr(), nullptr},
-                    determineState());
+    return _functor(
+        {&fi, Moose::FV::LimiterType::CentralDifference, true, false, fi.neighborPtr(), nullptr},
+        determineState());
   else
-    return _functor({&fi, Moose::FV::LimiterType::CentralDifference, true, false, fi.elemPtr(), nullptr},
-                    determineState());
+    return _functor(
+        {&fi, Moose::FV::LimiterType::CentralDifference, true, false, fi.elemPtr(), nullptr},
+        determineState());
 }
 
 template class FVFunctorDirichletBCTempl<false>;
