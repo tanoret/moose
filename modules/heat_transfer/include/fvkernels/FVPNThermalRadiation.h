@@ -9,19 +9,18 @@
 
 #pragma once
 
-#include "FVDiffusion.h"
+#include "FVFluxKernel.h"
 
-class PNThermalRadiation : public FVDiffusion
+class FVPNThermalRadiation : public FVFluxKernel
 {
 public:
 
   static InputParameters validParams();
-  PNThermalRadiation(const InputParameters & params);
+  FVPNThermalRadiation(const InputParameters & params);
 
 protected:
 
-  // Overwriting current residual
-  virtual ADReal computeQpResidual() override final;
+  virtual ADReal computeQpResidual() override;
 
   // Order of the PN equation
   const unsigned int _n;
@@ -37,4 +36,8 @@ protected:
 
   /// Leading scattering cross section
   const Moose::Functor<ADReal> & _sigma_n_plus_1;
+
+  /// Decides if a geometric arithmetic or harmonic average is used for the
+  /// face interpolation of the diffusion coefficient.
+  Moose::FV::InterpMethod _coeff_interp_method;
 };
