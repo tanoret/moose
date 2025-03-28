@@ -38,6 +38,8 @@ FVPNThermalRadiation::validParams()
       coeff_interp_method,
       "Switch that can select face interpolation method for diffusion coefficients.");
 
+  params.set<unsigned short>("ghost_layers") = 2;
+
   return params;
 }
 
