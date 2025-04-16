@@ -17,7 +17,7 @@
  * turbulent kinetic energy dissipation
  * discretized using the finite volume method to a linear system.
  */
-class LinearFVTKEDSourceSink : public LinearFVElementalKernel
+class LinearFVEllipticBlendingSourceSink : public LinearFVElementalKernel
 {
 public:
   static InputParameters validParams();
@@ -26,9 +26,7 @@ public:
    * Class constructor.
    * @param params The InputParameters for the kernel.
    */
-  LinearFVTKEDSourceSink(const InputParameters & params);
-
-  virtual void initialSetup() override;
+  LinearFVEllipticBlendingSourceSink(const InputParameters & params);
 
   virtual Real computeMatrixContribution() override;
 
@@ -48,49 +46,21 @@ protected:
   /// Turbulent kinetic energy
   const Moose::Functor<Real> & _k;
 
+  /// Turbulent kinetic energy dissipation
+  const Moose::Functor<Real> & _epsilon;
+
+  /// Normal-wall velocity fluctuations
+  const Moose::Functor<Real> & _theta_squared;
+
   /// Density
   const Moose::Functor<Real> & _rho;
 
   /// Dynamic viscosity
   const Moose::Functor<Real> & _mu;
 
-  /// Turbulent dynamic viscosity
-  const Moose::Functor<Real> & _mu_t;
-
-  /// Wall boundaries
-  const std::vector<BoundaryName> & _wall_boundary_names;
-
-  /// If the user wants to use the linearized model
-  const bool _linearized_model;
-
-  /// Method used for wall treatment
-  NS::WallTreatmentEnum _wall_treatment;
-
-  /// Value of the first epsilon closure coefficient
-  const Real _C1_eps;
-
-  /// Value of the second epsilon closure coefficient
-  const Real _C2_eps;
-
-  /// C_mu constant
-  const Real _C_mu;
-
-  /// Production Limiter Constant
-  const Real _C_pl;
-
-  // Bool to activate v2f correction
-  const bool _v2f_bool;
-
-  /// theta-squared
-  const Moose::Functor<Real> * _theta_squared;
-
-  /// v2f time scale modification
-  const Real _A;
-
-  ///@{
-  /** Maps for wall treatment */
-  std::map<const Elem *, bool> _wall_bounded;
-  std::map<const Elem *, std::vector<Real>> _dist;
-  std::map<const Elem *, std::vector<const FaceInfo *>> _face_infos;
-  ///@}
+  /// Closure coefficients for v2f mdoel
+  const Real _C1;
+  const Real _C2;
+  const Real _C3;
+  const Real _C_mu_theta_2;
 };

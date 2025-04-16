@@ -45,6 +45,10 @@ LinearFVTKEDSourceSink::validParams()
   params.addParam<Real>("C_mu", 0.09, "Coupled turbulent kinetic energy closure.");
   params.addParam<Real>("C_pl", 10.0, "Production limiter constant multiplier.");
 
+  params.addParam<bool>("v2f_bool", false, "Boolean to activate the v2f correction.");
+  params.addParam<MooseFunctorName>("theta_squared", "Theta-squared field.");
+  params.addParam<Real>("A", 0.045, "v2f time scale modification factor.");
+
   return params;
 }
 
@@ -64,13 +68,19 @@ LinearFVTKEDSourceSink::LinearFVTKEDSourceSink(const InputParameters & params)
     _C1_eps(getParam<Real>("C1_eps")),
     _C2_eps(getParam<Real>("C2_eps")),
     _C_mu(getParam<Real>("C_mu")),
-    _C_pl(getParam<Real>("C_pl"))
+    _C_pl(getParam<Real>("C_pl")),
+    _v2f_bool(getParam<bool>("v2f_bool")),
+    _theta_squared(params.isParamValid("theta_squared")? &(getFunctor<Real>("theta_squared")) : nullptr),
+    _A(getParam<Real>("A"))
 {
   if (_dim >= 2 && !_v_var)
     paramError("v", "In two or more dimensions, the v velocity must be supplied!");
 
   if (_dim >= 3 && !_w_var)
     paramError("w", "In three or more dimensions, the w velocity must be supplied!");
+
+  if(_v2f_bool && !_theta_squared)
+    paramError("theta_squared", "If the v2f corrections are being used, the `theta_squared` functor should be defined.");
 }
 
 void
@@ -98,7 +108,6 @@ LinearFVTKEDSourceSink::computeMatrixContribution()
     const Real TKE = _k(elem_arg, state);
     const auto epsilon = _var.getElemValue(*_current_elem_info, state);
 
-    // Compute destruction
     const auto destruction = _C2_eps * rho * epsilon / TKE;
 
     // Assign to matrix (term gets multiplied by TKED)
@@ -191,7 +200,13 @@ LinearFVTKEDSourceSink::computeRightHandSideContribution()
     production_k = std::min(production_k, production_limit);
 
     // Compute production - recasted with mu_t definition to avoid division by epsilon
-    const auto production = _C1_eps * _C_mu * TKE * rho * production_k;
+    auto production = _C1_eps * _C_mu * TKE * rho * production_k;
+
+    if(_v2f_bool)
+    {
+      const Real theta_squared = (*_theta_squared)(elem_arg, state);
+      production *= (1.0 + _A*std::sqrt(TKE/theta_squared));
+    }
 
     // Assign to matrix (term gets multiplied by TKED)
     return production * _current_elem_volume;
