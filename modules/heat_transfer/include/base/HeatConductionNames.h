@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,5 +19,8 @@ static const std::string T_ambient = "T_ambient";
 namespace Constants
 {
 static const Real sigma = 5.670374419e-8;
+static const Real hp = 6.62607015e-34; // J.s
+static const Real c = 2.99792458e8; // m/s
+static const Real kb = 1.380649e-23; // J/K
 }
 }
