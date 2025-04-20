@@ -65,4 +65,5 @@ protected:
   const Real _C1;
   const Real _C2;
   const Real _C3;
+  const Real _C_mu_2;
 };

@@ -13,15 +13,15 @@ advected_interp_method = 'upwind'
 sigma_k = 1.0
 sigma_theta_2 = 1.0
 sigma_eps = 1.3
-C1_eps = 1.44
-C2_eps = 1.92
+C1_eps = 1.4
+C2_eps = 1.9
 C_mu = 0.09
 C_mu_theta_2 = 0.22
 CL = 0.23
 C_eta = 70.0
 
 ### Initial and Boundary Conditions ###
-intensity = 0.01
+intensity = 0.0001
 k_init = '${fparse 1.5*(intensity * bulk_u)^2}'
 eps_init = '${fparse C_mu^0.75 * k_init^1.5 / (2*H)}'
 
@@ -39,7 +39,7 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     ymin = 0
     ymax = ${H}
     nx = 40
-    ny = 10
+    ny = 20
     bias_y = 0.7
   []
   [block_2]
@@ -50,7 +50,7 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     ymin = ${fparse -H}
     ymax = 0
     nx = 40
-    ny = 10
+    ny = 20
     bias_y = ${fparse 1/0.7}
   []
   [smg]
@@ -211,8 +211,8 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     mu = ${mu}
     mu_t = 'mu_t'
     C_pl = 1e10
-    walls = ${walls}
-    wall_treatment = ${wall_treatment}
+    # walls = ${walls}
+    # wall_treatment = ${wall_treatment}
   []
 
   [TKED_advection]
@@ -409,9 +409,29 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     initial_condition = '${fparse ${k_init}^2 / eps_init}'
     two_term_boundary_expansion = false
   []
+  [time_scale_realizable]
+    type = MooseVariableFVReal
+    initial_condition = '${fparse ${k_init}^2 / eps_init}'
+    two_term_boundary_expansion = false
+  []
   [mu_t]
     type = MooseVariableFVReal
     initial_condition = '${fparse rho * C_mu * ${k_init}^2 / eps_init}'
+    two_term_boundary_expansion = false
+  []
+  [mixing_length_viscosity]
+    type = MooseVariableFVReal
+    initial_condition = '1.0'
+    two_term_boundary_expansion = false
+  []
+  [strain_rate]
+    type = MooseVariableFVReal
+    initial_condition = '1.0'
+    two_term_boundary_expansion = false
+  []
+  [realizable_scale]
+    type = MooseVariableFVReal
+    initial_condition = '1.0'
     two_term_boundary_expansion = false
   []
   [yplus]
@@ -423,9 +443,63 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     initial_condition = '0.1'
     two_term_boundary_expansion = false
   []
+  [u_var]
+    type = INSFVVelocityVariable
+    initial_condition = '1.0'
+    two_term_boundary_expansion = false
+  []
+  [v_var]
+    type = INSFVVelocityVariable
+    initial_condition = '1.0'
+    two_term_boundary_expansion = false
+  []
 []
 
 [AuxKernels]
+  [compute_u_var]
+    type = FunctorAux
+    functor = 'vel_x'
+    variable = 'u_var'
+    execute_on = 'NONLINEAR'
+  []
+  [compute_v_var]
+    type = FunctorAux
+    functor = 'vel_y'
+    variable = 'v_var'
+    execute_on = 'NONLINEAR'
+  []
+  [compute_mixing_length_viscosity]
+    type = INSFVMixingLengthTurbulentViscosityAux
+    variable = mixing_length_viscosity
+    mixing_length = 1.0
+    u = u_var
+    v = v_var
+    execute_on = 'NONLINEAR'
+  []
+  [compute_strain_rate]
+    type = ParsedAux
+    variable = strain_rate
+    functor_names = 'mixing_length_viscosity'
+    functor_symbols = 'mixing_length_viscosity'
+    expression = 'sqrt(mixing_length_viscosity)'
+    execute_on = 'NONLINEAR'
+  []
+  [compute_realizable_scale]
+    type = ParsedAux
+    variable = realizable_scale
+    functor_names = 'TKE theta_squared strain_rate'
+    functor_symbols = 'TKE theta_squared strain_rate'
+    expression = '0.6*TKE/(sqrt(3)*${C_mu_theta_2}*theta_squared*strain_rate)'
+    execute_on = 'NONLINEAR'
+  []
+  [compute_time_scale_realizable]
+    type = ParsedAux
+    variable = time_scale_realizable
+    functor_names = 'TKE TKED realizable_scale'
+    functor_symbols = 'TKE TKED realizable_scale'
+    expression = 'max(min(TKE/TKED, realizable_scale), 6.0*sqrt(${mu}/${rho}/TKED))'
+    execute_on = 'NONLINEAR'
+  []
   [compute_time_scale]
     type = ParsedAux
     variable = time_scale
@@ -437,9 +511,9 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
   [compute_mu_t]
     type = ParsedAux
     variable = mu_t
-    functor_names = 'TKE theta_squared time_scale'
-    functor_symbols = 'TKE theta_squared time_scale'
-    expression = '${rho} * min(${C_mu}*TKE*time_scale, ${C_mu_theta_2}*theta_squared*time_scale)'
+    functor_names = 'TKE theta_squared time_scale time_scale_realizable'
+    functor_symbols = 'TKE theta_squared time_scale time_scale_realizable'
+    expression = '${rho} * min(${C_mu}*TKE*time_scale_realizable, ${C_mu_theta_2}*theta_squared*time_scale)'
     execute_on = 'NONLINEAR'
   []
   [compute_y_plus]
@@ -457,9 +531,9 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
   [compute_L2]
     type = ParsedAux
     variable = L2
-    functor_names = 'TKE TKED'
-    functor_symbols = 'TKE TKED'
-    expression = '(${CL} * max(TKE^1.5/TKED, ${C_eta}*((${mu}/${rho})^3/TKED)^0.25))^2'
+    functor_names = 'TKE TKED time_scale_realizable'
+    functor_symbols = 'TKE TKED time_scale_realizable'
+    expression = '(${CL} * max(min(TKE^1.5/TKED, time_scale_realizable*TKE^0.5/0.6), ${C_eta}*((${mu}/${rho})^3/TKED)^0.25))^2'
     execute_on = 'NONLINEAR'
   []
 []
@@ -481,7 +555,7 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
 
   momentum_equation_relaxation = 0.7
   pressure_variable_relaxation = 0.3
-  turbulence_equation_relaxation = '0.25 0.25 0.25 0.9'
+  turbulence_equation_relaxation = '0.25 0.25 0.25 0.25'
   num_iterations = 1000
   pressure_absolute_tolerance = 1e-12
   momentum_absolute_tolerance = 1e-12

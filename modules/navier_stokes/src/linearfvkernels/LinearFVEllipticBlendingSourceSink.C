@@ -64,8 +64,8 @@ LinearFVEllipticBlendingSourceSink::LinearFVEllipticBlendingSourceSink(const Inp
 Real
 LinearFVEllipticBlendingSourceSink::computeMatrixContribution()
 {
-  // Assign to matrix (term gets multiplied by TKED)
-  return -_current_elem_volume;
+  // Assign to matrix (term gets multiplied by f)
+  return - 1.0 * _current_elem_volume;
 }
 
 Real

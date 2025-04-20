@@ -34,6 +34,7 @@ LinearFVThetaSquaredSourceSink::validParams()
   params.addParam<Real>("C1", 1.4, "First blending production coefficient - production of wall-normal stesses.");
   params.addParam<Real>("C2", 0.3, "Second blending production coefficient - bulk scale.");
   params.addParam<Real>("C3", 6.0, "Third blending coefficient - destruction scaling.");
+  params.addParam<Real>("C_mu_2", 0.22, "Elliptic blending coefficient.");
 
   return params;
 }
@@ -52,7 +53,8 @@ LinearFVThetaSquaredSourceSink::LinearFVThetaSquaredSourceSink(const InputParame
     _mu_t(getFunctor<Real>(NS::mu_t)),
     _C1(getParam<Real>("C1")),
     _C2(getParam<Real>("C2")),
-    _C3(getParam<Real>("C3"))
+    _C3(getParam<Real>("C3")),
+    _C_mu_2(getParam<Real>("C_mu_2"))
 {
   if (_dim >= 2 && !_v_var)
     paramError("v", "In two or more dimensions, the v velocity must be supplied!");
@@ -101,12 +103,16 @@ LinearFVThetaSquaredSourceSink::computeRightHandSideContribution()
 
   // Bulk production
   const auto nu = mu / rho;
-  const auto time_scale = std::max(TKE/TKED, _C3*std::sqrt(nu/TKED));
-  const auto T1 = -1.0/time_scale * ((_C1-_C3)*theta_squared - 2./3.*TKE*(_C1-1.0));
+
+  const auto Te = TKE/TKED;
+  const auto Te_realizable = 0.6*TKE/(std::sqrt(3.0)*_C_mu_2*theta_squared*symmetric_strain_tensor_sq_norm);
+  const auto Te_wall = _C3 * std::sqrt(nu/TKED);
+  const auto time_scale = std::max(std::min(Te, Te_realizable), Te_wall);
+  const auto T1 = 1.0/time_scale * ((_C1-_C3)*theta_squared - 2./3.*TKE*(_C1-1.0));
   const auto T2 = _C2*production_k;
 
   // Compute production
-  const auto production = rho*std::min(production_near_wall, T1 + T2);
+  const auto production = rho*std::min(production_near_wall, -T1 + T2);
 
   // Assign to matrix (term gets multiplied by TKED)
   return production * _current_elem_volume;

@@ -108,7 +108,7 @@ LinearFVTKEDSourceSink::computeMatrixContribution()
     const Real TKE = _k(elem_arg, state);
     const auto epsilon = _var.getElemValue(*_current_elem_info, state);
 
-    const auto destruction = _C2_eps * rho * epsilon / TKE;
+    auto destruction = _C2_eps * rho * epsilon / TKE;
 
     // Assign to matrix (term gets multiplied by TKED)
     return destruction * _current_elem_volume;
