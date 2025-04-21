@@ -21,7 +21,7 @@ CL = 0.23
 C_eta = 70.0
 
 ### Initial and Boundary Conditions ###
-intensity = 0.0001
+intensity = 0.01
 k_init = '${fparse 1.5*(intensity * bulk_u)^2}'
 eps_init = '${fparse C_mu^0.75 * k_init^1.5 / (2*H)}'
 
@@ -38,9 +38,9 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     xmax = ${L}
     ymin = 0
     ymax = ${H}
-    nx = 40
-    ny = 20
-    bias_y = 0.7
+    nx = 100
+    ny = 10
+    bias_y = 0.8
   []
   [block_2]
     type = GeneratedMeshGenerator
@@ -49,9 +49,9 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     xmax = ${L}
     ymin = ${fparse -H}
     ymax = 0
-    nx = 40
-    ny = 20
-    bias_y = ${fparse 1/0.7}
+    nx = 100
+    ny = 10
+    bias_y = ${fparse 1/0.8}
   []
   [smg]
     type = StitchedMeshGenerator
@@ -211,8 +211,8 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     mu = ${mu}
     mu_t = 'mu_t'
     C_pl = 1e10
-    # walls = ${walls}
-    # wall_treatment = ${wall_treatment}
+    walls = ${walls}
+    wall_treatment = ${wall_treatment}
   []
 
   [TKED_advection]
@@ -256,11 +256,13 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
   [theta_squared_advection]
     type = LinearFVTurbulentAdvection
     variable = theta_squared
+    walls = ${walls}
   []
   [theta_squared_diffusion]
     type = LinearFVTurbulentDiffusion
     variable = theta_squared
     diffusion_coeff = ${mu}
+    walls = ${walls}
     use_nonorthogonal_correction = false
   []
   [theta_squared_turb_diffusion]
@@ -268,6 +270,7 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = theta_squared
     diffusion_coeff = 'mu_t'
     scaling_coeff = ${sigma_theta_2}
+    walls = ${walls}
     use_nonorthogonal_correction = false
   []
   [theta_squared_source_sink]
@@ -281,6 +284,8 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     rho = ${rho}
     mu = ${mu}
     mu_t = 'mu_t'
+    walls = ${walls}
+    wall_treatment = ${wall_treatment}
   []
 
   [f_diffusion]
@@ -288,6 +293,7 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = f
     diffusion_coeff = 'L2'
     use_nonorthogonal_correction = true
+    walls = ${walls}
   []
   [f_source_sink]
     type = LinearFVEllipticBlendingSourceSink
@@ -299,6 +305,9 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     theta_squared = theta_squared
     rho = ${rho}
     mu = ${mu}
+    mu_t = 'mu_t'
+    walls = ${walls}
+    wall_treatment = ${wall_treatment}
   []
 []
 
@@ -382,24 +391,20 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = TKED
     use_two_term_expansion = false
   []
+[]
 
-  [walls-tke]
-    type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'top bottom'
-    variable = TKE
-    functor = 0.0
-  []
-  [walls-theta-squared]
-    type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'top bottom'
-    variable = theta_squared
-    functor = 0.0
-  []
-  [walls-f]
-    type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'top bottom'
-    variable = f
-    functor = 0.0
+[FVBCs]
+  [walls_mu_t]
+    type = INSFVTurbulentViscosityWallFunction
+    boundary = 'bottom top'
+    variable = mu_t
+    u = vel_x
+    v = vel_y
+    rho = ${rho}
+    mu = ${mu}
+    mu_t = 'mu_t'
+    tke = TKE
+    wall_treatment = ${wall_treatment}
   []
 []
 
@@ -412,6 +417,11 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
   [time_scale_realizable]
     type = MooseVariableFVReal
     initial_condition = '${fparse ${k_init}^2 / eps_init}'
+    two_term_boundary_expansion = false
+  []
+  [mu_t_keps]
+    type = MooseVariableFVReal
+    initial_condition = '${fparse rho * C_mu * ${k_init}^2 / eps_init}'
     two_term_boundary_expansion = false
   []
   [mu_t]
@@ -511,10 +521,27 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
   [compute_mu_t]
     type = ParsedAux
     variable = mu_t
-    functor_names = 'TKE theta_squared time_scale time_scale_realizable'
-    functor_symbols = 'TKE theta_squared time_scale time_scale_realizable'
+    functor_names = 'TKE TKED theta_squared time_scale time_scale_realizable mu_t_keps'
+    functor_symbols = 'TKE TKED theta_squared time_scale time_scale_realizable mu_t_keps'
     expression = '${rho} * min(${C_mu}*TKE*time_scale_realizable, ${C_mu_theta_2}*theta_squared*time_scale)'
+    # expression = 'min(mu_t_keps, ${rho}*${C_mu_theta_2}*theta_squared*time_scale)'
     execute_on = 'NONLINEAR'
+  []
+  [compute_mu_t_keps]
+    type = kEpsilonViscosityAux
+    variable = mu_t_keps
+    C_mu = ${C_mu}
+    tke = TKE
+    epsilon = TKED
+    mu = ${mu}
+    rho = ${rho}
+    u = vel_x
+    v = vel_y
+    bulk_wall_treatment = false
+    walls = ${walls}
+    wall_treatment = ${wall_treatment}
+    execute_on = 'NONLINEAR'
+    mu_t_ratio_max = 1e20
   []
   [compute_y_plus]
     type = RANSYPlusAux
@@ -534,6 +561,7 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
     functor_names = 'TKE TKED time_scale_realizable'
     functor_symbols = 'TKE TKED time_scale_realizable'
     expression = '(${CL} * max(min(TKE^1.5/TKED, time_scale_realizable*TKE^0.5/0.6), ${C_eta}*((${mu}/${rho})^3/TKED)^0.25))^2'
+    # expression = '(${CL}*max(TKE^1.5/TKED,${C_eta}*((${mu}/${rho})^3/TKED)^0.25))^2'
     execute_on = 'NONLINEAR'
   []
 []
@@ -544,7 +572,7 @@ wall_treatment = 'eq_newton'  # Options: eq_newton, eq_incremental, eq_linearize
   rhie_chow_user_object = 'rc'
   momentum_systems = 'u_system v_system'
   pressure_system = 'pressure_system'
-  turbulence_systems = 'TKE_system TKED_system v2_system f_system'
+  turbulence_systems = 'TKE_system TKED_system f_system v2_system'
 
   momentum_l_abs_tol = 1e-14
   pressure_l_abs_tol = 1e-14

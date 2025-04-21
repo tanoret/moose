@@ -28,6 +28,8 @@ public:
    */
   LinearFVEllipticBlendingSourceSink(const InputParameters & params);
 
+  virtual void initialSetup() override;
+
   virtual Real computeMatrixContribution() override;
 
   virtual Real computeRightHandSideContribution() override;
@@ -58,9 +60,29 @@ protected:
   /// Dynamic viscosity
   const Moose::Functor<Real> & _mu;
 
+  /// Turbulent dynamic viscosity
+  const Moose::Functor<Real> & _mu_t;
+
+  /// Wall boundaries
+  const std::vector<BoundaryName> & _wall_boundary_names;
+
+  /// If the user wants to use the linearized model
+  const bool _linearized_model;
+
+  /// Method used for wall treatment
+  NS::WallTreatmentEnum _wall_treatment;
+
+  ///@{
+  /** Maps for wall treatment */
+  std::map<const Elem *, bool> _wall_bounded;
+  std::map<const Elem *, std::vector<Real>> _dist;
+  std::map<const Elem *, std::vector<const FaceInfo *>> _face_infos;
+  ///@}
+
   /// Closure coefficients for v2f mdoel
   const Real _C1;
   const Real _C2;
   const Real _C3;
+  const Real _C_mu;
   const Real _C_mu_theta_2;
 };
