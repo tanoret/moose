@@ -92,5 +92,5 @@ FVSP3ThermalRadiationDiffusion::computeQpResidual()
   // Scaling with order of the diffusion coefficient
   coef_face *= _mu_order; 
 
-  return -1 * _mu_order * dudn;
+  return -1 * coef_face * dudn; // isn't this to be "coef_face * dudn" ?
 }
