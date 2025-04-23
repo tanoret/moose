@@ -26,34 +26,33 @@ kap = 1.0
         type = MooseVariableFVReal
         initial_condition = ${T0}
     []
-    [psi_1]
+    # Never include _ in variable namse to use it to functor naem
+    [psi1] 
         type = MooseVariableFVReal
-        initial_condition = 0.0
     []
-    [psi_2]
+    [psi2]
         type = MooseVariableFVReal
-        initial_condition = 0.0
     []
 []
 
 [FVKernels]
     [diffusion_1]
         type = FVSP3ThermalRadiationDiffusion
-        variable = psi_1
+        variable = psi1
         epsilon = ${eps}
         kappa = ${kap}
         order = first  
     []
     [diffusion_2]
         type = FVSP3ThermalRadiationDiffusion
-        variable = psi_2
+        variable = psi2
         epsilon = ${eps}
         kappa = ${kap}
         order = second 
     []
     [source_1]
         type = FVSP3ThermalRadiationSourceSink
-        variable = psi_1
+        variable = psi1
         T = 'T'
         nu = ${nu1}
         refraction_index = ${n1}
@@ -61,7 +60,7 @@ kap = 1.0
     []
     [source_2]
         type = FVSP3ThermalRadiationSourceSink
-        variable = psi_2
+        variable = psi2
         T = 'T'
         nu = ${nu1}
         refraction_index = ${n1}
@@ -72,9 +71,9 @@ kap = 1.0
         type = FVSP3TemperatureSourceSink
         variable = T
         absorptivities = '${kap}'
-        psi_1 = 'psi_1'
-        psi_2 = 'psi_2'
-        band_frequency_width = '${nu1}'
+        psi_1 = 'psi1'
+        psi_2 = 'psi2'
+        band_frequency_width = 1
     []
 
     [energy_time]
@@ -92,25 +91,25 @@ kap = 1.0
     [BC_1]
         type = FVSP3ThermalRadiationBC
         boundary = 'left right'
-        variable = psi_1
+        variable = psi1
         T = 'T'
         nu = ${nu1}
         refraction_index = ${n1}
         kappa = ${kap}
         epsilon = ${eps}
-        psi = 'psi_2'
+        psi = 'psi2'
         order = first
     []
     [BC_2]
         type = FVSP3ThermalRadiationBC
         boundary = 'left right'
-        variable = psi_2
+        variable = psi2
         T = 'T'
         nu = ${nu1}
         refraction_index = ${n2}
         kappa = ${kap}
         epsilon = ${eps}
-        psi = 'psi_1'
+        psi = 'psi1'
         order = second
     []
 
@@ -130,11 +129,11 @@ kap = 1.0
 []
 
 [Executioner]
-    type = Transient
-    steady_state_detection = true
-    steady_state_tolerance = 1e-12 
-    dt = 1e-2
-    num_steps = 100
+  type = Transient
+  solve_type = 'PJFNK'
+
+  num_steps = 100
+  dt = 0.0001
 []
   
 [Outputs]
