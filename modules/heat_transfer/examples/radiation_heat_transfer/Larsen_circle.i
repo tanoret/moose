@@ -5,7 +5,7 @@ n2 = 1
 alpha = 0.92
 Tb = 300
 T0 = 1000
-epsilon = 1
+epsilon = 1.0
 
 nu1 = 42827494000000.0
 
@@ -18,14 +18,14 @@ nu6half = 92243833230769.23
 nu7half = 187370286250000.0
 nu8half = 85654988000000.0
 
-kappa1 = 1.0
-kappa2 = 1.0
-kappa3 = 1.0
-kappa4 = 1.0
-kappa5 = 1.0
-kappa6 = 1.0
-kappa7 = 1.0
-kappa8 = 1.0
+kappa1 = 7136.06
+kappa2 = 567.32
+kappa3 = 267.98
+kappa4 = 27.98
+kappa5 = 15.45
+kappa6 = 7.7
+kappa7 = 0.5
+kappa8 = 0.4
 
 nu1to2 = 7137915666666.664
 nu2to3 = 4542309969696.977
@@ -34,17 +34,19 @@ nu4to5 = 8327568277777.781
 nu5to6 = 10706873500000.0
 nu6to7 = 14275831333333.328
 nu7to8 = 1399031470666666.8
-nu8to9 = 1399031470666666.8
+nu8to9 = 13990314706666668
 
 [Mesh]
-    [cmg]
-        type = CartesianMeshGenerator
-        dim = 1
-        dx = 1
-        ix = 100
+    [ccmg]
+      type = ConcentricCircleMeshGenerator
+      has_outer_square = false
+      radii = '0.41 0.46  0.5'
+      num_sectors = 20
+      rings = '1 1 1'
+      preserve_volumes = false
+      smoothing_max_it = 2
     []
 []
-
 
 [Variables]
   [T]
@@ -415,7 +417,7 @@ nu8to9 = 1399031470666666.8
 [FVBCs]
   [BC11]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi11
       T = 'T'
       nu = ${nu1half}
@@ -428,7 +430,7 @@ nu8to9 = 1399031470666666.8
 
   [BC21]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi21
       T = 'T'
       nu = ${nu1half}
@@ -441,7 +443,7 @@ nu8to9 = 1399031470666666.8
 
   [BC12]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi12
       T = 'T'
       nu = ${nu2half}
@@ -454,7 +456,7 @@ nu8to9 = 1399031470666666.8
 
   [BC22]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi22
       T = 'T'
       nu = ${nu2half}
@@ -467,7 +469,7 @@ nu8to9 = 1399031470666666.8
 
   [BC13]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi13
       T = 'T'
       nu = ${nu3half}
@@ -480,7 +482,7 @@ nu8to9 = 1399031470666666.8
 
   [BC23]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi23
       T = 'T'
       nu = ${nu3half}
@@ -493,7 +495,7 @@ nu8to9 = 1399031470666666.8
 
   [BC14]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi14
       T = 'T'
       nu = ${nu4half}
@@ -506,7 +508,7 @@ nu8to9 = 1399031470666666.8
 
   [BC24]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi24
       T = 'T'
       nu = ${nu4half}
@@ -519,7 +521,7 @@ nu8to9 = 1399031470666666.8
 
   [BC15]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi15
       T = 'T'
       nu = ${nu5half}
@@ -532,7 +534,7 @@ nu8to9 = 1399031470666666.8
 
   [BC25]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi25
       T = 'T'
       nu = ${nu5half}
@@ -545,7 +547,7 @@ nu8to9 = 1399031470666666.8
 
   [BC16]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi16
       T = 'T'
       nu = ${nu6half}
@@ -558,7 +560,7 @@ nu8to9 = 1399031470666666.8
 
   [BC26]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi26
       T = 'T'
       nu = ${nu6half}
@@ -571,7 +573,7 @@ nu8to9 = 1399031470666666.8
 
   [BC17]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi17
       T = 'T'
       nu = ${nu7half}
@@ -584,7 +586,7 @@ nu8to9 = 1399031470666666.8
 
   [BC27]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi27
       T = 'T'
       nu = ${nu7half}
@@ -597,7 +599,7 @@ nu8to9 = 1399031470666666.8
 
   [BC18]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi18
       T = 'T'
       nu = ${nu8half}
@@ -610,7 +612,7 @@ nu8to9 = 1399031470666666.8
 
   [BC28]
       type = FVSP3ThermalRadiationBC
-      boundary = 'left right'
+      boundary = outer
       variable = psi28
       T = 'T'
       nu = ${nu8half}
@@ -623,7 +625,7 @@ nu8to9 = 1399031470666666.8
 
     [BC_temperature]
         type = FVSP3TemperatureBC
-        boundary = 'left right'
+        boundary =  outer
         variable = T
         Tb = ${Tb}
         n1 = ${n1}
@@ -638,11 +640,13 @@ nu8to9 = 1399031470666666.8
 
 [Executioner]
   type = Transient
-  solve_type = 'PJFNK'
+  solve_type = 'Newton'
 
   num_steps = 100
-  dt = 0.0001
+  dt = 0.00001
+
   nl_rel_tol = 1e-6
+  l_tol = 1e-6
 
   petsc_options_iname = '-pc_type -pc_factor_shift_type -pc_factor_mat_solver_type'
   petsc_options_value = 'lu       NONZERO                superlu_dist'
