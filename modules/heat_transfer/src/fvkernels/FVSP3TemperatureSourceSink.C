@@ -23,6 +23,7 @@ FVSP3TemperatureSourceSink::validParams()
   params.addParam<std::vector<MooseFunctorName>>("psi_1", "The vector of radiation heat flux from group 1.");
   params.addParam<std::vector<MooseFunctorName>>("psi_2", "The vector of radiation heat flux from group 1");
   params.addParam<std::vector<Real>>("band_frequency_width", "The width in Hz of the frequency bands used in the multi-band approximation.");
+  params.addParam<std::vector<Real>>("integral_width", "The width of integral.");
 
   params.set<unsigned short>("ghost_layers") = 2;
 
@@ -33,7 +34,7 @@ FVSP3TemperatureSourceSink::FVSP3TemperatureSourceSink(const InputParameters & p
   : FVFluxKernel(params),
     _absorptivity_vec(getParam<std::vector<MooseFunctorName>>("absorptivities")),
     _psi1_vec(getParam<std::vector<MooseFunctorName>>("psi_1")),
-    _psi2_vec(getParam<std::vector<MooseFunctorName>>("psi_2")),
+    _psi2_vec(getParam<std::vector<MooseFunctorName>>( "psi_2")),
     _band_frequency_width(getParam<std::vector<Real>>("band_frequency_width"))
 {
 
@@ -65,6 +66,7 @@ FVSP3TemperatureSourceSink::FVSP3TemperatureSourceSink(const InputParameters & p
   // Give an error is the number of band widths does not match the number of bands defined for the thermal radiation groups
   if (_band_frequency_width.size() != num_values)
     mooseError("Number of variables in the psi_2 vector is not the same than the psi_1 vector!");
+  
 }
 
 ADReal
@@ -81,7 +83,8 @@ FVSP3TemperatureSourceSink::computeQpResidual()
       const auto band_grad_phi_2 = _a2 * _psi2_vec_functors[index]->gradient(face_arg, state) * _face_info->normal();
       const auto band_kappa = (*_absorptivity_vec_functors[index])(face_arg, state);
       const auto band_width = _band_frequency_width[index];
-      thermal_flux += 1./band_kappa * (band_grad_phi_1 + band_grad_phi_1) * band_width;
+
+      thermal_flux += 1./band_kappa * (band_grad_phi_1 + band_grad_phi_2) * band_width;
   }
 
   return -1 * thermal_flux;

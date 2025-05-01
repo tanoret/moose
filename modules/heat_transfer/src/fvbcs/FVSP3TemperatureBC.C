@@ -26,7 +26,7 @@ FVSP3TemperatureBC::validParams()
 
   params.addRequiredParam<MooseFunctorName>("alpha", "The hemispheric emissivity of the medium.");
   params.addRequiredParam<Real>("nu1", "The maximum opaque frequency of the medium.");
-  params.addParam<unsigned int> ("Nint", "The number of Plank function integral interval");
+  params.addParam<unsigned int> ("Nintegral", "The number of Plank function integral interval");
 
   return params;
 }
@@ -40,7 +40,7 @@ FVSP3TemperatureBC::FVSP3TemperatureBC(const InputParameters & parameters)
     _k(getFunctor<ADReal>("k")),
     _alpha(getFunctor<ADReal>("alpha")),
     _nu1(getParam<Real>("nu1")),
-    _Nint(getParam<unsigned int>("Nint"))
+    _Nint(getParam<unsigned int>("Nintegral"))
 {
 }
 
