@@ -10,8 +10,9 @@
 #pragma once
 
 #include "FVFluxKernel.h"
+#include "FVDiffusionInterpolationInterface.h"
 
-class FVPNThermalRadiation : public FVFluxKernel
+class FVPNThermalRadiation : public FVFluxKernel, public FVDiffusionInterpolationInterface
 {
 public:
 

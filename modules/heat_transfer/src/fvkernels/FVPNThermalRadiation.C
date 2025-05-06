@@ -17,6 +17,7 @@ InputParameters
 FVPNThermalRadiation::validParams()
 {
   InputParameters params = FVFluxKernel::validParams();
+  params += FVDiffusionInterpolationInterface::validParams();
   params.addClassDescription(
       "Kernel that assembles the equations for PN thermal radiation transport.");
 
@@ -43,6 +44,7 @@ FVPNThermalRadiation::validParams()
 
 FVPNThermalRadiation::FVPNThermalRadiation(const InputParameters & params)
   : FVFluxKernel(params),
+    FVDiffusionInterpolationInterface(params),
     _n(getParam<unsigned int>("n")),
     _phi_n_minus_2(getFunctor<ADReal>("phi_n_minus_2")),
     _phi_n_plus_2(getFunctor<ADReal>("phi_n_plus_2")),
@@ -92,7 +94,7 @@ FVPNThermalRadiation::computeQpResidual()
   const auto current_n_order_plus_2 = Utility::pow<2>(rn+1)/((2*rn+1)*(2*rn+3));
   const auto current_n_order_minus_2 = Utility::pow<2>(rn)/((2*rn+1)*(2*rn-1));
   const auto res_order = -(current_n_order_plus_2/sigma_n_plus_1_interpolated + 
-                           current_n_order_minus_2/sigma_n_minus_1_interpolated) * gradUDotNormal(state);
+                           current_n_order_minus_2/sigma_n_minus_1_interpolated) * gradUDotNormal(state, _correct_skewness);
 
   return res_leading_order + res_lagged_order + res_order;
 }

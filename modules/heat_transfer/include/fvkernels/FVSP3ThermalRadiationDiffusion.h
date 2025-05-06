@@ -10,6 +10,7 @@
 #pragma once
 
 #include "FVFluxKernel.h"
+#include "FVDiffusionInterpolationInterface.h"
 
 /// FVSP3ThermalRadiationDiffusion implements a diffusion term for the SP3 thermal radiation diffusion/
 ///
@@ -17,7 +18,7 @@
 ///
 ///     - weak form: \int_{A} (\epsilon^2 \mu_n^2) \nabla u / coef \cdot \vec{n} dA
 ///
-class FVSP3ThermalRadiationDiffusion : public FVFluxKernel
+class FVSP3ThermalRadiationDiffusion : public FVFluxKernel, public FVDiffusionInterpolationInterface
 {
 public:
   static InputParameters validParams();

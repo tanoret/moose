@@ -16,6 +16,7 @@ InputParameters
 FVSP3ThermalRadiationDiffusion::validParams()
 {
   InputParameters params = FVFluxKernel::validParams();
+  params += FVDiffusionInterpolationInterface::validParams();
   params.addClassDescription(
       "Computes residual for the SP3 diffusion operator for finite volume method.");
 
@@ -38,6 +39,7 @@ FVSP3ThermalRadiationDiffusion::validParams()
 
 FVSP3ThermalRadiationDiffusion::FVSP3ThermalRadiationDiffusion(const InputParameters & params)
   : FVFluxKernel(params),
+    FVDiffusionInterpolationInterface(params),
     _optical_thickness(getFunctor<ADReal>("epsilon")),
     _absorptivity(getFunctor<ADReal>("kappa")),
     _order(getParam<MooseEnum>("order")),
@@ -56,7 +58,7 @@ FVSP3ThermalRadiationDiffusion::computeQpResidual()
   using namespace Moose::FV;
   const auto state = determineState();
 
-  const auto dudn = gradUDotNormal(state);
+  const auto dudn = gradUDotNormal(state, _correct_skewness);
 
   ADReal coef_face;
 

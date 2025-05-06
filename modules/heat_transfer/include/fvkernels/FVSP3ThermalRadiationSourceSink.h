@@ -32,6 +32,10 @@ protected:
   /// Frquency
   const Moose::Functor<ADReal> & _nu;
 
+  /// Frequency bounds for numerical integration
+  const Moose::Functor<ADReal> * _nu_low;
+  const Moose::Functor<ADReal> * _nu_high;
+
   /// Refraction index
   const Moose::Functor<ADReal> & _n1;
 
