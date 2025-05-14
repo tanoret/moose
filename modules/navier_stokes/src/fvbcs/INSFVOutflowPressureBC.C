@@ -48,10 +48,10 @@ INSFVOutflowPressureBCTempl<T>::INSFVOutflowPressureBCTempl(const InputParameter
 
 template <class T>
 ADReal
-INSFVOutflowPressureBCTempl<T>::boundaryValue(const FaceInfo & fi) const
+INSFVOutflowPressureBCTempl<T>::boundaryValue(const FaceInfo & fi,
+                                              const Moose::StateArg & state) const
 {
   // const auto boundary_face = singleSidedFaceArg(&fi);
-  const auto state = determineState();
 
   const bool use_elem = fi.faceType(std::make_pair(_var.number(), _var.sys().number())) ==
                         FaceInfo::VarFaceNeighbors::ELEM;
@@ -61,8 +61,7 @@ INSFVOutflowPressureBCTempl<T>::boundaryValue(const FaceInfo & fi) const
   if (_dim == 1)
     grad_u = ADRealTensorValue(_u.gradient(elem_arg, state));
   else if (_dim == 2)
-    grad_u =
-        ADRealTensorValue(_u.gradient(elem_arg, state), (*_v).gradient(elem_arg, state));
+    grad_u = ADRealTensorValue(_u.gradient(elem_arg, state), (*_v).gradient(elem_arg, state));
   else
     grad_u = ADRealTensorValue(_u.gradient(elem_arg, state),
                                (*_v).gradient(elem_arg, state),

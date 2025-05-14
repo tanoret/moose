@@ -27,6 +27,13 @@ WCNSFV2PMassAdvection::validParams()
   params.set<unsigned short>("ghost_layers") = 2;
   params.suppressParameter<bool>("force_boundary_execution");
 
+  params.addRelationshipManager(
+      "ElementSideNeighborLayers",
+      Moose::RelationshipManagerType::GEOMETRIC | Moose::RelationshipManagerType::ALGEBRAIC |
+          Moose::RelationshipManagerType::COUPLING,
+      [](const InputParameters & obj_params, InputParameters & rm_params)
+      { FVRelationshipManagerInterface::setRMParamsAdvection(obj_params, rm_params, 3); });
+
   return params;
 }
 
@@ -39,11 +46,8 @@ WCNSFV2PMassAdvection::WCNSFV2PMassAdvection(const InputParameters & params)
   const bool need_more_ghosting =
       Moose::FV::setInterpolationMethods(*this, _advected_interp_method, _velocity_interp_method);
   if (need_more_ghosting && _tid == 0)
-  {
-    adjustRMGhostLayers(std::max((unsigned short)(3), _pars.get<unsigned short>("ghost_layers")));
     getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")
         ->setErrorOnJacobianNonzeroReallocation(false);
-  }
 
   auto param_check = [&params, this](const auto & param_name)
   {

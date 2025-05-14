@@ -22,6 +22,8 @@ WCNSFV2PLevelSet::validParams()
   params.addParam<MooseFunctorName>("interface_thickness", 1e-3, "The interface thickness.");
   params.addParam<MooseFunctorName>("gamma", 1.0, "The reinitialization parameter.");
   params.addParam<MooseFunctorName>("regularizer_control", 1.0, "The reinitialization parameter.");
+  params.addParam<bool>(
+      "correct_skewness", false, "Whether to correct for mesh skewness in face calculations.");
 
   params.set<unsigned short>("ghost_layers") = 2;
   return params;
@@ -31,7 +33,8 @@ WCNSFV2PLevelSet::WCNSFV2PLevelSet(const InputParameters & params)
   : FVFluxKernel(params),
     _reinitialization_parameter(getFunctor<ADReal>("gamma")),
     _interface_thickness(getFunctor<ADReal>("interface_thickness")),
-    _regularizer_control(getFunctor<ADReal>("regularizer_control"))
+    _regularizer_control(getFunctor<ADReal>("regularizer_control")),
+    _correct_skewness(getParam<bool>("correct_skewness"))
 {
 }
 
@@ -48,10 +51,10 @@ WCNSFV2PLevelSet::computeQpResidual()
   const auto grad_phi = _var.gradient(face, state);
   const auto grad_phi_norm = NS::computeSpeed(_var.gradient(face, state)) + offset;
 
-  const auto regularizer =
-      _regularizer_control(face, state) * phi * (1.0 - phi) * gradUDotNormal(state) / grad_phi_norm;
+  const auto regularizer = _regularizer_control(face, state) * phi * (1.0 - phi) *
+                           gradUDotNormal(state, _correct_skewness) / grad_phi_norm;
 
-  const auto dPhidn = _interface_thickness(face, state) * gradUDotNormal(state);
+  const auto dPhidn = _interface_thickness(face, state) * gradUDotNormal(state, _correct_skewness);
 
   // ADReal rho_cp_face;
   // if (onBoundary(*_face_info))

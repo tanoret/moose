@@ -34,4 +34,7 @@ protected:
 
   /// Regularizer control
   const Moose::Functor<ADReal> & _regularizer_control;
+
+  /// Whether to correct for mesh skewness in face calculations
+  const bool _correct_skewness;
 };

@@ -77,14 +77,6 @@ velocity_interp_method = 'rc'
     type = INSFVScalarFieldVariable
     initial_condition = 0.5
   []
-  # [pressure_hydro]
-  #   type = INSFVPressureVariable
-  #   two_term_boundary_expansion = false
-  # []
-  # [lambda]
-  #   family = SCALAR
-  #   order = FIRST
-  # []
 []
 
 [FVKernels]
@@ -119,19 +111,6 @@ velocity_interp_method = 'rc'
     interface_thickness = 0.1
     regularizer_control = 1e-3
   []
-
-  # [mean_alpha]
-  #   type = FVIntegralValueConstraint
-  #   variable = alpha_1_var
-  #   lambda = lambda
-  #   phi0 = 0.5
-  # []
-  # [mean_zero_pressure]
-  #   type = FVIntegralValueConstraint
-  #   variable = pressure
-  #   lambda = lambda
-  #   phi0 = 0.0
-  # []
 
   [u_time_1]
     type = WCNSFV2PMomentumTimeDerivative
@@ -327,16 +306,6 @@ velocity_interp_method = 'rc'
     gravity = '${g} 0 0'
   []
 
-  # [pressure_hydro_laplacian]
-  #   type = FVDiffusion
-  #   variable = pressure_hydro
-  #   coeff = 1.0
-  # []
-  # [divergence_rho_g_mixture]
-  #   type = FVDivergence
-  #   variable = pressure_hydro
-  #   vector_field = rho_g_mixture
-  # []
 []
 
 [FVBCs]
@@ -390,35 +359,6 @@ velocity_interp_method = 'rc'
     function = 0
   []
 
-  # [outlet_p]
-  #   type = INSFVOutletPressureBC
-  #   boundary = 'top'
-  #   variable = pressure
-  #   function = '0.0'
-  # []
-
-  # [outlet_p]
-  #   type = INSFVAveragePressureValueBC
-  #   boundary = 'right'
-  #   variable = pressure
-  #   lambda = 'lambda'
-  # []
-
-  # [fixed_hydro_pressure]
-  #   type = FVDirichletBC
-  #   boundary = 'top'
-  #   variable = pressure_hydro
-  #   value = 0.0
-  # []
-
-  # [outlet_p_hydro]
-  #   type = INSFVOutletPressureBC
-  #   boundary = 'right'
-  #   variable = pressure
-  #   #functor = 'pressure_hydro'
-  #   function = '0.0'
-  # []
-
   [outlet_p_hydro]
     type = INSFVOutflowPressureBC
     boundary = 'right'
@@ -436,18 +376,6 @@ velocity_interp_method = 'rc'
     value = ${fparse 1-inlet_phase_2}
   []
 []
-
-# [UserObjects]
-#   [set_pressure]
-#     type = NSPressurePin
-#     variable = pressure
-#     # pin_type = 'average'
-#     # pressure_average = 'pavg'
-#     pin_type = 'point-value'
-#     point = '0 0 0'
-#     execute_on = 'TIMESTEP_END'
-#   []
-# []
 
 [AuxVariables]
   [alpha_2_var]
@@ -534,7 +462,7 @@ velocity_interp_method = 'rc'
 [Postprocessors]
   [Re]
     type = ParsedPostprocessor
-   function = '${rho_1} * ${fparse pipe_diameter} * ${U_1}'
+    expression = '${rho_1} * ${fparse pipe_diameter} * ${U_1}'
     pp_names = ''
   []
   [lin]

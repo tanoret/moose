@@ -30,26 +30,29 @@ WCNSFV2PMomentumDiffusion::validParams()
 }
 
 WCNSFV2PMomentumDiffusion::WCNSFV2PMomentumDiffusion(const InputParameters & params)
-  : INSFVMomentumDiffusion(params),
-    _alpha(getFunctor<ADReal>("fd"))
+  : INSFVMomentumDiffusion(params), _alpha(getFunctor<ADReal>("fd"))
 {
   if (!_u_var)
-    paramError("u", "The u velocity must be defined for the divergence term in 'WCNSFV2PMomentumDiffusion'.");
+    paramError(
+        "u",
+        "The u velocity must be defined for the divergence term in 'WCNSFV2PMomentumDiffusion'.");
 
   if (_dim >= 2 && !_v_var)
-    paramError("v",
-               "The v velocity must be defined for the divergence term in 'WCNSFV2PMomentumDiffusion'");
+    paramError(
+        "v",
+        "The v velocity must be defined for the divergence term in 'WCNSFV2PMomentumDiffusion'");
 
   if (_dim >= 3 && !_w_var)
-    paramError("w",
-               "The w velocity must be defined for the divergence term in 'WCNSFV2PMomentumDiffusion'");
+    paramError(
+        "w",
+        "The w velocity must be defined for the divergence term in 'WCNSFV2PMomentumDiffusion'");
 }
 
 ADReal
 WCNSFV2PMomentumDiffusion::computeStrongResidual(const bool populate_a_coeffs)
 {
   const Moose::StateArg state = determineState();
-  const auto dudn = gradUDotNormal(state);
+  const auto dudn = gradUDotNormal(state, _correct_skewness);
   ADReal face_mu;
 
   if (onBoundary(*_face_info))
@@ -138,5 +141,5 @@ WCNSFV2PMomentumDiffusion::computeStrongResidual(const bool populate_a_coeffs)
     dudn_transpose += gradient_transpose.row(_index) * _face_info->normal();
   }
 
-  return -face_mu * (dudn + dudn_transpose) + 2./3. * face_mu * divergence;
+  return -face_mu * (dudn + dudn_transpose) + 2. / 3. * face_mu * divergence;
 }
