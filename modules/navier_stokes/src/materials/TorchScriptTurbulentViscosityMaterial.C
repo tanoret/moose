@@ -66,62 +66,48 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
   const auto r = makeElemArg(_current_elem);
   const auto t = determineState();
 
-  Real eta_1 = 0.0;
-  Real eta_2 = 0.0;
-  Real tr_sij = 0.0;
-
-  const auto u_grad_x = _u_var.gradient(r,t)(0);
-  eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (u_grad_x + u_grad_x)));
-  eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (u_grad_x - u_grad_x)));
-  tr_sij += MetaPhysicL::raw_value(u_grad_x);
-
+  TensorValue<Real> grad_velocity;
+  grad_velocity(0, 0) = MetaPhysicL::raw_value(_u_var.gradient(r,t)(0));
   if (_mesh_dimension > 1)
   {
-    const auto u_grad_y = _u_var.gradient(r,t)(1);
-    const auto v_grad_x = _v_var->gradient(r,t)(0);
-    const auto v_grad_y = _v_var->gradient(r,t)(1);
-
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (u_grad_y + v_grad_x)));
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (v_grad_x + u_grad_y)));
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (v_grad_y + v_grad_y)));
-
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (u_grad_y - v_grad_x)));
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (v_grad_x - u_grad_y)));
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (v_grad_y - v_grad_y)));
-
-    tr_sij += MetaPhysicL::raw_value(v_grad_y);
+    grad_velocity(0, 1) = MetaPhysicL::raw_value(_u_var.gradient(r,t)(1));
+    grad_velocity(1, 0) = MetaPhysicL::raw_value(_v_var->gradient(r,t)(0));
+    grad_velocity(1, 1) = MetaPhysicL::raw_value(_v_var->gradient(r,t)(1));
   }
   if (_mesh_dimension > 2)
   {
-    const auto u_grad_z = _u_var.gradient(r,t)(2);
-    const auto v_grad_z = _v_var->gradient(r,t)(2);
-    const auto w_grad_x = _v_var->gradient(r,t)(0);
-    const auto w_grad_y = _v_var->gradient(r,t)(1);
-    const auto w_grad_z = _v_var->gradient(r,t)(2);
-
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (u_grad_z + w_grad_x)));
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (w_grad_x + u_grad_z)));
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (v_grad_z + w_grad_y)));
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (w_grad_y + v_grad_z)));
-    eta_1 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (w_grad_z + w_grad_z)));
-
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (u_grad_z - w_grad_x)));
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (w_grad_x - u_grad_z)));
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (v_grad_z - w_grad_y)));
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (w_grad_y - v_grad_z)));
-    eta_2 += MetaPhysicL::raw_value(Utility::pow<2>(0.5 * (w_grad_z - w_grad_z)));
-
-    tr_sij += MetaPhysicL::raw_value(w_grad_z);
+    grad_velocity(0, 2)= MetaPhysicL::raw_value(_u_var.gradient(r,t)(2));
+    grad_velocity(1, 2)= MetaPhysicL::raw_value(_v_var->gradient(r,t)(2));
+    grad_velocity(2, 0)= MetaPhysicL::raw_value(_w_var->gradient(r,t)(0));
+    grad_velocity(2, 1)= MetaPhysicL::raw_value(_w_var->gradient(r,t)(1));
+    grad_velocity(2, 2)= MetaPhysicL::raw_value(_w_var->gradient(r,t)(2));
   }
 
+  const TensorValue<Real> sij = (grad_velocity + grad_velocity) / 2.0;
+  const TensorValue<Real> rij = (grad_velocity - grad_velocity) / 2.0;
+
+  const TensorValue<Real> I(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+  const Real eta1 = std::max(sij.contract(sij), 0.1);
+  const Real eta2 = std::max(rij.contract(rij), 0.1);
+
+  const Real G1_term = eta1;
+  const Real G2_term = sij.contract(sij * rij - rij * sij);
+  const Real G3_term = sij.contract(sij * sij - 1./3. * I * sij.contract(sij.transpose()));
+  const Real k_term = 2./3. * _k * sij.contract(I);
+
   auto input_accessor = _input_tensor.accessor<Real, 2>();
-  input_accessor[0][0] =  std::max(eta_1, 0.1);
-  input_accessor[0][1] =  std::max(eta_2, 0.1);
+  input_accessor[0][0] =  eta1;
+  input_accessor[0][1] =  eta2;
 
   const auto output = _torch_script_userobject.evaluate(_input_tensor);
   const auto output_accessor = output.accessor<Real, 2>();
 
-  const Real nu_t = std::max(output_accessor[0][0] + 2./3.*_k/input_accessor[0][0]*std::abs(tr_sij), 1e-3);
+  const auto G1 = output_accessor[0][0];
+  const auto G2 = output_accessor[0][1];
+  const auto G3 = output_accessor[0][2];
+
+  const Real nu_t = std::max((1.0/eta1) * (G1 * G1_term + G2 * G2_term + G3 * G3_term + k_term), 1e-3);
 
   if (_debug)
   {
