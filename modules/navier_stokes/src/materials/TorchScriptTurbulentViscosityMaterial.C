@@ -25,8 +25,10 @@ TorchScriptTurbulentViscosityMaterial::validParams()
   params.addRequiredParam<UserObjectName>(
       "torch_script_userobject",
       "The name of the user object which contains the torch script module.");
-  params.addParam<Real>("k", "k value for Reynold's stress");
+  params.addRequiredParam<MooseFunctorName>("k", "k value for Reynold's stress");
+  params.addRequiredParam<MooseFunctorName>("eps", "epsilon for Reynold's stress");
   params.addParam<bool>("debug", "Value to control debugging console messages");
+  params.addParam<Real>("mu_t_min", "Minimum value outputted for mu_t");
 
   return params;
 }
@@ -37,8 +39,10 @@ TorchScriptTurbulentViscosityMaterial::TorchScriptTurbulentViscosityMaterial(con
     _u_var(getFunctor<ADReal>("u")),
     _v_var(parameters.isParamValid("v") ? &(getFunctor<ADReal>("v")) : nullptr),
     _w_var(parameters.isParamValid("w") ? &(getFunctor<ADReal>("w")) : nullptr),
-    _k(getParam<Real>("k")),
+    _k(getFunctor<ADReal>("k")),
+    _eps(getFunctor<ADReal>("eps")),
     _debug(getParam<bool>("debug")),
+    _mu_t_min(getParam<Real>("mu_t_min")),
     _torch_script_userobject(getUserObject<TorchScriptUserObject>("torch_script_userobject")),
     _input_tensor(torch::zeros(
         {1, 2},
@@ -83,18 +87,22 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
     grad_velocity(2, 2)= MetaPhysicL::raw_value(_w_var->gradient(r,t)(2));
   }
 
-  const TensorValue<Real> sij = (grad_velocity + grad_velocity) / 2.0;
-  const TensorValue<Real> rij = (grad_velocity - grad_velocity) / 2.0;
+  const Real k = MetaPhysicL::raw_value(_k(r,t));
+  const Real eps = std::max(MetaPhysicL::raw_value(_eps(r,t)), 1e-10);
+  const Real timescale = (k / eps);
+
+  const TensorValue<Real> sij = timescale * (grad_velocity + grad_velocity.transpose()) / 2.0;
+  const TensorValue<Real> rij = timescale * (grad_velocity - grad_velocity.transpose()) / 2.0;
 
   const TensorValue<Real> I(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 
-  const Real eta1 = std::max(sij.contract(sij), 0.1);
-  const Real eta2 = std::max(rij.contract(rij), 0.1);
+  const Real eta1 = std::min(std::max(sij.contract(sij), 1e-3), 1e3);
+  const Real eta2 = std::min(std::max(rij.contract(rij), 1e-3), 1e3);
 
-  const Real G1_term = eta1;
+  const Real G1_term = eta1 ;
   const Real G2_term = sij.contract(sij * rij - rij * sij);
-  const Real G3_term = sij.contract(sij * sij - 1./3. * I * sij.contract(sij.transpose()));
-  const Real k_term = 2./3. * _k * sij.contract(I);
+  const Real G3_term = sij.contract(sij * sij - 1./3. * I * I.contract(sij*sij));
+  const Real k_term = 2./3. * k * sij.contract(I);
 
   auto input_accessor = _input_tensor.accessor<Real, 2>();
   input_accessor[0][0] =  eta1;
@@ -107,15 +115,19 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
   const auto G2 = output_accessor[0][1];
   const auto G3 = output_accessor[0][2];
 
-  const Real nu_t = std::max((1.0/eta1) * (G1 * G1_term + G2 * G2_term + G3 * G3_term + k_term), 1e-3);
+  const Real nu_t = (timescale / eta1) * (2. * k *(G1 * G1_term + G2 * G2_term + G3 * G3_term) + k_term);
 
   if (_debug)
   {
+    _console << "-----------------------------------------" << std::endl;
+    _console << "k: " << k << " eps: " << eps << std::endl;
     _console << "eta_1: " << input_accessor[0][0] << " eta_2: " << input_accessor[0][0] << std::endl;
+    _console << "G1 term: " << G1_term << " G2 term: " << G2_term << " G3 term: " << G3_term << std::endl;
+    _console << "G1: " << G1 << " G2: " << G2 << " G3: " << G3 << std::endl;
     _console << "nu_t output: " << nu_t << std::endl;
   }
   
-  (*_properties)[_qp] = nu_t;
+  (*_properties)[_qp] = std::min(std::max(nu_t, 0.05), 0.15);
 }
 
 #endif

@@ -11,6 +11,25 @@ g = 0.0
 
 pressure_tag = "pressure_grad"
 
+H = 1 #halfwidth of the channel
+bulk_u = 1
+
+### k-epsilon Closure Parameters ###
+sigma_k = 1.0
+sigma_eps = 1.3
+C1_eps = 1.44
+C2_eps = 1.92
+C_mu = 0.09
+
+### Initial and Boundary Conditions ###
+intensity = 0.01
+k_init = '${fparse 1.5*(intensity * bulk_u)^2}'
+eps_init = '${fparse C_mu^0.75 * k_init^1.5 / H}'
+
+### Modeling parameters ###
+walls = 'top bottom'
+wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized, neq
+
 [Mesh]
   [mesh]
     type = CartesianMeshGenerator
@@ -27,7 +46,7 @@ pressure_tag = "pressure_grad"
 []
 
 [Problem]
-  nl_sys_names = 'u_system v_system pressure_system energy_system'
+  nl_sys_names = 'u_system v_system pressure_system energy_system  TKE_system TKED_system'
   previous_nl_solution_required = true
 []
 
@@ -64,6 +83,16 @@ pressure_tag = "pressure_grad"
     initial_condition = 300
     solver_sys = energy_system
     two_term_boundary_expansion = false
+  []
+  [TKE]
+    type = INSFVEnergyVariable
+    solver_sys = TKE_system
+    initial_condition = ${k_init}
+  []
+  [TKED]
+    type = INSFVEnergyVariable
+    solver_sys = TKED_system
+    initial_condition = ${eps_init}
   []
 []
 
@@ -182,6 +211,69 @@ pressure_tag = "pressure_grad"
     coeff = 'k_t'
     variable = T_fluid
   []
+
+  [TKE_advection]
+    type = INSFVTurbulentAdvection
+    variable = TKE
+    rho = ${rho}
+  []
+  [TKE_diffusion]
+    type = INSFVTurbulentDiffusion
+    variable = TKE
+    coeff = ${mu}
+  []
+  [TKE_diffusion_turbulent]
+    type = INSFVTurbulentDiffusion
+    variable = TKE
+    coeff = 'mu_t_torch_func'
+    scaling_coef = ${sigma_k}
+  []
+  [TKE_source_sink]
+    type = INSFVTKESourceSink
+    variable = TKE
+    u = vel_x
+    v = vel_y
+    epsilon = TKED
+    rho = ${rho}
+    mu = ${mu}
+    mu_t = 'mu_t_torch_func'
+    walls = ${walls}
+    wall_treatment = ${wall_treatment}
+  []
+
+  [TKED_advection]
+    type = INSFVTurbulentAdvection
+    variable = TKED
+    rho = ${rho}
+    walls = ${walls}
+  []
+  [TKED_diffusion]
+    type = INSFVTurbulentDiffusion
+    variable = TKED
+    coeff = ${mu}
+    walls = ${walls}
+  []
+  [TKED_diffusion_turbulent]
+    type = INSFVTurbulentDiffusion
+    variable = TKED
+    coeff = 'mu_t_torch_func'
+    scaling_coef = ${sigma_eps}
+    walls = ${walls}
+  []
+  [TKED_source_sink]
+    type = INSFVTKEDSourceSink
+    variable = TKED
+    u = vel_x
+    v = vel_y
+    k = TKE
+    rho = ${rho}
+    mu = ${mu}
+    mu_t = 'mu_t_torch_func'
+    C1_eps = ${C1_eps}
+    C2_eps = ${C2_eps}
+    walls = ${walls}
+    wall_treatment = ${wall_treatment}
+  []
 []
 
 [FVBCs]
@@ -239,6 +331,33 @@ pressure_tag = "pressure_grad"
     variable = T_fluid
     value = 300
   []
+  [inlet_TKE]
+    type = INSFVInletIntensityTKEBC
+    boundary = 'left'
+    variable = TKE
+    u = vel_x
+    v = vel_y
+    intensity = ${intensity}
+  []
+  [inlet_TKED]
+    type = INSFVMixingLengthTKEDBC
+    boundary = 'left'
+    variable = TKED
+    k = TKE
+    characteristic_length = '${fparse 2*H}'
+  []
+  [walls_mu_t]
+    type = INSFVTurbulentViscosityWallFunction
+    boundary = 'top bottom'
+    variable = mu_t_torch_func
+    u = vel_x
+    v = vel_y
+    rho = ${rho}
+    mu = ${mu}
+    mu_t = 'mu_t_torch_func'
+    k = TKE
+    wall_treatment = ${wall_treatment}
+  []
   ##########################################################
 []
 
@@ -254,14 +373,17 @@ pressure_tag = "pressure_grad"
   momentum_systems = 'u_system v_system'
   pressure_system = 'pressure_system'
   energy_system = 'energy_system'
+  turbulence_systems = 'TKED_system TKE_system'
   pressure_gradient_tag = ${pressure_tag}
   momentum_equation_relaxation = 0.7
   pressure_variable_relaxation = 0.3
   energy_equation_relaxation = 0.5
+  turbulence_equation_relaxation = '0.25 0.25'
   num_iterations = 200
   pressure_absolute_tolerance = 1e-10
   momentum_absolute_tolerance = 1e-10
   energy_absolute_tolerance = 1e-10
+  turbulence_absolute_tolerance = '1e-10 1e-10'
   print_fields = false
   continue_on_max_its = true
 []
@@ -306,9 +428,9 @@ pressure_tag = "pressure_grad"
    torch_script_userobject = cody_net
    u = vel_x
    v = vel_y
-   k = 1.0
-   eps = 1.0
-   debug = false
+   k = TKE
+   eps = TKED
+   debug = true
    mu_t_min = 0.01
   []
   [k_t]
