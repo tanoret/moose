@@ -69,6 +69,12 @@ protected:
   /// For Newton solves we want to add extra zero-valued terms regardless of y-plus to avoid sparsity pattern changes as y-plus changes near the walls
   const bool _newton_solve;
 
+  /// Anisotropy parameters
+  const bool _ani_corrections;
+  const std::vector<MooseFunctorName> & _b_name;
+  std::vector<const Moose::Functor<Real> *> _b;
+
+
   ///@{
   /// Maps for wall treatement
   std::map<const Elem *, bool> _wall_bounded;

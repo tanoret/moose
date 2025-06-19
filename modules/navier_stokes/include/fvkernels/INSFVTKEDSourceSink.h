@@ -91,4 +91,10 @@ protected:
 
   /// Whether a nonlinear Newton-like solver is being used (as opposed to a linearized solver)
   const bool _newton_solve;
+
+  /// Anisotropy parameters
+  const bool _ani_corrections;
+  const std::vector<MooseFunctorName> & _b_name;
+  std::vector<const Moose::Functor<Real> *> _b;
+
 };

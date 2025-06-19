@@ -112,13 +112,14 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     momentum_component = 'x'
   []
   [u_viscosity_turbulent]
-    type = INSFVMomentumDiffusion
+    type = INSFVTurbulentAnisotropyDiffusion
     variable = vel_x
-    mu = 'mu_t_torch_func'
-    momentum_component = 'x'
-    complete_expansion = true
-    u = vel_x
-    v = vel_y
+    coeff = 1
+    bc0 = b_00_torch_func
+    bc1 = b_01_torch_func
+    rho = ${rho}
+    k = TKE 
+    #momentum_component = 'x'
   []
   [u_pressure]
     type = INSFVMomentumPressure
@@ -150,13 +151,14 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     momentum_component = 'y'
   []
   [v_viscosity_turbulent]
-    type = INSFVMomentumDiffusion
+    type = INSFVTurbulentAnisotropyDiffusion
     variable = vel_y
-    mu = 'mu_t_torch_func'
-    momentum_component = 'y'
-    complete_expansion = true
-    u = vel_x
-    v = vel_y
+    coeff = 1
+    bc0 = b_10_torch_func
+    bc1 = b_11_torch_func
+    rho = ${rho}
+    k = TKE
+    #momentum_component = 'y'
   []
   [v_pressure]
     type = INSFVMomentumPressure
@@ -227,6 +229,14 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     variable = TKE
     coeff = 'mu_t_torch_func'
     scaling_coef = ${sigma_k}
+    type = INSFVTurbulentAnisotropyDiffusion
+    variable = TKE
+    coeff = ${sigma_k}
+    bc0 = b_00_torch_func
+    bc1 = b_01_torch_func
+    rho = ${rho}
+    k = TKE 
+    #momentum_component = 'x'
   []
   [TKE_source_sink]
     type = INSFVTKESourceSink
@@ -239,6 +249,8 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     mu_t = 'mu_t_torch_func'
     walls = ${walls}
     wall_treatment = ${wall_treatment}
+    anisotropy_corrections = true
+    b_name = 'b_00_torch_func b_01_torch_func b_10_torch_func b_11_torch_func'
   []
 
   [TKED_advection]
@@ -273,6 +285,8 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
     C2_eps = ${C2_eps}
     walls = ${walls}
     wall_treatment = ${wall_treatment}
+    anisotropy_corrections = true
+    b_name = 'b_00_torch_func b_01_torch_func b_10_torch_func b_11_torch_func'
   []
 []
 
@@ -398,17 +412,63 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
 []
 
 [AuxVariables]
-  [mu_t_torch_func]
+  [b_00_torch_func]
     type = MooseVariableFVReal
     initial_condition = 0.3
   []
+  [b_01_torch_func]
+    type = MooseVariableFVReal
+    initial_condition = 0.3
+  []
+  [b_10_torch_func]
+    type = MooseVariableFVReal
+    initial_condition = 0.3
+  []
+  [b_11_torch_func]
+    type = MooseVariableFVReal
+    initial_condition = 0.3
+  []
+  [mu_t_torch_func_temp]
+    type = MooseVariableFVReal
+    initial_condition = 0.1
+  []
+  [mu_t_torch_func]
+    type = MooseVariableFVReal
+    initial_condition = 0.1
+  []  
 []
 
 [AuxKernels]
- [populate_mu_t_torch_func]
+ [populate_b_00_torch_func]
    type = MaterialRealAux
-   variable = mu_t_torch_func
-   property = 'mu_t_torch'
+   variable = b_00_torch_func
+   property = 'b_00'
+ []
+[populate_b_01_torch_func]
+   type = MaterialRealAux
+   variable = b_01_torch_func
+   property = 'b_01'
+ []
+[populate_b_10_torch_func]
+   type = MaterialRealAux
+   variable = b_10_torch_func
+   property = 'b_10'
+ []
+[populate_b_11_torch_func]
+   type = MaterialRealAux
+   variable = b_11_torch_func
+   property = 'b_11'
+ []
+ [populate_mu_t_torch_func_temp]
+  type = MaterialRealAux
+  variable = mu_t_torch_func_temp
+  property = 'b_00'
+ []
+ [populate_mu_t_torch_func]
+  type = ParsedAux
+  variable = mu_t_torch_func
+  coupled_variables = mu_t_torch_func_temp
+  expression = '- ${rho} * mu_t_torch_func_temp'
  []
 []
 
@@ -423,8 +483,8 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
   #  prop_names = 'mu_t'
   #  prop_values = '0.1'
   #[]
-  [net_material] # Populates mu_t_torch
-   type = TorchScriptTurbulentViscosityMaterial
+  [net_material] # Populates anisotropy
+   type = TorchScriptTurbulentAnisotropyMaterial
    torch_script_userobject = cody_net
    u = vel_x
    v = vel_y
@@ -432,9 +492,6 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
    eps = TKED
    debug = false
    use_NN = false
-   mu_t_min = 0.01
-   mu_t_old = mu_t_torch_func
-   relaxation_factor = 0.8
   []
   [k_t]
     type = ADParsedFunctorMaterial

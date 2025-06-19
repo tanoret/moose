@@ -46,6 +46,9 @@ INSFVTKEDSourceSink::validParams()
   params.set<unsigned short>("ghost_layers") = 2;
   params.addParam<bool>("newton_solve", false, "Whether a Newton nonlinear solve is being used");
   params.addParamNamesToGroup("newton_solve", "Advanced");
+  params.addParam<bool>("anisotropy_corrections", false, "Use anisotropy corrections?");
+  params.addParam<std::vector<MooseFunctorName>>("b_name", "b_coefficients");
+
   return params;
 }
 
@@ -66,13 +69,22 @@ INSFVTKEDSourceSink::INSFVTKEDSourceSink(const InputParameters & params)
     _C2_eps(getParam<Real>("C2_eps")),
     _C_mu(getParam<Real>("C_mu")),
     _C_pl(getParam<Real>("C_pl")),
-    _newton_solve(getParam<bool>("newton_solve"))
+    _newton_solve(getParam<bool>("newton_solve")),
+    _ani_corrections(getParam<bool>("anisotropy_corrections")),
+    _b_name(getParam<std::vector<MooseFunctorName>>("b_name"))
+
 {
   if (_dim >= 2 && !_v_var)
     paramError("v", "In two or more dimensions, the v velocity must be supplied!");
 
   if (_dim >= 3 && !_w_var)
     paramError("w", "In three or more dimensions, the w velocity must be supplied!");
+
+  if (_ani_corrections)
+  {
+    for (auto & name: _b_name)
+      _b.push_back(&getFunctor<Real>(name));
+  }
 }
 
 void
@@ -162,62 +174,97 @@ INSFVTKEDSourceSink::computeQpResidual()
   }
   else
   {
-    const auto & grad_u = _u_var.gradient(elem_arg, state);
-    const auto Sij_xx = 2.0 * grad_u(0);
-    ADReal Sij_xy = 0.0;
-    ADReal Sij_xz = 0.0;
-    ADReal Sij_yy = 0.0;
-    ADReal Sij_yz = 0.0;
-    ADReal Sij_zz = 0.0;
-
-    const auto grad_xx = grad_u(0);
-    ADReal grad_xy = 0.0;
-    ADReal grad_xz = 0.0;
-    ADReal grad_yx = 0.0;
-    ADReal grad_yy = 0.0;
-    ADReal grad_yz = 0.0;
-    ADReal grad_zx = 0.0;
-    ADReal grad_zy = 0.0;
-    ADReal grad_zz = 0.0;
-
-    auto trace = Sij_xx / 3.0;
-
-    if (_dim >= 2)
+    ADReal production_k;
+    if (!_ani_corrections)
     {
-      const auto & grad_v = (*_v_var).gradient(elem_arg, state);
-      Sij_xy = grad_u(1) + grad_v(0);
-      Sij_yy = 2.0 * grad_v(1);
+      const auto & grad_u = _u_var.gradient(elem_arg, state);
+      const auto Sij_xx = 2.0 * grad_u(0);
+      ADReal Sij_xy = 0.0;
+      ADReal Sij_xz = 0.0;
+      ADReal Sij_yy = 0.0;
+      ADReal Sij_yz = 0.0;
+      ADReal Sij_zz = 0.0;
 
-      grad_xy = grad_u(1);
-      grad_yx = grad_v(0);
-      grad_yy = grad_v(1);
+      const auto grad_xx = grad_u(0);
+      ADReal grad_xy = 0.0;
+      ADReal grad_xz = 0.0;
+      ADReal grad_yx = 0.0;
+      ADReal grad_yy = 0.0;
+      ADReal grad_yz = 0.0;
+      ADReal grad_zx = 0.0;
+      ADReal grad_zy = 0.0;
+      ADReal grad_zz = 0.0;
 
-      trace += Sij_yy / 3.0;
+      auto trace = Sij_xx / 3.0;
 
-      if (_dim >= 3)
+      if (_dim >= 2)
       {
-        const auto & grad_w = (*_w_var).gradient(elem_arg, state);
+        const auto & grad_v = (*_v_var).gradient(elem_arg, state);
+        Sij_xy = grad_u(1) + grad_v(0);
+        Sij_yy = 2.0 * grad_v(1);
 
-        Sij_xz = grad_u(2) + grad_w(0);
-        Sij_yz = grad_v(2) + grad_w(1);
-        Sij_zz = 2.0 * grad_w(2);
+        grad_xy = grad_u(1);
+        grad_yx = grad_v(0);
+        grad_yy = grad_v(1);
 
-        grad_xz = grad_u(2);
-        grad_yz = grad_v(2);
-        grad_zx = grad_w(0);
-        grad_zy = grad_w(1);
-        grad_zz = grad_w(2);
+        trace += Sij_yy / 3.0;
 
-        trace += Sij_zz / 3.0;
+        if (_dim >= 3)
+        {
+          const auto & grad_w = (*_w_var).gradient(elem_arg, state);
+
+          Sij_xz = grad_u(2) + grad_w(0);
+          Sij_yz = grad_v(2) + grad_w(1);
+          Sij_zz = 2.0 * grad_w(2);
+
+          grad_xz = grad_u(2);
+          grad_yz = grad_v(2);
+          grad_zx = grad_w(0);
+          grad_zy = grad_w(1);
+          grad_zz = grad_w(2);
+
+          trace += Sij_zz / 3.0;
+        }
       }
+
+      const auto symmetric_strain_tensor_sq_norm =
+          (Sij_xx - trace) * grad_xx + Sij_xy * grad_xy + Sij_xz * grad_xz + Sij_xy * grad_yx +
+          (Sij_yy - trace) * grad_yy + Sij_yz * grad_yz + Sij_xz * grad_zx + Sij_yz * grad_zy +
+          (Sij_zz - trace) * grad_zz;
+
+      production_k = _mu_t(elem_arg, state) * symmetric_strain_tensor_sq_norm;
     }
+    else
+    {
+      TensorValue<Real> grad_velocity;
+      TensorValue<Real> b_tensor;
+      grad_velocity(0, 0) = MetaPhysicL::raw_value(_u_var.gradient(elem_arg, state)(0));
+      b_tensor(0, 0) = (*_b[0])(elem_arg, state);
+      if (_dim > 1)
+      {
+        grad_velocity(0, 1) = MetaPhysicL::raw_value(_u_var.gradient(elem_arg, state)(1));
+        grad_velocity(1, 0) = MetaPhysicL::raw_value(_v_var->gradient(elem_arg, state)(0));
+        grad_velocity(1, 1) = MetaPhysicL::raw_value(_v_var->gradient(elem_arg, state)(1));
+        b_tensor(0, 1) = (*_b[1])(elem_arg, state);
+        b_tensor(1, 0) = (*_b[2])(elem_arg, state);
+        b_tensor(1, 1) = (*_b[3])(elem_arg, state);
+      }
+      if (_dim > 2)
+      {
+        grad_velocity(0, 2)= MetaPhysicL::raw_value(_u_var.gradient(elem_arg, state)(2));
+        grad_velocity(1, 2)= MetaPhysicL::raw_value(_v_var->gradient(elem_arg, state)(2));
+        grad_velocity(2, 0)= MetaPhysicL::raw_value(_w_var->gradient(elem_arg, state)(0));
+        grad_velocity(2, 1)= MetaPhysicL::raw_value(_w_var->gradient(elem_arg, state)(1));
+        grad_velocity(2, 2)= MetaPhysicL::raw_value(_w_var->gradient(elem_arg, state)(2));
+        b_tensor(0, 2) = (*_b[4])(elem_arg, state);
+        b_tensor(1, 2) = (*_b[5])(elem_arg, state);
+        b_tensor(2, 0) = (*_b[6])(elem_arg, state);
+        b_tensor(2, 1) = (*_b[7])(elem_arg, state);
+        b_tensor(2, 2) = (*_b[8])(elem_arg, state);
+      }
 
-    const auto symmetric_strain_tensor_sq_norm =
-        (Sij_xx - trace) * grad_xx + Sij_xy * grad_xy + Sij_xz * grad_xz + Sij_xy * grad_yx +
-        (Sij_yy - trace) * grad_yy + Sij_yz * grad_yz + Sij_xz * grad_zx + Sij_yz * grad_zy +
-        (Sij_zz - trace) * grad_zz;
-
-    ADReal production_k = _mu_t(elem_arg, state) * symmetric_strain_tensor_sq_norm;
+      production_k = TKE_old * b_tensor.contract(grad_velocity);
+    }
     // Compute production limiter (needed for flows with stagnation zones)
     const auto eps_old =
         _newton_solve ? std::max(_var(elem_arg, old_state), 1e-10) : _var(elem_arg, old_state);

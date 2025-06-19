@@ -27,8 +27,11 @@ TorchScriptTurbulentViscosityMaterial::validParams()
       "The name of the user object which contains the torch script module.");
   params.addRequiredParam<MooseFunctorName>("k", "k value for Reynold's stress");
   params.addRequiredParam<MooseFunctorName>("eps", "epsilon for Reynold's stress");
-  params.addParam<bool>("debug", "Value to control debugging console messages");
+  params.addRequiredParam<bool>("debug", "Value to control debugging console messages");
+  params.addRequiredParam<bool>("use_NN", "Value to control whether using NN or ASRM");
   params.addParam<Real>("mu_t_min", "Minimum value outputted for mu_t");
+  params.addParam<MooseFunctorName>("mu_t_old", "A functor storing the 'old' value of the turbulent viscosity.");
+  params.addParam<Real>("relaxation_factor", 1.0, "The relaxation factor for the turbulent viscosity.");
 
   return params;
 }
@@ -42,8 +45,11 @@ TorchScriptTurbulentViscosityMaterial::TorchScriptTurbulentViscosityMaterial(con
     _k(getFunctor<ADReal>("k")),
     _eps(getFunctor<ADReal>("eps")),
     _debug(getParam<bool>("debug")),
+    _use_NN(getParam<bool>("use_NN")),
     _mu_t_min(getParam<Real>("mu_t_min")),
     _torch_script_userobject(getUserObject<TorchScriptUserObject>("torch_script_userobject")),
+    _mu_t_old(parameters.isParamValid("mu_t_old") ? &(getFunctor<ADReal>("mu_t_old")) : nullptr),
+    _rf(getParam<Real>("relaxation_factor")),
     _input_tensor(torch::zeros(
         {1, 2},
         torch::TensorOptions().dtype(torch::kFloat64).device(_app.getLibtorchDevice())))
@@ -62,6 +68,59 @@ TorchScriptTurbulentViscosityMaterial::computeQpProperties()
 {
   computeQpValues();
 }
+
+void 
+TorchScriptTurbulentViscosityMaterial::arsm(const Real& eta1, const Real& eta2, Real& G1, Real& G2, Real& G3)
+{
+  /// SSG
+  /*
+  Real c_10 = 3.4;
+  Real c_11 = 1.8;
+  Real c_2  = 0.36;
+  Real c_3  = 1.25;
+  Real c_4 = 0.4;
+  */
+
+  /// LRR
+  Real c_10 = 3.0;
+  Real c_11 = 0.0;
+  Real c_2  = 0.8;
+  Real c_3  = 1.75;
+  Real c_4 = 1.31;
+
+  Real l_10 = c_10/2.0 - 1.0;
+  Real l_11 = c_11 + 2.0;
+  Real l_2 = c_2/2.0 - 2.0/3.0;
+  Real l_3 = c_3/2.0 - 1.0;
+  Real l_4 = c_4/2.0 - 1.0;
+
+  Real p = - (2.0 * l_10) / (eta1 * l_11);
+  Real q = (1.0 / std::pow(eta1 * l_11, 2.0)) * (std::pow(l_10, 2.0) + eta1 * l_11 * l_2 - (2.0/3.0) * eta1 * std::pow(l_3, 2.0) + 2.0 * eta2 * std::pow(l_4, 2.0));
+  Real r = - (l_10 * l_2) / std::pow(eta1 * l_11, 2.0);
+
+  Real a = (q - std::pow(p, 2.0) / 3.0);
+  Real b = (1.0/27.0) * (2.0 * std::pow(p, 3.0) - 9.0 * p * q + 27.0 * r);
+  Real d = std::pow(b, 2.0) / 4.0 + std::pow(a, 3.0) / 27.0;
+
+  Real theta = std::acos(-(b / 2.0) / (std::sqrt(- std::pow(a, 3.0) / 27.0)));
+
+  if (d > 0)
+  {
+    G1 = - (p / 3.0) + std::cbrt(-(b/2.0) + std::sqrt(d)) + std::cbrt(-(b/2.0) - std::sqrt(d));
+  }
+  else if (d <= 0 && b < 0)
+  {
+    G1 = - (p/3.0) + 2.0 * std::sqrt(-(a/3.0)) * std::cos(theta / 3.0);
+  }
+  else
+  {
+    G1 = - (p/3.0) + 2.0 * std::sqrt(-(a/3.0)) * std::cos(theta / 3.0 + (2.0 * libMesh::pi / 3.0));
+  }
+
+  G2 = - (l_4 * G1) / (l_10 - eta1 * l_11 * G1);
+  G3 = (2.0 * l_3 * G1) / (l_10 - eta1 * l_11 * G1);
+}
+
 
 void
 TorchScriptTurbulentViscosityMaterial::computeQpValues()
@@ -96,14 +155,20 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
 
   const TensorValue<Real> I(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 
-  const Real eta1 = std::min(std::max(sij.contract(sij), 1e-3), 1e3);
-  const Real eta2 = std::min(std::max(rij.contract(rij), 1e-3), 1e3);
+  const Real eta1 = std::min(std::max(sij.contract(sij), 1e-8), 1e8);
+  const Real eta2 = std::min(std::max(rij.contract(rij), 1e-8), 1e8);
 
-  const Real G1_term = eta1 ;
+  const Real G1_term = sij.contract(sij);
   const Real G2_term = sij.contract(sij * rij - rij * sij);
-  const Real G3_term = sij.contract(sij * sij - 1./3. * I * I.contract(sij*sij));
-  const Real k_term = 2./3. * k * sij.contract(I);
+  const Real G3_term = sij.contract(sij * sij - 1./3. * I * sij.contract(sij));
+  //const Real k_term = 2./3. * k * sij.contract(I);
 
+  double G1 = 0.0;
+  double G2 = 0.0;
+  double G3 = 0.0;
+
+  if (_use_NN)
+  {
   auto input_accessor = _input_tensor.accessor<Real, 2>();
   input_accessor[0][0] =  eta1;
   input_accessor[0][1] =  eta2;
@@ -111,23 +176,41 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
   const auto output = _torch_script_userobject.evaluate(_input_tensor);
   const auto output_accessor = output.accessor<Real, 2>();
 
-  const auto G1 = output_accessor[0][0];
-  const auto G2 = output_accessor[0][1];
-  const auto G3 = output_accessor[0][2];
+  G1 = output_accessor[0][0];
+  G2 = output_accessor[0][1];
+  G3 = output_accessor[0][2];
+  }
+  else
+  {
+    arsm(eta1, eta2, G1, G2, G3);
+  }
 
-  const Real nu_t = (timescale / eta1) * (2. * k *(G1 * G1_term + G2 * G2_term + G3 * G3_term) + k_term);
+  //G2 = 0.0;
+  //G3 = 0.0;
 
-  if (_debug)
+  Real mu_t = -(timescale / eta1) * (G1 * G1_term + G2 * G2_term + G3 * G3_term);
+
+  if(_mu_t_old)
+    mu_t = mu_t * _rf + MetaPhysicL::raw_value((*_mu_t_old)(r,t)) * (1 - _rf);
+
+  bool irregular = false; 
+
+  if (_debug || irregular)
   {
     _console << "-----------------------------------------" << std::endl;
     _console << "k: " << k << " eps: " << eps << std::endl;
-    _console << "eta_1: " << input_accessor[0][0] << " eta_2: " << input_accessor[0][0] << std::endl;
+    _console << "eta_1: " << eta1 << " eta_2: " << eta1 << std::endl;
     _console << "G1 term: " << G1_term << " G2 term: " << G2_term << " G3 term: " << G3_term << std::endl;
     _console << "G1: " << G1 << " G2: " << G2 << " G3: " << G3 << std::endl;
-    _console << "nu_t output: " << nu_t << std::endl;
+    _console << "mu_t output: " << mu_t << std::endl;
+  }
+  if (irregular)
+  {
+    arsm(eta1, eta2, G1, G2, G3);
+    _console << "ARSM G1: " << G1 << " G2: " << G2 << " G3: " << G3 << std::endl;
   }
   
-  (*_properties)[_qp] = std::min(std::max(nu_t, 0.05), 0.15);
+  (*_properties)[_qp] = std::max(std::min(mu_t, 10.0), 1e-12);
 }
 
 #endif

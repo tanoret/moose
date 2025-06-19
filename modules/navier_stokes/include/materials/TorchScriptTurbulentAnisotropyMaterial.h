@@ -18,12 +18,12 @@
  * This material declares properties which are evaluated as
  * based on a torch script neural network.
  */
-class TorchScriptTurbulentViscosityMaterial : public Material
+class TorchScriptTurbulentAnisotropyMaterial : public Material
 {
 public:
   static InputParameters validParams();
 
-  TorchScriptTurbulentViscosityMaterial(const InputParameters & parameters);
+  TorchScriptTurbulentAnisotropyMaterial(const InputParameters & parameters);
 
 protected:
   virtual void initQpStatefulProperties() override;
@@ -46,24 +46,18 @@ protected:
   const bool & _debug;
   /// Use NN or ASRM
   const bool & _use_NN;
-  /// Minimum output for nu_t
-  const Real & _mu_t_min;
 
   /// The user object that holds the torch module
   const TorchScriptUserObject & _torch_script_userobject;
 
-  /// Old prop functor
-  const Moose::Functor<ADReal> * _mu_t_old;
-
-  /// Relaxation Factor
-  const Real _rf;
-
   /// Place holder for the inputs to the neural network
   torch::Tensor _input_tensor;
 
+  /// Vector of all property prefix
+  const MooseFunctorName & _property_prefix;
+  
   /// Vector of all the properties, for now we don't support AD
-  GenericMaterialProperty<Real, false> * _properties;
-
+  std::vector<GenericMaterialProperty<Real, false>*>  _properties;
 
 private:
   /**
