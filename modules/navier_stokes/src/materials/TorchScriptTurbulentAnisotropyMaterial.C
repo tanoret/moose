@@ -10,6 +10,7 @@
 #ifdef LIBTORCH_ENABLED
 
 #include "TorchScriptTurbulentAnisotropyMaterial.h"
+#include "NS.h"
 
 registerMooseObject("MooseApp", TorchScriptTurbulentAnisotropyMaterial);
 
@@ -21,7 +22,8 @@ TorchScriptTurbulentAnisotropyMaterial::validParams()
       "Material object which relies on the evaluation of a TorchScript module to compute the turbulent dynamic viscosity.");
   params.addRequiredParam<MooseFunctorName>("u", "The velocity in the x direction.");
   params.addParam<MooseFunctorName>("v", "The velocity in the y direction.");
-  params.addParam<MooseFunctorName>("w", "The velocity in the z direction.");
+params.addParam<MooseFunctorName>("w", "The velocity in the z direction.");
+  params.addRequiredParam<MooseFunctorName>(NS::density, "The density.");
   params.addRequiredParam<UserObjectName>(
       "torch_script_userobject",
       "The name of the user object which contains the torch script module.");
@@ -40,6 +42,7 @@ TorchScriptTurbulentAnisotropyMaterial::TorchScriptTurbulentAnisotropyMaterial(c
     _u_var(getFunctor<ADReal>("u")),
     _v_var(parameters.isParamValid("v") ? &(getFunctor<ADReal>("v")) : nullptr),
     _w_var(parameters.isParamValid("w") ? &(getFunctor<ADReal>("w")) : nullptr),
+    _rho(getFunctor<ADReal>(NS::density)),
     _k(getFunctor<ADReal>("k")),
     _eps(getFunctor<ADReal>("eps")),
     _debug(getParam<bool>("debug")),
@@ -49,7 +52,9 @@ TorchScriptTurbulentAnisotropyMaterial::TorchScriptTurbulentAnisotropyMaterial(c
         {1, 2},
         torch::TensorOptions().dtype(torch::kFloat64).device(_app.getLibtorchDevice()))),
     _property_prefix(getParam<MooseFunctorName>("property_prefix"))
-    {
+{
+    _properties.push_back(&declareGenericPropertyByName<Real, false>("ani_mu_t"));
+    
     for (unsigned int i = 0; i < _mesh_dimension; ++i)
     {
       for (unsigned int j = 0; j < _mesh_dimension; ++j)
@@ -182,7 +187,9 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
         arsm(eta1, eta2, G1, G2, G3);
     }
 
-    const TensorValue<Real> bij = G1 * sij + G2 * (sij * rij - rij * sij) + G3 * (sij * sij - 1./3. * I * sij.contract(sij));
+    const Real rho = MetaPhysicL::raw_value(_rho(r,t));
+    const TensorValue<Real> bij = rho * (G1 * sij + G2 * (sij * rij - rij * sij) + G3 * (sij * sij - 1./3. * I * sij.contract(sij)));
+    const Real _ani_mu_t = - rho * k * (-0.09) * timescale;
 
     bool irregular = false; 
 
@@ -199,12 +206,13 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
         _console << "ARSM G1: " << G1 << " G2: " << G2 << " G3: " << G3 << std::endl;
     }
 
+    (*_properties[0])[_qp] = _ani_mu_t;
     for (unsigned int i = 0; i < _mesh_dimension; ++i)
     {
       for (unsigned int j = 0; j < _mesh_dimension; ++j)
       {
         const auto index = i * _mesh_dimension + j;
-        (*_properties[index])[_qp] = bij(i,j);
+        (*_properties[index + 1])[_qp] = bij(i,j);
       }
     }
 } 

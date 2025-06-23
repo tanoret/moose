@@ -38,6 +38,8 @@ protected:
   const Moose::Functor<ADReal> * _v_var;
   /// z-velocity
   const Moose::Functor<ADReal> * _w_var;
+  /// Density
+  const Moose::Functor<ADReal> & _rho;
   /// k for viscosity
   const Moose::Functor<ADReal> & _k;
   /// epsilon for viscosity

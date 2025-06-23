@@ -47,7 +47,7 @@ INSFVTKEDSourceSink::validParams()
   params.addParam<bool>("newton_solve", false, "Whether a Newton nonlinear solve is being used");
   params.addParamNamesToGroup("newton_solve", "Advanced");
   params.addParam<bool>("anisotropy_corrections", false, "Use anisotropy corrections?");
-  params.addParam<std::vector<MooseFunctorName>>("b_name", "b_coefficients");
+  params.addParam<std::vector<MooseFunctorName>>("b_name", {}, "b_coefficients");
 
   return params;
 }

@@ -28,7 +28,6 @@ INSFVTurbulentAnisotropyDiffusion::validParams()
   params.addRequiredParam<MooseFunctorName>("k", "k value for Reynold's stress");
   params.addRequiredParam<MooseFunctorName>("rho", "fluid density");
 
-
   return params;
 }
 
