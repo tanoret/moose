@@ -188,8 +188,8 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
     }
 
     const Real rho = MetaPhysicL::raw_value(_rho(r,t));
-    const TensorValue<Real> bij = rho * (G1 * sij + G2 * (sij * rij - rij * sij) + G3 * (sij * sij - 1./3. * I * sij.contract(sij)));
-    const Real _ani_mu_t = - rho * k * (-0.09) * timescale;
+    const TensorValue<Real> bij = rho * (G1 * sij * 0.0 + G2 * (sij * rij - rij * sij) + G3 * (sij * sij - 1./3. * I * sij.contract(sij)));
+    const Real _ani_mu_t = - rho * k * G1 * timescale;
 
     bool irregular = false; 
 

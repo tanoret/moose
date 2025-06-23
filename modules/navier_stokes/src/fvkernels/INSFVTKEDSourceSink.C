@@ -263,7 +263,7 @@ INSFVTKEDSourceSink::computeQpResidual()
         b_tensor(2, 2) = (*_b[8])(elem_arg, state);
       }
 
-      production_k = TKE_old * b_tensor.contract(grad_velocity);
+      production_k = _k(elem_arg, state) * b_tensor.contract(grad_velocity);
     }
     // Compute production limiter (needed for flows with stagnation zones)
     const auto eps_old =
