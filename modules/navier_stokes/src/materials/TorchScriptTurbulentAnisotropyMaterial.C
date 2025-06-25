@@ -31,6 +31,7 @@ params.addParam<MooseFunctorName>("w", "The velocity in the z direction.");
   params.addRequiredParam<MooseFunctorName>("eps", "epsilon for Reynold's stress");
   params.addRequiredParam<bool>("debug", "Value to control debugging console messages");
   params.addRequiredParam<bool>("use_NN", "Value to control whether using NN or ASRM");
+  params.addRequiredParam<MooseFunctorName>("mu_t_name", "Name of property to store turbulent viscosity.");
   params.addParam<MooseFunctorName>("property_prefix", "b", "Anisotropy name prefix ex. b");
 
   return params;
@@ -51,9 +52,10 @@ TorchScriptTurbulentAnisotropyMaterial::TorchScriptTurbulentAnisotropyMaterial(c
     _input_tensor(torch::zeros(
         {1, 2},
         torch::TensorOptions().dtype(torch::kFloat64).device(_app.getLibtorchDevice()))),
+    _mu_t_name(getParam<MooseFunctorName>("mu_t_name")),
     _property_prefix(getParam<MooseFunctorName>("property_prefix"))
 {
-    _properties.push_back(&declareGenericPropertyByName<Real, false>("ani_mu_t"));
+    _properties.push_back(&declareGenericPropertyByName<Real, false>(_mu_t_name));
     
     for (unsigned int i = 0; i < _mesh_dimension; ++i)
     {
@@ -188,7 +190,7 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
     }
 
     const Real rho = MetaPhysicL::raw_value(_rho(r,t));
-    const TensorValue<Real> bij = rho * (G1 * sij * 0.0 + G2 * (sij * rij - rij * sij) + G3 * (sij * sij - 1./3. * I * sij.contract(sij)));
+    const TensorValue<Real> bij = rho * (G2 * (sij * rij - rij * sij) + G3 * (sij * sij - 1./3. * I * sij.contract(sij)));
     const Real _ani_mu_t = - rho * k * G1 * timescale;
 
     bool irregular = false; 

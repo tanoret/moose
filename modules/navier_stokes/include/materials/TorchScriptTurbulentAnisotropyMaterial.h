@@ -55,6 +55,9 @@ protected:
   /// Place holder for the inputs to the neural network
   torch::Tensor _input_tensor;
 
+  /// Name of property to store mu_t in
+  const MooseFunctorName & _mu_t_name;
+
   /// Vector of all property prefix
   const MooseFunctorName & _property_prefix;
   

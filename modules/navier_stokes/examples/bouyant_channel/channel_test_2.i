@@ -432,7 +432,6 @@ wall_treatment = 'eq_newton' # Options: eq_newton, eq_incremental, eq_linearized
    eps = TKED
    debug = false
    use_NN = false
-   mu_t_min = 0.01
    mu_t_old = mu_t_torch_func
    relaxation_factor = 0.8
   []

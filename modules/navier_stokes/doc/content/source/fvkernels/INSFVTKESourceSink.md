@@ -119,6 +119,9 @@ When using near-wall treatment, we assume that the $\mu_t$ functor is computed b
 that performs near-wall treatment.
 Otherwise, the results obtained won't not physically correct
 
+!alert note
+When anisotropy corrections is true, the kernel will calculate the TKE based on the anisotropy correction terms and not the full anisotropy tensor. Refer to TorchScriptTurbulentAnisotropyMaterial for explanation. For this case one kernel must be created regularly with turbulent viscosity and another with the aniostropy correction.
+
 !syntax parameters /FVKernels/INSFVTKESourceSink
 
 !syntax inputs /FVKernels/INSFVTKESourceSink

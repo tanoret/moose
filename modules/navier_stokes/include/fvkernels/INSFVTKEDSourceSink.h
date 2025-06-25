@@ -94,7 +94,8 @@ protected:
 
   /// Anisotropy parameters
   const bool _ani_corrections;
-  const std::vector<MooseFunctorName> & _b_name;
+  const MooseFunctorName & _ani_prefix;
+  const MooseFunctorName & _ani_suffix;
   std::vector<const Moose::Functor<Real> *> _b;
 
 };

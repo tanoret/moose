@@ -208,20 +208,6 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
     coeff = 'mu_t'
     scaling_coef = ${sigma_k}
   []
-  [TKE_source_sink]
-    type = INSFVTKESourceSink
-    variable = TKE
-    u = vel_x
-    v = vel_y
-    epsilon = TKED
-    rho = ${rho}
-    mu = ${mu}
-    mu_t = 'mu_t'
-    walls = ${walls}
-    wall_treatment = ${wall_treatment}
-    C_pl = 1e10
-    anisotropy_corrections = false
-  []
   [TKE_source_sink_ani]
     type = INSFVTKESourceSink
     variable = TKE
@@ -235,7 +221,8 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
     wall_treatment = ${wall_treatment}
     C_pl = 1e10
     anisotropy_corrections = true
-    b_name = 'b_00_torch_func b_01_torch_func b_10_torch_func b_11_torch_func'
+    ani_prefix = 'b'
+    ani_suffix = 'torch_func'
   []
 
   [TKED_advection]
@@ -257,22 +244,6 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
     scaling_coef = ${sigma_eps}
     walls = ${walls}
   []
-  [TKED_source_sink]
-    type = INSFVTKEDSourceSink
-    variable = TKED
-    u = vel_x
-    v = vel_y
-    k = TKE
-    rho = ${rho}
-    mu = ${mu}
-    mu_t = 'mu_t'
-    C1_eps = ${C1_eps}
-    C2_eps = ${C2_eps}
-    walls = ${walls}
-    wall_treatment = ${wall_treatment}
-    C_pl = 1e10
-    anisotropy_corrections = false
-  []
   [TKED_source_sink_ani]
     type = INSFVTKEDSourceSink
     variable = TKED
@@ -288,9 +259,9 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
     wall_treatment = ${wall_treatment}
     C_pl = 1e10
     anisotropy_corrections = true
-    b_name = 'b_00_torch_func b_01_torch_func b_10_torch_func b_11_torch_func'
+    ani_prefix = 'b'
+    ani_suffix = 'torch_func'
   []
-
 []
 
 [FVBCs]
@@ -511,6 +482,7 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
    eps = TKED
    debug = false
    use_NN = false
+   mu_t_name = 'ani_mu_t'
   []
 []
 

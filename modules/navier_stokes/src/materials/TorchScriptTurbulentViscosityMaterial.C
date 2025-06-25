@@ -29,7 +29,8 @@ TorchScriptTurbulentViscosityMaterial::validParams()
   params.addRequiredParam<MooseFunctorName>("eps", "epsilon for Reynold's stress");
   params.addRequiredParam<bool>("debug", "Value to control debugging console messages");
   params.addRequiredParam<bool>("use_NN", "Value to control whether using NN or ASRM");
-  params.addParam<Real>("mu_t_min", "Minimum value outputted for mu_t");
+  params.addParam<Real>("mu_t_min", 1e-12,"Minimum value outputted for mu_t");
+  params.addParam<Real>("mu_t_max", 0.6, "Max value outputted for mu_t");
   params.addParam<MooseFunctorName>("mu_t_old", "A functor storing the 'old' value of the turbulent viscosity.");
   params.addParam<Real>("relaxation_factor", 1.0, "The relaxation factor for the turbulent viscosity.");
 
@@ -47,8 +48,9 @@ TorchScriptTurbulentViscosityMaterial::TorchScriptTurbulentViscosityMaterial(con
     _debug(getParam<bool>("debug")),
     _use_NN(getParam<bool>("use_NN")),
     _mu_t_min(getParam<Real>("mu_t_min")),
+    _mu_t_max(getParam<Real>("mu_t_max")),
     _torch_script_userobject(getUserObject<TorchScriptUserObject>("torch_script_userobject")),
-    _mu_t_old(parameters.isParamValid("mu_t_old") ? &(getFunctor<ADReal>("mu_t_old")) : nullptr),
+    _mu_t_old(parameters.isParamValid("nu_t_old") ? &(getFunctor<ADReal>("mu_t_old")) : nullptr),
     _rf(getParam<Real>("relaxation_factor")),
     _input_tensor(torch::zeros(
         {1, 2},
@@ -161,7 +163,6 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
   const Real G1_term = sij.contract(sij);
   const Real G2_term = sij.contract(sij * rij - rij * sij);
   const Real G3_term = sij.contract(sij * sij - 1./3. * I * sij.contract(sij));
-  //const Real k_term = 2./3. * k * sij.contract(I);
 
   double G1 = 0.0;
   double G2 = 0.0;
@@ -185,9 +186,6 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
     arsm(eta1, eta2, G1, G2, G3);
   }
 
-  //G2 = 0.0;
-  //G3 = 0.0;
-
   Real mu_t = -(timescale / eta1) * (G1 * G1_term + G2 * G2_term + G3 * G3_term);
 
   if(_mu_t_old)
@@ -210,7 +208,7 @@ TorchScriptTurbulentViscosityMaterial::computeQpValues()
     _console << "ARSM G1: " << G1 << " G2: " << G2 << " G3: " << G3 << std::endl;
   }
   
-  (*_properties)[_qp] = std::max(std::min(mu_t, 10.0), 1e-12);
+  (*_properties)[_qp] = std::max(std::min(mu_t, _mu_t_max), _mu_t_min);
 }
 
 #endif

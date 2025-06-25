@@ -48,7 +48,8 @@ protected:
   const bool & _use_NN;
   /// Minimum output for nu_t
   const Real & _mu_t_min;
-
+  /// Max output for nu_t
+  const Real & _mu_t_max;
   /// The user object that holds the torch module
   const TorchScriptUserObject & _torch_script_userobject;
 

@@ -46,7 +46,8 @@ INSFVTKESourceSink::validParams()
   params.addParamNamesToGroup("newton_solve", "Advanced");
 
   params.addParam<bool>("anisotropy_corrections", false, "Use anisotropy corrections?");
-  params.addParam<std::vector<MooseFunctorName>>("b_name", {}, "b_coefficients");
+  params.addParam<MooseFunctorName>("ani_prefix", "b", "Prefix of the name of the anisotropy tensor");
+  params.addParam<MooseFunctorName>("ani_suffix", "torch_func", "Suffix of the name of the anisotropy tensor");
 
   return params;
 }
@@ -68,7 +69,8 @@ INSFVTKESourceSink::INSFVTKESourceSink(const InputParameters & params)
     _C_pl(getParam<Real>("C_pl")),
     _newton_solve(getParam<bool>("newton_solve")),
     _ani_corrections(getParam<bool>("anisotropy_corrections")),
-    _b_name(getParam<std::vector<MooseFunctorName>>("b_name"))
+    _ani_prefix(getParam<MooseFunctorName>("ani_prefix")),
+    _ani_suffix(getParam<MooseFunctorName>("ani_suffix"))
 {
   if (_dim >= 2 && !_v_var)
     paramError("v", "In two or more dimensions, the v velocity must be supplied!");
@@ -78,8 +80,11 @@ INSFVTKESourceSink::INSFVTKESourceSink(const InputParameters & params)
 
   if (_ani_corrections)
   {
-    for (auto & name: _b_name)
-      _b.push_back(&getFunctor<Real>(name));
+    for (unsigned int i = 0; i < _dim; ++i)
+    {
+      for (unsigned int j = 0; j < _dim; ++j)
+        _b.push_back(&getFunctor<Real>(_ani_prefix + '_' + std::to_string(i) + std::to_string(j) + '_' + _ani_suffix));
+    }
   }
 }
 
@@ -207,79 +212,79 @@ INSFVTKESourceSink::computeQpResidual()
   }
   else
   {
-    if (!_ani_corrections)
+    const auto & grad_u = _u_var.gradient(elem_arg, state);
+    const auto Sij_xx = 2.0 * grad_u(0);
+    ADReal Sij_xy = 0.0;
+    ADReal Sij_xz = 0.0;
+    ADReal Sij_yy = 0.0;
+    ADReal Sij_yz = 0.0;
+    ADReal Sij_zz = 0.0;
+
+    const auto grad_xx = grad_u(0);
+    ADReal grad_xy = 0.0;
+    ADReal grad_xz = 0.0;
+    ADReal grad_yx = 0.0;
+    ADReal grad_yy = 0.0;
+    ADReal grad_yz = 0.0;
+    ADReal grad_zx = 0.0;
+    ADReal grad_zy = 0.0;
+    ADReal grad_zz = 0.0;
+
+    auto trace = Sij_xx / 3.0;
+
+    if (_dim >= 2)
     {
-      const auto & grad_u = _u_var.gradient(elem_arg, state);
-      const auto Sij_xx = 2.0 * grad_u(0);
-      ADReal Sij_xy = 0.0;
-      ADReal Sij_xz = 0.0;
-      ADReal Sij_yy = 0.0;
-      ADReal Sij_yz = 0.0;
-      ADReal Sij_zz = 0.0;
+      const auto & grad_v = (*_v_var).gradient(elem_arg, state);
+      Sij_xy = grad_u(1) + grad_v(0);
+      Sij_yy = 2.0 * grad_v(1);
 
-      const auto grad_xx = grad_u(0);
-      ADReal grad_xy = 0.0;
-      ADReal grad_xz = 0.0;
-      ADReal grad_yx = 0.0;
-      ADReal grad_yy = 0.0;
-      ADReal grad_yz = 0.0;
-      ADReal grad_zx = 0.0;
-      ADReal grad_zy = 0.0;
-      ADReal grad_zz = 0.0;
+      grad_xy = grad_u(1);
+      grad_yx = grad_v(0);
+      grad_yy = grad_v(1);
 
-      auto trace = Sij_xx / 3.0;
+      trace += Sij_yy / 3.0;
 
-      if (_dim >= 2)
+      if (_dim >= 3)
       {
-        const auto & grad_v = (*_v_var).gradient(elem_arg, state);
-        Sij_xy = grad_u(1) + grad_v(0);
-        Sij_yy = 2.0 * grad_v(1);
+        const auto & grad_w = (*_w_var).gradient(elem_arg, state);
 
-        grad_xy = grad_u(1);
-        grad_yx = grad_v(0);
-        grad_yy = grad_v(1);
+        Sij_xz = grad_u(2) + grad_w(0);
+        Sij_yz = grad_v(2) + grad_w(1);
+        Sij_zz = 2.0 * grad_w(2);
 
-        trace += Sij_yy / 3.0;
+        grad_xz = grad_u(2);
+        grad_yz = grad_v(2);
+        grad_zx = grad_w(0);
+        grad_zy = grad_w(1);
+        grad_zz = grad_w(2);
 
-        if (_dim >= 3)
-        {
-          const auto & grad_w = (*_w_var).gradient(elem_arg, state);
-
-          Sij_xz = grad_u(2) + grad_w(0);
-          Sij_yz = grad_v(2) + grad_w(1);
-          Sij_zz = 2.0 * grad_w(2);
-
-          grad_xz = grad_u(2);
-          grad_yz = grad_v(2);
-          grad_zx = grad_w(0);
-          grad_zy = grad_w(1);
-          grad_zz = grad_w(2);
-
-          trace += Sij_zz / 3.0;
-        }
+        trace += Sij_zz / 3.0;
       }
-
-      const auto symmetric_strain_tensor_sq_norm =
-          (Sij_xx - trace) * grad_xx + Sij_xy * grad_xy + Sij_xz * grad_xz + Sij_xy * grad_yx +
-          (Sij_yy - trace) * grad_yy + Sij_yz * grad_yz + Sij_xz * grad_zx + Sij_yz * grad_zy +
-          (Sij_zz - trace) * grad_zz;
-
-      production = _mu_t(elem_arg, state) * symmetric_strain_tensor_sq_norm;
     }
-    else
+
+    const auto symmetric_strain_tensor_sq_norm =
+        (Sij_xx - trace) * grad_xx + Sij_xy * grad_xy + Sij_xz * grad_xz + Sij_xy * grad_yx +
+        (Sij_yy - trace) * grad_yy + Sij_yz * grad_yz + Sij_xz * grad_zx + Sij_yz * grad_zy +
+        (Sij_zz - trace) * grad_zz;
+
+    production = _mu_t(elem_arg, state) * symmetric_strain_tensor_sq_norm;
+    if (_ani_corrections)
     {
       TensorValue<Real> grad_velocity;
       TensorValue<Real> b_tensor;
       grad_velocity(0, 0) = MetaPhysicL::raw_value(_u_var.gradient(elem_arg, state)(0));
-      b_tensor(0, 0) = (*_b[0])(elem_arg, state);
+
+      for (unsigned int i = 0; i < _dim; ++i)
+      {
+        for (unsigned int j = 0; j < _dim; ++j)
+          b_tensor(i,j) = (*_b[i*_dim + j])(elem_arg, state); 
+      }
+
       if (_dim > 1)
       {
         grad_velocity(0, 1) = MetaPhysicL::raw_value(_u_var.gradient(elem_arg, state)(1));
         grad_velocity(1, 0) = MetaPhysicL::raw_value(_v_var->gradient(elem_arg, state)(0));
         grad_velocity(1, 1) = MetaPhysicL::raw_value(_v_var->gradient(elem_arg, state)(1));
-        b_tensor(0, 1) = (*_b[1])(elem_arg, state);
-        b_tensor(1, 0) = (*_b[2])(elem_arg, state);
-        b_tensor(1, 1) = (*_b[3])(elem_arg, state);
       }
       if (_dim > 2)
       {
@@ -288,15 +293,9 @@ INSFVTKESourceSink::computeQpResidual()
         grad_velocity(2, 0)= MetaPhysicL::raw_value(_w_var->gradient(elem_arg, state)(0));
         grad_velocity(2, 1)= MetaPhysicL::raw_value(_w_var->gradient(elem_arg, state)(1));
         grad_velocity(2, 2)= MetaPhysicL::raw_value(_w_var->gradient(elem_arg, state)(2));
-        b_tensor(0, 2) = (*_b[4])(elem_arg, state);
-        b_tensor(1, 2) = (*_b[5])(elem_arg, state);
-        b_tensor(2, 0) = (*_b[6])(elem_arg, state);
-        b_tensor(2, 1) = (*_b[7])(elem_arg, state);
-        b_tensor(2, 2) = (*_b[8])(elem_arg, state);
       }
 
-      production = TKE * b_tensor.contract(grad_velocity);
-
+      production += TKE * b_tensor.contract(grad_velocity);
     }
 
     const auto tke_old_raw = raw_value(TKE);

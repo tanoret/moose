@@ -310,7 +310,6 @@ pressure_tag = "pressure_grad"
    eps = 1.0
    debug = false
    use_NN = false
-   mu_t_min = 0.01
   []
   [k_t]
     type = ADParsedFunctorMaterial
