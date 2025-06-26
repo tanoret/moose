@@ -45,8 +45,8 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
     dim = 2
     dx = '${L}'
     dy = '0.75 0.25'
-    ix = '250'
-    iy = '35 1'
+    ix = '100'
+    iy = '40 1'
   []
 []
 
@@ -481,7 +481,7 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
    k = TKE
    eps = TKED
    debug = false
-   use_NN = false
+   use_NN = true
    mu_t_name = 'ani_mu_t'
   []
 []
@@ -494,9 +494,9 @@ wall_treatment = 'neq' # Options: eq_newton, eq_incremental, eq_linearized, neq
   turbulence_systems = 'TKED_system TKE_system'
 
   pressure_gradient_tag = ${pressure_tag}
-  momentum_equation_relaxation = 0.3
+  momentum_equation_relaxation = 0.01
   pressure_variable_relaxation = 0.3
-  turbulence_equation_relaxation = '0.1 0.1'
+  turbulence_equation_relaxation = '0.01 0.01'
   num_iterations = 1000
   pressure_absolute_tolerance = 1e-12
   momentum_absolute_tolerance = 1e-12

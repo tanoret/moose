@@ -154,6 +154,7 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
         grad_velocity(2, 1)= MetaPhysicL::raw_value(_w_var->gradient(r,t)(1));
         grad_velocity(2, 2)= MetaPhysicL::raw_value(_w_var->gradient(r,t)(2));
     }
+    
 
     const Real k = MetaPhysicL::raw_value(_k(r,t));
     const Real eps = std::max(MetaPhysicL::raw_value(_eps(r,t)), 1e-10);
@@ -164,8 +165,8 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
 
     const TensorValue<Real> I(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 
-    const Real eta1 = std::min(std::max(sij.contract(sij), 1e-8), 1e8);
-    const Real eta2 = std::min(std::max(rij.contract(rij), 1e-8), 1e8);
+    const Real eta1 = std::min(std::max(sij.contract(sij), 1e-11), 10.0);
+    const Real eta2 = std::min(std::max(rij.contract(rij), 1e-11), 10.0);
 
     double G1 = 0.0;
     double G2 = 0.0;
@@ -189,6 +190,10 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
         arsm(eta1, eta2, G1, G2, G3);
     }
 
+    G1 = std::min(std::max(G1, -0.55), -1e-6);
+    G2 = std::min(std::max(G2, -0.40), -1e-8);
+    G3 = std::min(std::max(G3, 1e-6), 0.4);
+
     const Real rho = MetaPhysicL::raw_value(_rho(r,t));
     const TensorValue<Real> bij = rho * (G2 * (sij * rij - rij * sij) + G3 * (sij * sij - 1./3. * I * sij.contract(sij)));
     const Real _ani_mu_t = - rho * k * G1 * timescale;
@@ -201,20 +206,21 @@ TorchScriptTurbulentAnisotropyMaterial::computeQpValues()
         _console << "k: " << k << " eps: " << eps << std::endl;
         _console << "eta_1: " << eta1 << " eta_2: " << eta1 << std::endl;
         _console << "G1: " << G1 << " G2: " << G2 << " G3: " << G3 << std::endl;
+        _console << "mu_t: " << _ani_mu_t << std::endl; 
     }
-    if (irregular)
+    if (_debug || irregular)
     {
         arsm(eta1, eta2, G1, G2, G3);
         _console << "ARSM G1: " << G1 << " G2: " << G2 << " G3: " << G3 << std::endl;
     }
-
-    (*_properties[0])[_qp] = _ani_mu_t;
+    
+    (*_properties[0])[_qp] = std::min(0.6, std::max(_ani_mu_t, 0.0));
     for (unsigned int i = 0; i < _mesh_dimension; ++i)
     {
       for (unsigned int j = 0; j < _mesh_dimension; ++j)
       {
         const auto index = i * _mesh_dimension + j;
-        (*_properties[index + 1])[_qp] = bij(i,j);
+        (*_properties[index + 1])[_qp] = std::min(0.6, std::max(bij(i,j), -0.6));
       }
     }
 } 
