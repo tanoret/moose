@@ -77,5 +77,11 @@ FVDiffusion::computeQpResidual()
     coeff = _coeff(face, state);
   }
 
+  // Real x_coord = _face_info->faceCentroid()(0);
+  // const auto flux = coeff * dudn;
+  // if(x_coord <= 0.01 || x_coord >= 0.99){
+  //   printf("In FVDiffusion : x = %f, flux = %f\n", x_coord, flux.value());
+  // }
+
   return -1 * coeff * dudn;
 }
