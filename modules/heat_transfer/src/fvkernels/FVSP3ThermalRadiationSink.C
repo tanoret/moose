@@ -1,0 +1,95 @@
+//* This file is part of the MOOSE framework
+//* https://mooseframework.inl.gov
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
+#include "FVSP3ThermalRadiationSink.h"
+#include "MathUtils.h"
+#include "HeatConductionNames.h"
+#include "HeatTransferModels.h"
+
+registerMooseObject("HeatTransferApp", FVSP3ThermalRadiationSink);
+
+InputParameters
+FVSP3ThermalRadiationSink::validParams()
+{
+  InputParameters params = FVElementalKernel::validParams();
+  params.addClassDescription("Elemental kernel to the thermal radiation source and sink.");
+
+  params.addRequiredRangeCheckedParam<MooseFunctorName>("T", "T>0", "The temperature of the medium.");
+  params.addRequiredRangeCheckedParam<MooseFunctorName>("nu", "nu>0", "The mean frequency of the thermal radiation band.");
+  params.addRangeCheckedParam<MooseFunctorName>("nu_low", "nu_low>0", "The lower frequency for integration of the thermal radiation band.");
+  params.addRangeCheckedParam<MooseFunctorName>("nu_high", "nu_high>0", "The higher frequency for integration of the thermal radiation band.");
+  params.addParam<MooseFunctorName>("refraction_index", 1.0, "The refraction index in the spectral band.");
+  params.addRequiredParam<MooseFunctorName>("kappa", "The absorptivity of the medium.");
+
+  return params;
+}
+
+FVSP3ThermalRadiationSink::FVSP3ThermalRadiationSink(const InputParameters & params)
+  : FVElementalKernel(params),
+    _T(getFunctor<ADReal>("T")),
+    _nu(getFunctor<ADReal>("nu")),
+    _nu_low(isParamValid("nu_low") ? &getFunctor<ADReal>("nu_low") : nullptr),
+    _nu_high(isParamValid("nu_high") ? &getFunctor<ADReal>("nu_high") : nullptr),
+    _n1(getFunctor<ADReal>("refraction_index")),
+    _absorptivity(getFunctor<ADReal>("kappa"))
+{
+  if(_nu_low && !_nu_high)
+    paramError("nu_high", "The top energy frequency for integration must be provided if the bottom one is provided.");
+
+    if(!_nu_low && _nu_high)
+    paramError("nu_low", "The bottom energy frequency for integration must be provided if the top one is provided.");
+}
+
+ADReal
+FVSP3ThermalRadiationSink::computeQpResidual()
+{
+  // Convenient arguments
+  const auto state = determineState();
+  const auto elem_arg = makeElemArg(_current_elem);
+  const auto old_state = Moose::StateArg(1, Moose::SolutionIterationType::Time);
+
+  // Build the emission source
+  const auto T = _T(elem_arg, old_state);
+  ADReal thermal_rad_source;
+
+  if (_nu_low)
+  {
+    const auto n1 = _n1(elem_arg, state);
+    const auto kappa = _absorptivity(elem_arg, state);
+    const auto nu_low = (*_nu_low)(elem_arg, state);
+    const auto nu_high = (*_nu_high)(elem_arg, state);
+    const Real abs_tol = 1E-8;
+    const Real rel_tol = 1E-6;
+  
+    thermal_rad_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, kappa, T, nu_low, nu_high, abs_tol, rel_tol);
+    
+    // printf("T = %f, K = %f, nu_low = %f, nu_high = %f, thermal_rad_source = %f\n", T.value(), kappa.value(), nu_low.value(), nu_high.value(), thermal_rad_source.value()/(kappa.value()*4*libMesh::pi));
+  }
+  else {
+    const auto n1_pow_2 = Utility::pow<2>(_n1(elem_arg, state));
+    const auto nu = _nu(elem_arg, state);
+    const auto nu_pow_3 = Utility::pow<3>(nu);
+  
+    const auto pre_factor = n1_pow_2 * 2.0 * HeatConduction::Constants::hp * nu_pow_3 / (Utility::pow<2>(HeatConduction::Constants::c));
+    const auto inv_thermal_source = std::exp(HeatConduction::Constants::hp*nu/(HeatConduction::Constants::kb * T)) - 1.0;
+    thermal_rad_source = 4.0 * libMesh::pi * _absorptivity(elem_arg, state) * pre_factor / inv_thermal_source;
+  }
+
+  // Build the absorption sink
+  const auto thermal_rad_sink = _absorptivity(elem_arg, state) * _var(elem_arg, state);
+
+  // Print for Debug
+  // const libMesh::Point & p = _current_elem->vertex_average();
+  // const auto x_coord = p(0);
+  // const auto tempflux = thermal_rad_sink - thermal_rad_source;
+  // if(x_coord <= 0.05 || x_coord >= 0.95) printf("ThermalSS %.3f : %.2f(T) %.2f(var) %.2f(flux)\n", x_coord, T.value(), _var(elem_arg, state).value(), tempflux.value());
+
+  // Return the residual
+  return thermal_rad_sink;
+}
