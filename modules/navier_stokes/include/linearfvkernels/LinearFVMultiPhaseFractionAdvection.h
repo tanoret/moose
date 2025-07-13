@@ -37,7 +37,6 @@ public:
   virtual void setupFaceData(const FaceInfo * face_info) override;
 
 protected:
-
   /// Function to compute compression mass flux
   Real computeCompressionVelocityMassFlux(const Moose::FaceArg & face, const Real & grad_alpha);
 

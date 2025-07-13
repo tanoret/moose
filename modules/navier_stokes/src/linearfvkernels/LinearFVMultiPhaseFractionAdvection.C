@@ -23,7 +23,8 @@ LinearFVMultiPhaseFractionAdvection::validParams()
   params.addRequiredParam<UserObjectName>(
       "rhie_chow_user_object",
       "The rhie-chow user-object which is used to determine the face velocity.");
-  params.addRangeCheckedParam<Real>("c_alpha", 0.0, "0.0<=c_alpha", "The compression velocity scaling constant.");
+  params.addRangeCheckedParam<Real>(
+      "c_alpha", 0.0, "0.0<=c_alpha", "The compression velocity scaling constant.");
   params.addParam<MooseFunctorName>(NS::density, "The density.");
   params.addParam<MooseFunctorName>("u", "The velocity in the x direction.");
   params.addParam<MooseFunctorName>("v", "The velocity in the y direction.");
@@ -31,12 +32,15 @@ LinearFVMultiPhaseFractionAdvection::validParams()
   params.addParam<MooseFunctorName>("u_mixture", "The mixture velocity in the x direction.");
   params.addParam<MooseFunctorName>("v_mixture", "The mixture velocity in the y direction.");
   params.addParam<MooseFunctorName>("w_mixture", "The mixture velocity in the z direction.");
-  params.addParam<bool>("use_nonorthogonal_correction", false,
-                        "If the nonorthogonal correction should be used when computing the normal gradient.");
+  params.addParam<bool>(
+      "use_nonorthogonal_correction",
+      false,
+      "If the nonorthogonal correction should be used when computing the normal gradient.");
 
   params += Moose::FV::advectedInterpolationParameter();
 
-  MooseEnum limiterEnum("average upwind sou min_mod vanLeer quick venkatakrishnan skewness-corrected", "vanLeer");
+  MooseEnum limiterEnum(
+      "average upwind sou min_mod vanLeer quick venkatakrishnan skewness-corrected", "vanLeer");
 
   params.addParam<MooseEnum>("limiter_method",
                              limiterEnum,
@@ -47,7 +51,8 @@ LinearFVMultiPhaseFractionAdvection::validParams()
   return params;
 }
 
-LinearFVMultiPhaseFractionAdvection::LinearFVMultiPhaseFractionAdvection(const InputParameters & params)
+LinearFVMultiPhaseFractionAdvection::LinearFVMultiPhaseFractionAdvection(
+    const InputParameters & params)
   : LinearFVFluxKernel(params),
     _mass_flux_provider(getUserObject<RhieChowMassFluxMultiPhase>("rhie_chow_user_object")),
     _dim(_subproblem.mesh().dimension()),
@@ -70,40 +75,50 @@ LinearFVMultiPhaseFractionAdvection::LinearFVMultiPhaseFractionAdvection(const I
   Moose::FV::setInterpolationMethod(*this, _advected_interp_method, "advected_interp_method");
   Moose::FV::setInterpolationMethod(*this, _limiter_method, "limiter_method");
 
-  if(_c_alpha > 1e-42)
+  if (_c_alpha > 1e-42)
   {
 
-    if(!_rho)
+    if (!_rho)
       paramError(NS::density,
-                "The density must be provided when compression velocity is activated by setting c_alpha>1e-42");
+                 "The density must be provided when compression velocity is activated by setting "
+                 "c_alpha>1e-42");
 
-    if(!_u_var)
+    if (!_u_var)
       paramError("u",
-                "The velocity 'u' must be provided when compression velocity is activated by setting c_alpha>1e-42");
+                 "The velocity 'u' must be provided when compression velocity is activated by "
+                 "setting c_alpha>1e-42");
 
     if (_dim >= 2 && !_v_var)
       paramError("v",
-                "In two or more dimensions, "
-                "the velocity 'v' must be provided when compression velocity is activated by setting c_alpha>1e-42!");
+                 "In two or more dimensions, "
+                 "the velocity 'v' must be provided when compression velocity is activated by "
+                 "setting c_alpha>1e-42!");
 
     if (_dim >= 3 && !_w_var)
       paramError("w",
-                "In three dimensions, "
-                "the velocity 'w' must be provided when compression velocity is activated by setting c_alpha>1e-42!");
+                 "In three dimensions, "
+                 "the velocity 'w' must be provided when compression velocity is activated by "
+                 "setting c_alpha>1e-42!");
 
-    if(!_u_var_mixture)
+    if (!_u_var_mixture)
       paramError("u_mixture",
-                 "The velocity mixture 'u' must be provided when compression velocity is activated by setting c_alpha>1e-42");
+                 "The velocity mixture 'u' must be provided when compression velocity is activated "
+                 "by setting c_alpha>1e-42");
 
     if (_dim >= 2 && !_v_var_mixture)
       paramError("v_mixture",
                  "In two or more dimensions, "
-                 "the velocity mixture 'v' must be provided when compression velocity is activated by setting c_alpha>1e-42!");
+                 "the velocity mixture 'v' must be provided when compression velocity is activated "
+                 "by setting c_alpha>1e-42!");
 
     if (_dim >= 3 && !_w_var_mixture)
       paramError("w_mixture",
                  "In three dimensions, "
-                 "the velocity mixture 'w' must be provided when compression velocity is activated by setting c_alpha>1e-42!");
+                 "the velocity mixture 'w' must be provided when compression velocity is activated "
+                 "by setting c_alpha>1e-42!");
+
+    // Gradients are needed for compression velocity
+    _var.computeCellGradients();
   }
 }
 
@@ -111,20 +126,22 @@ Real
 LinearFVMultiPhaseFractionAdvection::computeElemMatrixContribution()
 {
   Real comp_mass_flux = 0.0;
-  if(_c_alpha > 1e-42)
+  if (_c_alpha > 1e-42)
     comp_mass_flux = _lambda_f * computeCompressionVelocityMassFluxMatrixContribution();
 
-  return (_advected_interp_coeffs.first * _total_adv_mass_face_flux + comp_mass_flux) * _current_face_area;
+  return (_advected_interp_coeffs.first * _total_adv_mass_face_flux + comp_mass_flux) *
+         _current_face_area;
 }
 
 Real
 LinearFVMultiPhaseFractionAdvection::computeNeighborMatrixContribution()
 {
   Real comp_mass_flux = 0.0;
-  if(_c_alpha > 1e-42)
+  if (_c_alpha > 1e-42)
     comp_mass_flux = _lambda_f * computeCompressionVelocityMassFluxMatrixContribution();
 
-  return (_advected_interp_coeffs.second * _total_adv_mass_face_flux + comp_mass_flux) * _current_face_area;
+  return (_advected_interp_coeffs.second * _total_adv_mass_face_flux + comp_mass_flux) *
+         _current_face_area;
 }
 
 Real
@@ -135,16 +152,15 @@ LinearFVMultiPhaseFractionAdvection::computeElemRightHandSideContribution()
     rhs += _lambda_f * computeCompressionVelocityMassFluxRHSContribution();
 
   Real comp_mass_flux = 0.0;
-  if(_c_alpha > 1e-42)
+  if (_c_alpha > 1e-42)
     comp_mass_flux = _lambda_f * computeCompressionVelocityMassFluxMatrixContribution();
 
   Real tol_mass_flux = _advected_interp_coeffs.first * _total_adv_mass_face_flux + comp_mass_flux;
-  Real alpha_holo = MetaPhysicL::raw_value(_var(_high_order_face, determineState()))
-                    - MetaPhysicL::raw_value(_var(_low_order_face, determineState()));
+  Real alpha_holo = MetaPhysicL::raw_value(_var(_high_order_face, determineState())) -
+                    MetaPhysicL::raw_value(_var(_low_order_face, determineState()));
   rhs -= tol_mass_flux * alpha_holo * _current_face_area;
 
   return rhs;
-
 }
 
 Real
@@ -155,19 +171,20 @@ LinearFVMultiPhaseFractionAdvection::computeNeighborRightHandSideContribution()
     rhs += _lambda_f * computeCompressionVelocityMassFluxRHSContribution();
 
   Real comp_mass_flux = 0.0;
-  if(_c_alpha > 1e-42)
+  if (_c_alpha > 1e-42)
     comp_mass_flux = _lambda_f * computeCompressionVelocityMassFluxMatrixContribution();
 
   Real tol_mass_flux = _advected_interp_coeffs.second * _total_adv_mass_face_flux + comp_mass_flux;
-  Real alpha_holo = MetaPhysicL::raw_value(_var(_high_order_face, determineState()))
-                    - MetaPhysicL::raw_value(_var(_low_order_face, determineState()));
+  Real alpha_holo = MetaPhysicL::raw_value(_var(_high_order_face, determineState())) -
+                    MetaPhysicL::raw_value(_var(_low_order_face, determineState()));
   rhs -= tol_mass_flux * alpha_holo * _current_face_area;
 
   return rhs;
 }
 
 Real
-LinearFVMultiPhaseFractionAdvection::computeBoundaryMatrixContribution(const LinearFVBoundaryCondition & bc)
+LinearFVMultiPhaseFractionAdvection::computeBoundaryMatrixContribution(
+    const LinearFVBoundaryCondition & bc)
 {
   const auto * const adv_bc = static_cast<const LinearFVAdvectionDiffusionBC *>(&bc);
   mooseAssert(adv_bc, "This should be a valid BC!");
@@ -179,7 +196,7 @@ LinearFVMultiPhaseFractionAdvection::computeBoundaryMatrixContribution(const Lin
 
   // Adding compression velocity contribution
   Real compression_mass_flux = 0.0;
-  if(_c_alpha > 1e-42)
+  if (_c_alpha > 1e-42)
   {
     const auto face_arg = singleSidedFaceArg(_current_face_info);
     auto grad_alpha = adv_bc->computeBoundaryGradientMatrixContribution();
@@ -191,7 +208,8 @@ LinearFVMultiPhaseFractionAdvection::computeBoundaryMatrixContribution(const Lin
 }
 
 Real
-LinearFVMultiPhaseFractionAdvection::computeBoundaryRHSContribution(const LinearFVBoundaryCondition & bc)
+LinearFVMultiPhaseFractionAdvection::computeBoundaryRHSContribution(
+    const LinearFVBoundaryCondition & bc)
 {
   const auto * const adv_bc = static_cast<const LinearFVAdvectionDiffusionBC *>(&bc);
   mooseAssert(adv_bc, "This should be a valid BC!");
@@ -203,7 +221,7 @@ LinearFVMultiPhaseFractionAdvection::computeBoundaryRHSContribution(const Linear
 
   // Adding compression velocity contribution
   Real compression_mass_flux = 0.0;
-  if(_c_alpha > 1e-42)
+  if (_c_alpha > 1e-42)
   {
     const auto face_arg = singleSidedFaceArg(_current_face_info);
     auto grad_alpha = adv_bc->computeBoundaryGradientRHSContribution();
@@ -228,33 +246,28 @@ LinearFVMultiPhaseFractionAdvection::setupFaceData(const FaceInfo * face_info)
   _advected_interp_coeffs =
       interpCoeffs(_advected_interp_method, *_current_face_info, true, _total_adv_mass_face_flux);
 
-  // Store low-order face 
-  _low_order_face = makeFace(*_current_face_info,
-                             limiterType(_advected_interp_method),
-                             _total_adv_mass_face_flux);
+  // Store low-order face
+  _low_order_face = makeFace(
+      *_current_face_info, limiterType(_advected_interp_method), _total_adv_mass_face_flux);
 
-  // Store higher-order face 
-  _high_order_face = makeFace(*_current_face_info,
-                              limiterType(_limiter_method),
-                              _total_adv_mass_face_flux);
+  // Store higher-order face
+  _high_order_face =
+      makeFace(*_current_face_info, limiterType(_limiter_method), _total_adv_mass_face_flux);
 
   // CMULES
-  const auto total_adv_volume_flux = _mass_flux_provider.getVolumetricFaceFlux(*face_info) * _current_face_area * _dt;
+  const auto total_adv_volume_flux =
+      _mass_flux_provider.getVolumetricFaceFlux(*face_info) * _current_face_area * _dt;
 
-  auto donor    = _total_adv_mass_face_flux > 0 ?
-                        _low_order_face.makeElem() :
-                        _low_order_face.makeNeighbor();
-  auto acceptor = _total_adv_mass_face_flux > 0 ?
-                        _low_order_face.makeNeighbor() : 
-                        _low_order_face.makeElem();
+  auto donor =
+      _total_adv_mass_face_flux > 0 ? _low_order_face.makeElem() : _low_order_face.makeNeighbor();
+  auto acceptor =
+      _total_adv_mass_face_flux > 0 ? _low_order_face.makeNeighbor() : _low_order_face.makeElem();
 
-  auto donor_info    = _total_adv_mass_face_flux > 0 ?
-                             _current_face_info->elemInfo() :
-                             _current_face_info->neighborInfo();
-  auto acceptor_info = _total_adv_mass_face_flux > 0 ?
-                             _current_face_info->neighborInfo() :
-                             _current_face_info->elemInfo();
-  
+  auto donor_info = _total_adv_mass_face_flux > 0 ? _current_face_info->elemInfo()
+                                                  : _current_face_info->neighborInfo();
+  auto acceptor_info = _total_adv_mass_face_flux > 0 ? _current_face_info->neighborInfo()
+                                                     : _current_face_info->elemInfo();
+
   if (!donor_info)
   {
     donor_info = acceptor_info;
@@ -267,18 +280,14 @@ LinearFVMultiPhaseFractionAdvection::setupFaceData(const FaceInfo * face_info)
     acceptor = donor;
   }
 
-  const auto donnor_capacity = MetaPhysicL::raw_value(_var(donor, determineState())) * donor_info->volume();
-  const auto acceptor_capacity = (1.0 - MetaPhysicL::raw_value(_var(acceptor, determineState()))) * acceptor_info->volume();
+  const auto donnor_capacity =
+      MetaPhysicL::raw_value(_var(donor, determineState())) * donor_info->volume();
+  const auto acceptor_capacity =
+      (1.0 - MetaPhysicL::raw_value(_var(acceptor, determineState()))) * acceptor_info->volume();
 
-  _lambda_f = std::max(
-              std::min(
-              std::min(
-                  1.0, donnor_capacity/std::abs(total_adv_volume_flux)
-                ),
-                  acceptor_capacity/std::abs(total_adv_volume_flux)
-                ),
-                  1e-10
-              );
+  _lambda_f = std::max(std::min(std::min(1.0, donnor_capacity / std::abs(total_adv_volume_flux)),
+                                acceptor_capacity / std::abs(total_adv_volume_flux)),
+                       1e-10);
 }
 
 Real
@@ -289,10 +298,10 @@ LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFluxMatrixCon
   // If we requested nonorthogonal correction, we use the normal component of the
   // cell to face vector.
   const auto d = _use_nonorthogonal_correction
-                      ? std::abs(_current_face_info->dCN() * _current_face_info->normal())
-                      : _current_face_info->dCNMag();
+                     ? std::abs(_current_face_info->dCN() * _current_face_info->normal())
+                     : _current_face_info->dCNMag();
 
-  return computeCompressionVelocityMassFlux(face_arg, 1.0/d);
+  return computeCompressionVelocityMassFlux(face_arg, 1.0 / d);
 }
 
 Real
@@ -310,45 +319,63 @@ LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFluxRHSContri
 
   const auto correction_vector =
       _current_face_info->normal() -
-      1 / (_current_face_info->normal() * _current_face_info->eCN()) *
-          _current_face_info->eCN();
+      1 / (_current_face_info->normal() * _current_face_info->eCN()) * _current_face_info->eCN();
 
   //  Compute compression velocity
   Real compression_velocity = computeCompressionVelocityMassFlux(face_arg, 1.0);
 
-  return compression_velocity * (interp_coeffs.first * grad_elem + interp_coeffs.second * grad_neighbor) * correction_vector;
+  return compression_velocity *
+         (interp_coeffs.first * grad_elem + interp_coeffs.second * grad_neighbor) *
+         correction_vector;
 }
 
 Real
-LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFlux(const Moose::FaceArg & face_arg,
-                                                                   const Real & grad_alpha)
+LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFlux(
+    const Moose::FaceArg & face_arg, const Real & grad_alpha)
 {
   const auto state = determineState();
 
-  const auto alpha = MetaPhysicL::raw_value(_var(_high_order_face, state));
-  const auto grad_alpha_norm = MetaPhysicL::raw_value(_var.gradSln(*_current_face_info->elemInfo()).norm());
+  const auto alpha_f = MetaPhysicL::raw_value(_var(_high_order_face, state));
+  if (alpha_f <= 1e-12 || alpha_f >= 1.0 - 1e-12) // pure phase ⇒ no compression
+    return 0.0;
 
-  RealVectorValue velocity((*_u_var)(face_arg, state));
-  if (_v_var)
-    velocity(1) = (*_v_var)(face_arg, state);
-  if (_w_var)
-    velocity(2) = (*_w_var)(face_arg, state);
+  const auto grad = MetaPhysicL::raw_value(_var.gradSln(*_current_face_info->elemInfo()));
+  const auto grad_mag = grad.norm();
 
-  RealVectorValue velocity_mixture((*_u_var_mixture)(face_arg, state));
-  if (_v_var)
-    velocity_mixture(1) = (*_v_var_mixture)(face_arg, state);
-  if (_w_var)
-    velocity_mixture(2) = (*_w_var_mixture)(face_arg, state);
+  if (grad_mag < 1e-14)
+    return 0.0;
 
-  const auto rel_velocity = velocity - velocity_mixture;
+  // RealVectorValue velocity((*_u_var)(face_arg, state));
+  // if (_v_var)
+  //   velocity(1) = (*_v_var)(face_arg, state);
+  // if (_w_var)
+  //   velocity(2) = (*_w_var)(face_arg, state);
 
-  const auto compression_vel = _c_alpha * rel_velocity.norm() * grad_alpha / (grad_alpha_norm + 0.1);
+  // RealVectorValue velocity_mixture((*_u_var_mixture)(face_arg, state));
+  // if (_v_var)
+  //   velocity_mixture(1) = (*_v_var_mixture)(face_arg, state);
+  // if (_w_var)
+  //   velocity_mixture(2) = (*_w_var_mixture)(face_arg, state);
 
-  const auto rho = (*_rho)(face_arg, state);
+  // const auto rel_velocity = velocity - velocity_mixture;
 
-  const auto compression_mass_flux = rho * alpha * (1. - alpha) * compression_vel;
+  // const Real rho_f = (*_rho)(face_arg, state);
+  const Real Un = std::fabs(_total_adv_mass_face_flux);
+
+  const Real u_c = _c_alpha * Un;
+
+  const auto compression_dir = (grad / grad_mag) * _current_face_info->normal() / alpha_f;
+
+  // const auto compression_vel =
+  //     _c_alpha * rel_velocity.norm() * grad_alpha / (grad_alpha_norm + 0.1);
+
+  // const auto rho = (*_rho)(face_arg, state);
+
+  // const auto compression_mass_flux = rho * alpha_f * (1. - alpha_f) * compression_vel;
+
+  // const auto compression_mass_flux = rho_f * u_c * alpha_f * (1.0 - alpha_f) * compression_vel;
+
+  const auto compression_mass_flux = u_c * alpha_f * (1.0 - alpha_f) * compression_dir;
 
   return compression_mass_flux;
-
 }
-
