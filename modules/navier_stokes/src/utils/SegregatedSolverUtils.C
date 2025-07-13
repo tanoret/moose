@@ -131,6 +131,52 @@ limitSolutionUpdate(NumericVector<Number> & solution, const Real min_limit, cons
   solution_vector.restore_array();
 }
 
+void
+constrainPhaseUpdate(std::vector<NumericVector<Number> *> & solution)
+{
+  // Recast vector with Petsc Solutions
+  std::vector<PetscVector<Number> *> solution_vectors;
+  solution_vectors.reserve(solution.size());
+
+  // Recast array with Petsc Scalars
+  std::vector<PetscScalar *> solution_arrays;
+  solution_arrays.reserve(solution.size());
+
+  // Link solution vector to Petsc vector and get array
+  for(unsigned int i = 0; i < solution.size(); ++i)
+  {
+    PetscVector<Number> & petsc_vector = dynamic_cast<PetscVector<Number> &>(*solution[i]);
+    solution_vectors.push_back(&petsc_vector);
+    solution_arrays.push_back(petsc_vector.get_array());
+  }
+
+  for (auto comp : make_range(solution_vectors[0]->local_size()))
+  {
+    // Get the current sum of the component
+    PetscScalar sum = 0.0;
+    bool normalize_phase = false;
+
+    for(unsigned int i = 0; i < solution.size(); ++i)
+    {
+      const auto loc_sol = solution_arrays[i][comp];
+      if (loc_sol > 0.1 || loc_sol < 0.9)
+        normalize_phase = true;
+      sum += std::max(loc_sol, 1e-42);
+    }
+
+    // Rescale so that the sum is 1
+    if(normalize_phase)
+    {
+      for(unsigned int i = 0; i < solution.size(); ++i)
+        solution_arrays[i][comp] = solution_arrays[i][comp] / sum;
+    }
+  }
+
+  // Restore Petsc vectors
+  for(unsigned int i = 0; i < solution.size(); ++i)
+    solution_vectors[i]->restore_array();
+}
+
 Real
 computeNormalizationFactor(const NumericVector<Number> & solution,
                            const SparseMatrix<Number> & mat,

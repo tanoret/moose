@@ -77,6 +77,14 @@ void limitSolutionUpdate(NumericVector<Number> & solution,
                          const Real max_limit = 1e10);
 
 /**
+ * Limit a solution to its minimum and maximum bounds:
+ * $u = min(max(u, min_limit), max_limit)$
+ *
+ * @param solution Vector of solution for the phases to be limited
+ */
+void constrainPhaseUpdate(std::vector<NumericVector<Number> *> & solution);
+
+/**
  * Compute a normalization factor which is applied to the linear residual to determine
  * convergence. This function is based on the description provided here:
  * @article{greenshields2022notes,
