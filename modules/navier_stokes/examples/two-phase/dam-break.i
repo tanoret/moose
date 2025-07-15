@@ -1,14 +1,17 @@
 rho1 = 1000.0
 rho2 = 1.0
-advected_interp_method = 'upwind'
 mu_1 = 1e-3
 mu_2 = 1.48e-5
 gravity = 9.81 #9.81
 
 to_m = 0.146
 domain_dims = ${fparse 4.0*to_m}
-dam_dims_x = ${fparse 1*0.1461}
-dam_dims_y = ${fparse 2*0.1461}
+dam_dims_x = ${fparse 0.5*0.1461}
+dam_dims_y = ${fparse 3.5*0.1461}
+
+c_alpha = 0.0
+advected_interp_method = 'upwind'
+limiter_method = 'upwind'
 
 [Mesh]
   [mesh]
@@ -16,8 +19,8 @@ dam_dims_y = ${fparse 2*0.1461}
     dim = 2
     dx = '${domain_dims}'
     dy = '${domain_dims}'
-    ix = '50'
-    iy = '50'
+    ix = '100'
+    iy = '100'
   []
 []
 
@@ -233,14 +236,10 @@ dam_dims_y = ${fparse 2*0.1461}
     type = LinearFVMultiPhaseFractionAdvection
     variable = alpha_1
     rhie_chow_user_object = 'rc_p1'
-    c_alpha = 1e-2
+    c_alpha = ${c_alpha}
     rho = 1.0 #${rho1}
-    u = vel_x_p1
-    v = vel_x_p1
-    u_mixture = vel_x_mixture
-    v_mixture = vel_y_mixture
     advected_interp_method = ${advected_interp_method}
-    limiter_method = 'vanLeer'
+    limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
   []
 
@@ -254,14 +253,10 @@ dam_dims_y = ${fparse 2*0.1461}
     type = LinearFVMultiPhaseFractionAdvection
     variable = alpha_2
     rhie_chow_user_object = 'rc_p2'
-    c_alpha = 1e-2
+    c_alpha = ${c_alpha}
     rho = 1.0 #${rho2}
-    u = vel_x_p2
-    v = vel_x_p2
-    u_mixture = vel_x_mixture
-    v_mixture = vel_y_mixture
     advected_interp_method = ${advected_interp_method}
-    limiter_method = 'vanLeer'
+    limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
   []
 []
@@ -424,7 +419,7 @@ dam_dims_y = ${fparse 2*0.1461}
 
   momentum_equation_relaxation = 0.7
   pressure_variable_relaxation = 0.3
-  phase_equation_relaxation = 0.2
+  phase_equation_relaxation = 0.9
 
   num_iterations = 100
 
@@ -441,9 +436,15 @@ dam_dims_y = ${fparse 2*0.1461}
 
   print_fields = false
   continue_on_max_its = true
-  dt = 0.001
-  num_steps = 5
+  dt = 0.0001
+  num_steps = 10000
   num_piso_iterations = 0
+
+  # Interface tratment
+  enforce_phase_sum = true
+  activate_interface_shapening = false
+  shapening_type = 'heaviside'
+  smoothing_constant = 100.0
 []
 
 [Outputs]

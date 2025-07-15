@@ -429,6 +429,21 @@ SolveBaseMultiPhase::validParams()
                         true,
                         "If solve should continue if maximum number of iterations is hit.");
 
+
+  /*
+   * Parameters to control interface sharpening
+   */
+  params.addParam<bool>("enforce_phase_sum", true, "Ensure that all phases add to 1.0 for a cell.");
+  params.addParam<bool>("activate_interface_shapening", false, "Activate interface sharpening method.");
+  MooseEnum sharpening_type("heaviside smooth", "heaviside");
+  params.addParam<MooseEnum>("shapening_type", sharpening_type, "The interface sharpening method used.");
+  params.addParam<Real>("smoothing_constant", 100.0, "The interface smoothing constant value.");
+  
+  params.addParamNamesToGroup("enforce_phase_sum "
+                              "activate_interface_shapening "
+                              "shapening_type "
+                              "smoothing_constant ",
+                              "Interface Sharpenning");
   return params;
 }
 
@@ -497,9 +512,13 @@ SolveBaseMultiPhase::SolveBaseMultiPhase(Executioner & ex)
             ? _problem.linearSysNum(getParam<SolverSystemName>("solid_energy_system"))
             : libMesh::invalid_uint),
     _solid_energy_system(
-        _has_solid_energy_system ? &_problem.getLinearSystem(_solid_energy_sys_number) : nullptr)
+        _has_solid_energy_system ? &_problem.getLinearSystem(_solid_energy_sys_number) : nullptr),
+    // Interface sharpening
+    _enforce_phase_sum(getParam<bool>("enforce_phase_sum")),
+    _activate_interface_shapening(getParam<bool>("activate_interface_shapening")),
+    _shapening_type(getParam<MooseEnum>("shapening_type")),
+    _smoothing_constant(getParam<Real>("smoothing_constant"))
 {
-
   // Checks errors and assemblies for the momentum system
   for(unsigned int i = 0; i < _number_of_phases; ++i)
     if (_momentum_system_names[i].size() != _problem.mesh().dimension())
@@ -1301,24 +1320,6 @@ SolveBaseMultiPhase::solve()
       NS::FV::limitSolutionUpdate(current_solution, 0.0, 1.0);
     }
 
-    // Bound total phases
-    if (_number_of_phases == _number_of_solved_phases) // otherwise the total phase fraction should be externally constrained
-    {
-      std::vector<NumericVector<Number> *> phase_solutions;
-      phase_solutions.reserve(_number_of_solved_phases);
-
-      for(unsigned int phase_number = 0; phase_number < _number_of_solved_phases; ++phase_number)
-      {
-          LinearImplicitSystem & li_system =
-              libMesh::cast_ref<LinearImplicitSystem &>(_phase_systems[phase_number]->system());
-          NumericVector<Number> & current_solution = *(li_system.solution);
-          phase_solutions.push_back(&current_solution); // Store pointer to current_solution
-      }
-
-      // Call the function to limit phase solutions
-      NS::FV::constrainPhaseUpdate(phase_solutions);
-    }
-
     // If we have turbulence equations, solve them here.
     // The turbulent viscosity depends on the value of the turbulence surrogate variables
     if (_has_turbulence_systems)
@@ -1356,6 +1357,42 @@ SolveBaseMultiPhase::solve()
     _problem.execute(EXEC_NONLINEAR);
 
     converged = NS::FV::converged(ns_residuals, ns_abs_tols);
+  }
+
+  // -----------------------------------------------------------
+  // Interface constrain and sharpening
+  // -----------------------------------------------------------
+  // Apply interface sharpening
+  if(_activate_interface_shapening)
+  {
+    for(unsigned int phase_number = 0; phase_number < _number_of_solved_phases; ++phase_number)
+    {
+      LinearImplicitSystem & li_system =
+          libMesh::cast_ref<LinearImplicitSystem &>(_phase_systems[phase_number]->system());
+      NumericVector<Number> & current_solution = *(li_system.solution);
+      NS::FV::sharpenPhaseField(current_solution, // alpha
+                                *(_rc_uo[0]->getCellVolumes()), // should always have at least one rc system
+                                _shapening_type,
+                                _smoothing_constant);
+    }
+  }
+
+  // Bound total phases
+  if (_number_of_phases == _number_of_solved_phases && _enforce_phase_sum) // otherwise the total phase fraction should be externally constrained
+  {
+    std::vector<NumericVector<Number> *> phase_solutions;
+    phase_solutions.reserve(_number_of_solved_phases);
+
+    for(unsigned int phase_number = 0; phase_number < _number_of_solved_phases; ++phase_number)
+    {
+        LinearImplicitSystem & li_system =
+            libMesh::cast_ref<LinearImplicitSystem &>(_phase_systems[phase_number]->system());
+        NumericVector<Number> & current_solution = *(li_system.solution);
+        phase_solutions.push_back(&current_solution); // Store pointer to current_solution
+    }
+
+    // Call the function to limit phase solutions
+    NS::FV::constrainPhaseUpdate(phase_solutions);
   }
 
   // If we have passive scalar equations, solve them here. We assume the material properties in the

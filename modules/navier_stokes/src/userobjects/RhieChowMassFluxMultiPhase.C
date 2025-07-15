@@ -300,6 +300,12 @@ RhieChowMassFluxMultiPhase::getVolumetricFaceFlux(const Moose::FV::InterpMethod 
   return getVolumetricFaceFlux(fi);
 }
 
+std::unique_ptr<NumericVector<Number>> &
+RhieChowMassFluxMultiPhase::getCellVolumes()
+{
+  return _cell_volumes;
+}
+
 void
 RhieChowMassFluxMultiPhase::computeFaceMassFlux()
 {

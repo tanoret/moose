@@ -38,7 +38,7 @@ public:
 
 protected:
   /// Function to compute compression mass flux
-  Real computeCompressionVelocityMassFlux(const Moose::FaceArg & face, const Real & grad_alpha);
+  Real computeCompressionVelocityMassFlux();
 
   /// Function to compute the internal contribution from the compression velocity
   /// to the mass fluxes for the matrix term
@@ -47,6 +47,12 @@ protected:
   /// Function to compute the internal contribution from the compression velocity
   /// to the mass fluxes for the RHS term
   Real computeCompressionVelocityMassFluxRHSContribution();
+
+  /// Function to get face value with low-order interpolation
+  Real getLowOrderFaceValue(MooseLinearVariableFV<Real> & variable);
+
+  /// Function to get face value with high-order interpolation
+  Real getHighOrderFaceValue(MooseLinearVariableFV<Real> & variable);
 
   /// The Rhie-Chow user object that provides us with the face velocity
   const RhieChowMassFluxMultiPhase & _mass_flux_provider;
@@ -59,20 +65,6 @@ protected:
 
   /// The phase density used for compression velocity
   const Moose::Functor<Real> * _rho;
-
-  /// x-velocity
-  const Moose::Functor<Real> * _u_var;
-  /// y-velocity
-  const Moose::Functor<Real> * _v_var;
-  /// z-velocity
-  const Moose::Functor<Real> * _w_var;
-
-  /// x-velocity-mixture
-  const Moose::Functor<Real> * _u_var_mixture;
-  /// y-velocity-mixture
-  const Moose::Functor<Real> * _v_var_mixture;
-  /// z-velocity-mixture
-  const Moose::Functor<Real> * _w_var_mixture;
 
   /// Switch to enable/disable nonorthogonal correction in the stress term
   const bool _use_nonorthogonal_correction;
@@ -90,7 +82,7 @@ private:
   Moose::FV::InterpMethod _advected_interp_method;
 
   /// The limiter method
-  Moose::FV::InterpMethod _limiter_method;
+  MooseEnum _limiter_method;
 
   /// Face argument for higher order face interpolation
   Moose::FaceArg _low_order_face;

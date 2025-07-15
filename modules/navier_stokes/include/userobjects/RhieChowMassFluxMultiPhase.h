@@ -54,6 +54,9 @@ public:
                                      const THREAD_ID tid,
                                      bool subtract_mesh_velocity) const override;
 
+  /// Get cell volumes
+  std::unique_ptr<NumericVector<Number>> & getCellVolumes();
+
   /// Initialize the container for face velocities
   void initFaceMassFlux();
   /// Initialize the coupling fields (HbyA and Ainv)

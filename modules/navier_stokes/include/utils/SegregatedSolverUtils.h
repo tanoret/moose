@@ -77,14 +77,6 @@ void limitSolutionUpdate(NumericVector<Number> & solution,
                          const Real max_limit = 1e10);
 
 /**
- * Limit a solution to its minimum and maximum bounds:
- * $u = min(max(u, min_limit), max_limit)$
- *
- * @param solution Vector of solution for the phases to be limited
- */
-void constrainPhaseUpdate(std::vector<NumericVector<Number> *> & solution);
-
-/**
  * Compute a normalization factor which is applied to the linear residual to determine
  * convergence. This function is based on the description provided here:
  * @article{greenshields2022notes,
@@ -133,5 +125,36 @@ dof_id_type findPointDoFID(const MooseVariableFieldBase & variable,
  */
 bool converged(const std::vector<std::pair<unsigned int, Real>> & residuals,
                const std::vector<Real> & abs_tolerances);
+
+/* --------------------------------------------------------------------------
+   Interface-sharpening utils
+   -------------------------------------------------------------------------- */
+
+/**
+ * Constrain phase update so that the total sum of pahses add to 1.
+ * @param solution Vector of solution for the phases to be limited
+ */
+void constrainPhaseUpdate(std::vector<NumericVector<Number> *> & solution);
+
+/** Return the threshold t for H(α - t) so that ΣV_i H(...) = ΣV_i α_i */
+Real computeSharpeningThresholdHeaviside(const NumericVector<Number> & alpha,
+                                         const NumericVector<Number> & volumes,
+                                         Real tol       = 1e-10,
+                                         unsigned int max_iter = 50);
+
+/** Return the threshold t for 0.5[tanh(β(α - t))+1] */
+Real computeSharpeningThresholdSoft(const NumericVector<Number> & alpha,
+                                    const NumericVector<Number> & volumes,
+                                    Real beta,
+                                    Real tol       = 1e-10,
+                                    unsigned int max_iter = 50);
+
+/** In-place sharpening of the α field */
+void sharpenPhaseField(NumericVector<Number> &       alpha,
+                       const NumericVector<Number> & volumes,
+                       MooseEnum                     shapening_type,
+                       Real                          beta = 100.0);
+
+
 } // End FV namespace
 } // End Moose namespace

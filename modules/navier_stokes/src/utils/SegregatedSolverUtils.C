@@ -131,52 +131,6 @@ limitSolutionUpdate(NumericVector<Number> & solution, const Real min_limit, cons
   solution_vector.restore_array();
 }
 
-void
-constrainPhaseUpdate(std::vector<NumericVector<Number> *> & solution)
-{
-  // Recast vector with Petsc Solutions
-  std::vector<PetscVector<Number> *> solution_vectors;
-  solution_vectors.reserve(solution.size());
-
-  // Recast array with Petsc Scalars
-  std::vector<PetscScalar *> solution_arrays;
-  solution_arrays.reserve(solution.size());
-
-  // Link solution vector to Petsc vector and get array
-  for(unsigned int i = 0; i < solution.size(); ++i)
-  {
-    PetscVector<Number> & petsc_vector = dynamic_cast<PetscVector<Number> &>(*solution[i]);
-    solution_vectors.push_back(&petsc_vector);
-    solution_arrays.push_back(petsc_vector.get_array());
-  }
-
-  for (auto comp : make_range(solution_vectors[0]->local_size()))
-  {
-    // Get the current sum of the component
-    PetscScalar sum = 0.0;
-    bool normalize_phase = false;
-
-    for(unsigned int i = 0; i < solution.size(); ++i)
-    {
-      const auto loc_sol = solution_arrays[i][comp];
-      if (loc_sol > 0.1 || loc_sol < 0.9)
-        normalize_phase = true;
-      sum += std::max(loc_sol, 1e-42);
-    }
-
-    // Rescale so that the sum is 1
-    if(normalize_phase)
-    {
-      for(unsigned int i = 0; i < solution.size(); ++i)
-        solution_arrays[i][comp] = solution_arrays[i][comp] / sum;
-    }
-  }
-
-  // Restore Petsc vectors
-  for(unsigned int i = 0; i < solution.size(); ++i)
-    solution_vectors[i]->restore_array();
-}
-
 Real
 computeNormalizationFactor(const NumericVector<Number> & solution,
                            const SparseMatrix<Number> & mat,
@@ -288,6 +242,251 @@ converged(const std::vector<std::pair<unsigned int, Real>> & its_and_residuals,
       return converged;
   }
   return converged;
+}
+
+
+/* --------------------------------------------------------------------------
+   Interface-sharpening utils
+   -------------------------------------------------------------------------- */
+
+// -------------------------------------------------------------------------------
+// Constrain phase update so that the total number of pahses always sum up to 1.0
+// -------------------------------------------------------------------------------
+void
+constrainPhaseUpdate(std::vector<NumericVector<Number> *> & solution)
+{
+  // Recast vector with Petsc Solutions
+  std::vector<PetscVector<Number> *> solution_vectors;
+  solution_vectors.reserve(solution.size());
+
+  // Recast array with Petsc Scalars
+  std::vector<PetscScalar *> solution_arrays;
+  solution_arrays.reserve(solution.size());
+
+  // Link solution vector to Petsc vector and get array
+  for(unsigned int i = 0; i < solution.size(); ++i)
+  {
+    PetscVector<Number> & petsc_vector = dynamic_cast<PetscVector<Number> &>(*solution[i]);
+    solution_vectors.push_back(&petsc_vector);
+    solution_arrays.push_back(petsc_vector.get_array());
+  }
+
+  for (auto comp : make_range(solution_vectors[0]->local_size()))
+  {
+    // Get the current sum of the component
+    PetscScalar sum = 0.0;
+    bool normalize_phase = false;
+
+    for(unsigned int i = 0; i < solution.size(); ++i)
+    {
+      const auto loc_sol = solution_arrays[i][comp];
+      if (loc_sol > 0.1 || loc_sol < 0.9)
+        normalize_phase = true;
+      sum += std::max(loc_sol, 1e-42);
+    }
+
+    // Rescale so that the sum is 1
+    if(normalize_phase)
+    {
+      for(unsigned int i = 0; i < solution.size(); ++i)
+        solution_arrays[i][comp] = solution_arrays[i][comp] / sum;
+    }
+  }
+
+  // Restore Petsc vectors
+  for(unsigned int i = 0; i < solution.size(); ++i)
+    solution_vectors[i]->restore_array();
+}
+
+
+// -----------------------------------------------------------------------------
+// Helper functions - (local scope only)
+// -----------------------------------------------------------------------------
+namespace   // unnamed - internal helpers only
+{
+
+/// Return global \sum{αi.Vᵢ}  and \sum{Vi} for convenience
+inline std::pair<Real, Real>
+_globalPhaseAndDomainVolume(const NumericVector<Number> & alpha,
+                            const NumericVector<Number> & volumes)
+{
+  // Make sure alphas and volumes are the same size
+  mooseAssert(alpha.size() == volumes.size(),
+              "Alpha and volume vectors must be the same size.");
+
+  // Compute total volume
+  const Real Vdomain = volumes.sum();
+
+  // Compute alpha-weighted volume
+  auto working_vector = alpha.clone();
+  working_vector->pointwise_mult(volumes, *working_vector);
+  const Real Valpha = working_vector->sum();
+  working_vector->close();
+
+  // Return pair
+  return {Valpha, Vdomain};
+}
+
+/// Thresholded sum: \sum{Vi * H(αi - t)}
+/// H is the Heaviside function
+inline Real
+_globalVolumeAboveThreshold(const NumericVector<Number> & alpha,
+                            const NumericVector<Number> & volumes,
+                            Real                          t)
+{
+
+  // Make sure alphas and volumes are the same size -- otherwise this method won't work
+  mooseAssert(alpha.size() == volumes.size(),
+              "Alpha and volume vectors must be the same size.");
+
+  // Get PETSc vectors and communication ptcl
+  const libMesh::Parallel::Communicator & comm = alpha.comm();
+  const auto & a_vec = dynamic_cast<const PetscVector<Number> &>(alpha);
+  const auto & v_vec = dynamic_cast<const PetscVector<Number> &>(volumes);
+  auto a_arr = a_vec.get_array_read();
+  auto v_arr = v_vec.get_array_read();
+
+  // Compute sum above threshold
+  Real local_sum = 0.0;
+  for (auto i : make_range(a_vec.local_size()))
+    if (a_arr[i] >= t)
+      local_sum += v_arr[i];
+
+  // Restore arrays
+  const_cast<PetscVector<Number> &>(a_vec).restore_array();
+  const_cast<PetscVector<Number> &>(v_vec).restore_array();
+
+  // Get global sum
+  Real global_sum = local_sum;
+  comm.sum(global_sum);
+
+  return global_sum;
+}
+
+/// Soft thresholded sum: \sum{Vi * 1/2*[tanh(β(αi-t))+1]}
+/// tanh is the hyperbolic tangent
+/// β is the user defined sharpening parameter
+inline Real
+_globalSoftVolume(const NumericVector<Number> & alpha,
+                  const NumericVector<Number> & volumes,
+                  Real                          t,
+                  Real                          beta)
+{
+
+  // Make sure alphas and volumes are the same size -- otherwise this method won't work
+  mooseAssert(alpha.size() == volumes.size(),
+              "Alpha and volume vectors must be the same size.");
+
+  // Get PETSc vectors and communication ptcl
+  const libMesh::Parallel::Communicator & comm = alpha.comm();
+  const auto & a_vec = dynamic_cast<const PetscVector<Number> &>(alpha);
+  const auto & v_vec = dynamic_cast<const PetscVector<Number> &>(volumes);
+  auto a_arr = a_vec.get_array_read();
+  auto v_arr = v_vec.get_array_read();
+
+  Real local_sum = 0.0;
+  for (auto i : make_range(a_vec.size()))
+  {
+    const Real s = 0.5 * (std::tanh(beta * (a_arr[i] - t)) + 1.0);
+    local_sum += s * v_arr[i];
+  }
+
+  // Restore arrays
+  const_cast<PetscVector<Number> &>(a_vec).restore_array();
+  const_cast<PetscVector<Number> &>(v_vec).restore_array();
+
+  // Get global sum
+  Real global_sum = local_sum;
+  comm.sum(global_sum);
+
+  return global_sum;
+}
+} // end unnamed namespace
+
+
+// -----------------------------------------------------------------------------
+// Sharp indicator  (Heaviside) – bisection
+// -----------------------------------------------------------------------------
+Real
+computeSharpeningThresholdHeaviside(const NumericVector<Number> & alpha,
+                                    const NumericVector<Number> & volumes,
+                                    Real                          tol,
+                                    unsigned int                  max_iter)
+{
+  const auto [V_alpha, V_domain] = _globalPhaseAndDomainVolume(alpha, volumes);
+  if (V_alpha <= 0.0)
+    return 1.0;                    // phase absent
+  if (V_alpha >= V_domain)
+    return 0.0;                    // domain full
+  Real lo = 0.0, hi = 1.0;
+  for (unsigned int it = 0; it < max_iter; ++it)
+  {
+    const Real mid = 0.5 * (lo + hi);
+    const Real G   = _globalVolumeAboveThreshold(alpha, volumes, mid);
+    (G > V_alpha) ? lo = mid : hi = mid;   // monotone decreasing G(t)
+    if (hi - lo < tol)
+      break;
+  }
+  return 0.5 * (lo + hi);
+}
+
+// -----------------------------------------------------------------------------
+// Smooth indicator (tanh) – bisection
+// -----------------------------------------------------------------------------
+Real
+computeSharpeningThresholdSoft(const NumericVector<Number> & alpha,
+                               const NumericVector<Number> & volumes,
+                               Real                          beta,
+                               Real                          tol,
+                               unsigned int                  max_iter)
+{
+  mooseAssert(beta > 0.0, "Beta must be positive.");
+  const auto [V_alpha, V_domain] = _globalPhaseAndDomainVolume(alpha, volumes);
+  if (V_alpha <= 0.0)
+    return 1.0;
+  if (V_alpha >= V_domain)
+    return 0.0;
+  Real lo = 0.0, hi = 1.0;
+  for (unsigned int it = 0; it < max_iter; ++it)
+  {
+    const Real mid = 0.5 * (lo + hi);
+    const Real G   = _globalSoftVolume(alpha, volumes, mid, beta);
+    (G > V_alpha) ? lo = mid : hi = mid;
+    if (hi - lo < tol)
+      break;
+  }
+  return 0.5 * (lo + hi);
+}
+
+// -----------------------------------------------------------------------------
+// Apply sharpening in-place
+// -----------------------------------------------------------------------------
+
+void
+sharpenPhaseField(NumericVector<Number> &       alpha,
+                  const NumericVector<Number> & volumes,
+                  MooseEnum                     sharpening_type,
+                  Real                          beta)
+{
+  Real t = (sharpening_type == "heaviside")
+             ? computeSharpeningThresholdHeaviside(alpha, volumes)
+             : computeSharpeningThresholdSoft     (alpha, volumes, beta);
+
+  // --- modify α in-place -------------------------------------------------
+  PetscVector<Number> & a_vec = dynamic_cast<PetscVector<Number> &>(alpha);
+  auto a_arr = a_vec.get_array();
+  if (sharpening_type == "heaviside")
+  {
+    for (auto i : make_range(a_vec.local_size()))
+      a_arr[i] = (a_arr[i] >= t) ? 1.0 : 0.0;
+  }
+  else
+  {
+    for (auto i : make_range(a_vec.local_size()))
+      a_arr[i] = 0.5 * (std::tanh(beta * (a_arr[i] - t)) + 1.0);
+  }
+  a_vec.restore_array();
+  a_vec.close();   // sync
 }
 
 } // End FV namespace

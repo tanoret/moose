@@ -359,4 +359,11 @@ protected:
 
   /// Shortcut to every linear system that we solve for here
   std::vector<LinearSystem *> _systems_to_solve;
+
+  /// Interface sharpening variables
+  const bool _enforce_phase_sum;
+  const bool _activate_interface_shapening;
+  const MooseEnum _shapening_type;
+  const Real _smoothing_constant;
+
 };
