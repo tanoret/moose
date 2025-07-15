@@ -16,7 +16,8 @@ registerMooseObject("HeatTransferApp", FVSP3TemperatureBC);
 InputParameters
 FVSP3TemperatureBC::validParams()
 {
-  InputParameters params = FVFluxBC::validParams();
+  InputParameters params = FVDirichletBCBase::validParams();
+  params += FVDiffusionInterpolationInterface::validParams();
   params.addClassDescription("Semi-Transparent Boundary Condition for SP3 Radiation Temperature");
 
   params.addRequiredParam<MooseFunctorName>("Tb", "The temperature of the boundary");
@@ -33,7 +34,11 @@ FVSP3TemperatureBC::validParams()
 }
 
 FVSP3TemperatureBC::FVSP3TemperatureBC(const InputParameters & parameters)
-  : FVFluxBC(parameters),
+  : FVDirichletBCBase(parameters),
+    NeighborCoupleableMooseVariableDependencyIntermediateInterface(
+        this, /*nodal=*/false, /*neighbor_nodal=*/false, /*is_fv=*/true),
+    FVDiffusionInterpolationInterface(parameters),
+    _var(*mooseVariableFV()),
     _Tb(getFunctor<ADReal>("Tb")),
     _n1(getFunctor<ADReal>("n1")),
     _n2(getFunctor<ADReal>("n2")),
@@ -44,40 +49,42 @@ FVSP3TemperatureBC::FVSP3TemperatureBC(const InputParameters & parameters)
     _nu1(getParam<Real>("nu1")),
     _nu_min(getParam<Real>("nu_min"))
 {
+  NeighborCoupleableMooseVariableDependencyIntermediateInterface::addMooseVariableDependency(&_var);
+
+  if (_var.kind() == Moose::VarKindType::VAR_AUXILIARY)
+    paramError("variable",
+               "There should not be a need to specify a "
+               "boundary condition for an auxiliary variable.");
 }
 
 ADReal
-FVSP3TemperatureBC::computeQpResidual()
+FVSP3TemperatureBC::boundaryValue(const FaceInfo & fi, const Moose::StateArg & state) const
 {
   // Allow the functors to pick their side evaluation
-  const Moose::FaceArg face{
-      _face_info, Moose::FV::LimiterType::CentralDifference, true, false, nullptr, nullptr};
-  const auto state = determineState();
-  const auto old_state = Moose::StateArg(1, Moose::SolutionIterationType::Time);
+  // const Moose::FaceArg face{
+  //     &fi, Moose::FV::LimiterType::CentralDifference, true, false, nullptr, nullptr};
+  auto face = singleSidedFaceArg(&fi);
 
-  // Build the convective source at the boundary
-  const auto T = _var(face, state);
+  // Build the convective source at the boundary  
   const auto Tb = _Tb(face, state);
   const auto epsilon = _epsilon(face, state);
-  const auto thermal_conv_source = _h(face,  determineState()) * (_Tb(face,  determineState()) - _var(face,  determineState()));
+  const auto h = _h(face,  state);
+  const auto k = _k(face,  state);
+  const auto alpha = _alpha(face, state);
+  printf("3\n");
 
-  // Build the radiative source at the boundary
+  const auto T = _var(face, state);
+  printf("4\n");
+  const auto dudn = Moose::FV::gradUDotNormal(fi, _var, state, _correct_skewness);
+  printf("5\n");
+
   const auto n1 = _n1(face, state);
   const Real abs_tol = 1E-8;
   const Real rel_tol = 1E-6;
+  printf("6\n");
 
   const auto boundary_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, 1.0, Tb, _nu_min, _nu1, abs_tol, rel_tol); // put kappa = 1
   const auto cell_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, 1.0, T, _nu_min, _nu1, abs_tol, rel_tol); // put kappa = 1
 
-  const auto thermal_rad_source = _alpha(face, state) * Utility::pow<2>(_n2(face, state)/_n1(face, state)) * (boundary_source - cell_source) / (4.0); //*pi); // divided by 4 to get integrated PI*B(\nu)
-
-  const auto flux = (thermal_conv_source + thermal_rad_source ) / epsilon;
-  const auto facenorm = _face_info->normal();
-  const auto x_coord = _face_info->faceCentroid()(0);
-
-  // Print for Debug
-  // printf("Temerature BC(@ %.2f): %f (T = %f)\n",x_coord, flux.value(), T.value());
-  // printf("Old %f Curr %f\n", T.value(), _var(face, state).value());
-
-  return  -1 * (thermal_conv_source + thermal_rad_source ) / epsilon; //(_k(face, state) * epsilon);
+  return  Tb - epsilon / h * k * dudn + alpha / h * Utility::pow<2>(_n2(face, state)/_n1(face, state)) * (boundary_source - cell_source) / (4.0);
 }

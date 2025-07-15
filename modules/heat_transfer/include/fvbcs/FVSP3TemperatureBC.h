@@ -10,21 +10,30 @@
 #pragma once
 
 #include "FVFluxBC.h"
+#include "NeighborCoupleableMooseVariableDependencyIntermediateInterface.h"
+#include "FVDiffusionInterpolationInterface.h"
+#include "MathFVUtils.h"
 
 /**
  * Robin boundary condition (temperatures) for finite volume scheme between
  * a solid and fluid where the temperatures and heat transfer coefficient
  * are given as a functors
  */
-class FVSP3TemperatureBC : public FVFluxBC
+class FVSP3TemperatureBC : public FVDirichletBCBase
+                         , public NeighborCoupleableMooseVariableDependencyIntermediateInterface
+                         , public FVDiffusionInterpolationInterface
 {
 public:
   FVSP3TemperatureBC(const InputParameters & parameters);
 
   static InputParameters validParams();
 
+  ADReal boundaryValue(const FaceInfo & fi, const Moose::StateArg & state) const override;
+
+  using NeighborCoupleableMooseVariableDependencyIntermediateInterface::addMooseVariableDependency;
+
 protected:
-  virtual ADReal computeQpResidual() override;
+  MooseVariableFV<Real> & _var;
 
   /// Boundary Temperature
   const Moose::Functor<ADReal> & _Tb;
