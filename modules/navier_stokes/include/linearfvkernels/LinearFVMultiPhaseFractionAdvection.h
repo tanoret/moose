@@ -69,6 +69,9 @@ protected:
   /// Switch to enable/disable nonorthogonal correction in the stress term
   const bool _use_nonorthogonal_correction;
 
+  /// Switch to activate MULES
+  const bool _use_mules;
+
 private:
   /// Container for the current advected interpolation coefficients on the face to make sure
   /// we don't compute it multiple times for different terms.

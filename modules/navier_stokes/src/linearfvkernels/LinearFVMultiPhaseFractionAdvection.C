@@ -30,6 +30,10 @@ LinearFVMultiPhaseFractionAdvection::validParams()
       "use_nonorthogonal_correction",
       false,
       "If the nonorthogonal correction should be used when computing the normal gradient.");
+  params.addParam<bool>(
+      "activate_mules",
+      true,
+      "Flag to aactivate CMULES limiting.");
 
   params += Moose::FV::advectedInterpolationParameter();
 
@@ -53,6 +57,7 @@ LinearFVMultiPhaseFractionAdvection::LinearFVMultiPhaseFractionAdvection(
     _c_alpha(getParam<Real>("c_alpha")),
     _rho(params.isParamValid(NS::density) ? &(getFunctor<Real>(NS::density)) : nullptr),
     _use_nonorthogonal_correction(getParam<bool>("use_nonorthogonal_correction")),
+    _use_mules(getParam<bool>("activate_mules")),
     _advected_interp_coeffs(std::make_pair<Real, Real>(0, 0)),
     _total_adv_mass_face_flux(0.0),
     _limiter_method(getParam<MooseEnum>("limiter_method"))
@@ -187,41 +192,47 @@ LinearFVMultiPhaseFractionAdvection::setupFaceData(const FaceInfo * face_info)
       *_current_face_info, limiterType(_advected_interp_method), _total_adv_mass_face_flux);
 
   // MULES
-  const auto total_adv_volume_flux =
-      _mass_flux_provider.getVolumetricFaceFlux(*face_info) * _current_face_area * _dt;
-
-  const bool donor_is_elem = _low_order_face.elem_is_upwind;
-
-  auto donor =
-      donor_is_elem ? _low_order_face.makeElem() : _low_order_face.makeNeighbor();
-  auto acceptor =
-      donor_is_elem ? _low_order_face.makeNeighbor() : _low_order_face.makeElem();
-
-  auto donor_info = donor_is_elem ? _current_face_info->elemInfo()
-                                  : _current_face_info->neighborInfo();
-  auto acceptor_info = donor_is_elem ? _current_face_info->neighborInfo()
-                                     : _current_face_info->elemInfo();
-
-  if (!donor_info)
+  if(_use_mules)
   {
-    donor_info = acceptor_info;
-    donor = acceptor;
+    const auto total_adv_volume_flux =
+        _mass_flux_provider.getVolumetricFaceFlux(*face_info) * _current_face_area * _dt;
+
+    const bool donor_is_elem = _low_order_face.elem_is_upwind;
+
+    auto donor =
+        donor_is_elem ? _low_order_face.makeElem() : _low_order_face.makeNeighbor();
+    auto acceptor =
+        donor_is_elem ? _low_order_face.makeNeighbor() : _low_order_face.makeElem();
+
+    auto donor_info = donor_is_elem ? _current_face_info->elemInfo()
+                                    : _current_face_info->neighborInfo();
+    auto acceptor_info = donor_is_elem ? _current_face_info->neighborInfo()
+                                      : _current_face_info->elemInfo();
+
+    if (!donor_info)
+    {
+      donor_info = acceptor_info;
+      donor = acceptor;
+    }
+
+    if (!acceptor_info)
+    {
+      acceptor_info = donor_info;
+      acceptor = donor;
+    }
+
+    const auto donnor_capacity =
+        MetaPhysicL::raw_value(_var(donor, determineState())) * donor_info->volume();
+    const auto acceptor_capacity =
+        (1.0 - MetaPhysicL::raw_value(_var(acceptor, determineState()))) * acceptor_info->volume();
+
+    _lambda_f = std::max(std::min(std::min(1.0, donnor_capacity / std::abs(total_adv_volume_flux)),
+                                  acceptor_capacity / std::abs(total_adv_volume_flux)),
+                        1e-10);
   }
+  else
+    _lambda_f = 1.0;
 
-  if (!acceptor_info)
-  {
-    acceptor_info = donor_info;
-    acceptor = donor;
-  }
-
-  const auto donnor_capacity =
-      MetaPhysicL::raw_value(_var(donor, determineState())) * donor_info->volume();
-  const auto acceptor_capacity =
-      (1.0 - MetaPhysicL::raw_value(_var(acceptor, determineState()))) * acceptor_info->volume();
-
-  _lambda_f = std::max(std::min(std::min(1.0, donnor_capacity / std::abs(total_adv_volume_flux)),
-                                acceptor_capacity / std::abs(total_adv_volume_flux)),
-                       1e-10);
 }
 
 Real
