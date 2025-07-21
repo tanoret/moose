@@ -24,7 +24,10 @@ FVSP3TemperatureSourceSink::validParams()
   params.addParam<std::vector<MooseFunctorName>>("psi_2", "The vector of radiation heat flux from group 1");
   params.addParam<std::vector<Real>>("band_frequency_width", "The width in Hz of the frequency bands used in the multi-band approximation.");
 
+  params.set<bool>("force_boundary_execution") = true;
   params.set<unsigned short>("ghost_layers") = 2;
+
+  params.suppressParameter<bool>("force_boundary_execution");
 
   return params;
 }
