@@ -39,6 +39,7 @@ ChemicalReactionsApp::~ChemicalReactionsApp() {}
 void
 ChemicalReactionsApp::registerAll(Factory & f, ActionFactory & af, Syntax & syntax)
 {
+  NavierStokesApp::registerAll(f, af, syntax);
   Registry::registerObjectsTo(f, {"ChemicalReactionsApp"});
   Registry::registerActionsTo(af, {"ChemicalReactionsApp"});
 
@@ -64,29 +65,6 @@ ChemicalReactionsApp::registerApps()
 
   registerApp(ChemicalReactionsApp);
   NavierStokesApp::registerApps();
-}
-
-void
-ChemicalReactionsApp::registerObjects(Factory & factory)
-{
-  mooseDeprecated("use registerAll instead of registerObjects");
-  NavierStokesApp::registerObjects(factory);
-  Registry::registerObjectsTo(factory, {"ChemicalReactionsApp"});
-}
-
-void
-ChemicalReactionsApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory)
-{
-  mooseDeprecated("use registerAll instead of associateSyntax");
-  NavierStokesApp::associateSyntax(syntax, action_factory);
-  Registry::registerActionsTo(action_factory, {"ChemicalReactionsApp"});
-  associateSyntaxInner(syntax, action_factory);
-}
-
-void
-ChemicalReactionsApp::registerExecFlags(Factory & /*factory*/)
-{
-  mooseDeprecated("Do not use registerExecFlags, apps no longer require flag registration");
 }
 
 extern "C" void
