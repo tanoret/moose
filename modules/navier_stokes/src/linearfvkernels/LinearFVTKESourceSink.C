@@ -70,11 +70,11 @@ LinearFVTKESourceSink::LinearFVTKESourceSink(const InputParameters & params)
     paramError("w", "In three or more dimensions, the w velocity must be supplied!");
 
   // // Strain tensor term requires velocity gradients;
-  if (dynamic_cast<const MooseLinearVariableFV<Real> *>(&_u_var))
+  if (auto u = dynamic_cast<const MooseLinearVariableFV<Real> *>(&_u_var))
     requestVariableCellGradient(getParam<MooseFunctorName>("u"));
-  if (dynamic_cast<const MooseLinearVariableFV<Real> *>(_v_var))
+  if (auto v = dynamic_cast<const MooseLinearVariableFV<Real> *>(_v_var))
     requestVariableCellGradient(getParam<MooseFunctorName>("v"));
-  if (dynamic_cast<const MooseLinearVariableFV<Real> *>(_w_var))
+  if (auto w = dynamic_cast<const MooseLinearVariableFV<Real> *>(_w_var))
     requestVariableCellGradient(getParam<MooseFunctorName>("w"));
 }
 
