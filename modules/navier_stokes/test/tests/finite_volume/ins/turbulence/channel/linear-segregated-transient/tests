@@ -10,6 +10,10 @@
     capabilities = 'method!=dbg'
     recover = false # we don't support recovery for PIMPLE yet
     max_threads = 1 # see libmesh issue #3808
+<<<<<<< HEAD
     requirement = 'The system shall be able to solve transient fluid flow problems with the linear finite volume discretization and with k-epsilon turbulence model for a channel, and reach converged results with segregated solvers.'
+=======
+    requirement = 'The system shall be able to solve transient fluid flow problems with k-epsilon turbulence model for a channel, and reach converged results with segregated solvers.'
+>>>>>>> 88a199bdd8 (Convert transient linear-segregated channel case to CSVDiff)
   []
 []
