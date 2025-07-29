@@ -6,6 +6,10 @@
     type = 'CSVDiff'
     input = 'block-ke.i'
     csvdiff = 'block-ke_out_line_center_channel_0001.csv  block-ke_out_line_quarter_radius_channel_0001.csv block-ke_out_line_wall_0001.csv'
+<<<<<<< HEAD
+=======
+    detail = 'and reach converged results with segregated solvers.'
+>>>>>>> 497a829919 (Transition turbulence block restriction test to CSVDiff)
     abs_zero = 1e-6
     recover = false # we don't support recovery for SIMPLE yet
     max_threads = 1 # see libmesh issue #3808
