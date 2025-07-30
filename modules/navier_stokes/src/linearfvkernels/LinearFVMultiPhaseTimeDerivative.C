@@ -21,6 +21,8 @@ LinearFVMultiPhaseTimeDerivative::validParams()
                              "time derivative term for two-phase flows.");
   params.addRequiredParam<MooseFunctorName>(NS::density, "The density of the phase.");
   params.addRequiredParam<MooseFunctorName>("alpha", "The phase fraction.");
+  params.addParam<unsigned int>("MULES_iterations", 1, "Number of MULES iterations to perform.");
+
   return params;
 }
 
@@ -29,6 +31,7 @@ LinearFVMultiPhaseTimeDerivative::LinearFVMultiPhaseTimeDerivative(const InputPa
     _rho(getFunctor<Real>(NS::density)),
     _alpha(getFunctor<Real>("alpha")),
     _time_integrator(_sys.getTimeIntegrator(_var_num)),
+    _MULES_iterations(getParam<unsigned int>("MULES_iterations")),
     _rho_alpha_history(_time_integrator.numStatesRequired(), 0.0),
     _state_args(_time_integrator.numStatesRequired(), determineState())
 {
@@ -43,14 +46,14 @@ LinearFVMultiPhaseTimeDerivative::computeMatrixContribution()
   const auto elem_arg = makeElemArg(_current_elem_info->elem());
   const auto rho_alpha = _rho(elem_arg, _state_args[0]) * _alpha(elem_arg, _state_args[0]);
   return _time_integrator.timeDerivativeMatrixContribution(rho_alpha) *
-         _current_elem_volume;
+         _current_elem_volume / static_cast<Real>(_MULES_iterations);
 }
 
 Real
 LinearFVMultiPhaseTimeDerivative::computeRightHandSideContribution()
 {
   return _time_integrator.timeDerivativeRHSContribution(_dof_id, _rho_alpha_history) *
-         _current_elem_volume;
+         _current_elem_volume / static_cast<Real>(_MULES_iterations);
 }
 
 void

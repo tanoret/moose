@@ -269,6 +269,11 @@ SolveBaseMultiPhase::validParams()
       "The relaxation which should be used for the phase equation. (=1 for no relaxation, "
       "diagonal dominance will still be enforced)");
 
+  params.addRangeCheckedParam<unsigned int>("MULES_iterations",
+                                            1,
+                                            "1<=MULES_iterations",
+                                            "Number of MULES iterations to perform.");
+
   params.addParam<MultiMooseEnum>("phase_petsc_options",
                                   Moose::PetscSupport::getCommonPetscFlags(),
                                   "Singleton PETSc options for the phase equation");
@@ -303,7 +308,7 @@ SolveBaseMultiPhase::validParams()
       "The maximum allowed iterations in the linear solver of the phase equation.");
 
   params.addParamNamesToGroup(
-      "phase_equation_relaxation phase_petsc_options phase_petsc_options_iname "
+      "phase_equation_relaxation MULES_iterations phase_petsc_options phase_petsc_options_iname "
       "phase_petsc_options_value phase_petsc_options_value phase_absolute_tolerance "
       "phase_l_tol phase_l_abs_tol phase_l_max_its",
       "Phase Equation");
@@ -477,6 +482,7 @@ SolveBaseMultiPhase::SolveBaseMultiPhase(Executioner & ex)
     _phase_system_names(getParam<std::vector<SolverSystemName>>("phase_systems")),
     _number_of_solved_phases(_phase_system_names.size()),
     _phase_equation_relaxation(getParam<Real>("phase_equation_relaxation")),
+    _MULES_iterations(getParam<unsigned int>("MULES_iterations")),
     _phase_l_abs_tol(getParam<Real>("phase_l_abs_tol")),
     // Passive Scalars
     _passive_scalar_system_names(getParam<std::vector<SolverSystemName>>("passive_scalar_systems")),
@@ -1295,29 +1301,40 @@ SolveBaseMultiPhase::solve()
     // Solved the equation of phase transport for all tjhe solved phases
     // We solve right ater the piso iteration and temperature are solved so that
     // we get the right conditions in case there is phase exchange
-    for(unsigned int phase_number = 0; phase_number < _number_of_solved_phases; ++phase_number)
-    {
-      // We set the preconditioner/controllable parameters through petsc options. Linear
-      // tolerances will be overridden within the solver.
-      Moose::PetscSupport::petscSetOptions(_phase_petsc_options, solver_params);
-      ns_residuals[residual_counter] =
-          solveAdvectedSystem(_phase_system_numbers[phase_number],
-                              *_phase_systems[phase_number],
-                              _phase_equation_relaxation,
-                              _phase_linear_control,
-                              _phase_l_abs_tol);
-      residual_counter++;
-    }
+    const auto residual_counter_base = residual_counter;
 
-    // Limit the solutions of the phases after solving
-
-    // Bound indivdual phases
-    for(unsigned int phase_number = 0; phase_number < _number_of_solved_phases; ++phase_number)
+    for(unsigned int MULES_iteration = 0; MULES_iteration < _MULES_iterations; ++MULES_iteration)
     {
-      LinearImplicitSystem & li_system =
-          libMesh::cast_ref<LinearImplicitSystem &>(_phase_systems[phase_number]->system());
-      NumericVector<Number> & current_solution = *(li_system.solution);
-      NS::FV::limitSolutionUpdate(current_solution, 0.0, 1.0);
+      if(_MULES_iterations > 1)
+        _console << COLOR_CYAN << " -- MULES ITERATION: " << MULES_iteration << std::endl;
+
+      for(unsigned int phase_number = 0; phase_number < _number_of_solved_phases; ++phase_number)
+      {
+        // We set the preconditioner/controllable parameters through petsc options. Linear
+        // tolerances will be overridden within the solver.
+        Moose::PetscSupport::petscSetOptions(_phase_petsc_options, solver_params);
+        ns_residuals[residual_counter_base + phase_number] =
+            solveAdvectedSystem(_phase_system_numbers[phase_number],
+                                *_phase_systems[phase_number],
+                                _phase_equation_relaxation,
+                                _phase_linear_control,
+                                _phase_l_abs_tol);
+        
+        // Update residual counter
+        if (MULES_iteration == _MULES_iterations -1)
+          residual_counter++;
+      }
+
+      // Limit the solutions of the phases after solving
+
+      // Bound indivdual phases
+      for(unsigned int phase_number = 0; phase_number < _number_of_solved_phases; ++phase_number)
+      {
+        LinearImplicitSystem & li_system =
+            libMesh::cast_ref<LinearImplicitSystem &>(_phase_systems[phase_number]->system());
+        NumericVector<Number> & current_solution = *(li_system.solution);
+        NS::FV::limitSolutionUpdate(current_solution, 0.0, 1.0);
+      }
     }
 
     // If we have turbulence equations, solve them here.

@@ -34,6 +34,10 @@ LinearFVMultiPhaseFractionAdvection::validParams()
       "activate_mules",
       true,
       "Flag to aactivate CMULES limiting.");
+  params.addParam<unsigned int>(
+      "MULES_iterations",
+      1,
+      "Number of MULES iterations to perform.");
 
   params += Moose::FV::advectedInterpolationParameter();
 
@@ -58,14 +62,13 @@ LinearFVMultiPhaseFractionAdvection::LinearFVMultiPhaseFractionAdvection(
     _rho(params.isParamValid(NS::density) ? &(getFunctor<Real>(NS::density)) : nullptr),
     _use_nonorthogonal_correction(getParam<bool>("use_nonorthogonal_correction")),
     _use_mules(getParam<bool>("activate_mules")),
+    _MULES_iterations(getParam<unsigned int>("MULES_iterations")),
     _advected_interp_coeffs(std::make_pair<Real, Real>(0, 0)),
     _total_adv_mass_face_flux(0.0),
-    _limiter_method(getParam<MooseEnum>("limiter_method"))
+    _limiter_method(getParam<MooseEnum>("limiter_method")),
+    _compression_interp_coeffs(std::make_pair<Real, Real>(0, 0)),
+    _total_comp_mass_face_flux(0.0)
 {
-
-  // if (_use_nonorthogonal_correction)
-  //   _var.computeCellGradients();
-
   Moose::FV::setInterpolationMethod(*this, _advected_interp_method, "advected_interp_method");
 
   if (_c_alpha > 1e-42)
@@ -86,7 +89,7 @@ LinearFVMultiPhaseFractionAdvection::computeElemMatrixContribution()
 {
   Real comp_mass_flux = 0.0;
   if (_c_alpha > 1e-42)
-    comp_mass_flux = _lambda_f * computeCompressionVelocityMassFluxMatrixContribution();
+    comp_mass_flux += _compression_interp_coeffs.first * _total_comp_mass_face_flux;
 
   return (_advected_interp_coeffs.first * _total_adv_mass_face_flux + comp_mass_flux) *
          _current_face_area;
@@ -97,7 +100,7 @@ LinearFVMultiPhaseFractionAdvection::computeNeighborMatrixContribution()
 {
   Real comp_mass_flux = 0.0;
   if (_c_alpha > 1e-42)
-    comp_mass_flux = _lambda_f * computeCompressionVelocityMassFluxMatrixContribution();
+    comp_mass_flux += _compression_interp_coeffs.second * _total_comp_mass_face_flux;
 
   return (_advected_interp_coeffs.second * _total_adv_mass_face_flux + comp_mass_flux) *
          _current_face_area;
@@ -106,13 +109,19 @@ LinearFVMultiPhaseFractionAdvection::computeNeighborMatrixContribution()
 Real
 LinearFVMultiPhaseFractionAdvection::computeElemRightHandSideContribution()
 {
-  Real rhs = 0;
-  if (_dim > 1 && _use_nonorthogonal_correction && _c_alpha > 1e-42)
-    rhs += _lambda_f * computeCompressionVelocityMassFluxRHSContribution();
-
-  Real tol_mass_flux = _advected_interp_coeffs.first * _total_adv_mass_face_flux;
   Real alpha_holo = this->getHighOrderFaceValue(_var) - this->getLowOrderFaceValue(_var);
-  rhs -= tol_mass_flux * alpha_holo * _current_face_area;
+
+  Real comp_mass_flux = 0.0;
+  if(_c_alpha > 1e-42)
+  {
+    comp_mass_flux += _compression_interp_coeffs.first * _total_comp_mass_face_flux;
+    if (_dim > 1 && _use_nonorthogonal_correction)
+      comp_mass_flux += _compression_interp_coeffs.first *
+                        computeCompressionVelocityMassFluxNonOrthogonalRHSContribution();
+  }
+
+  Real tol_mass_flux = _advected_interp_coeffs.first * _total_adv_mass_face_flux + comp_mass_flux;
+  const auto rhs = _lambda_f * tol_mass_flux * alpha_holo * _current_face_area;
 
   return rhs;
 }
@@ -120,13 +129,19 @@ LinearFVMultiPhaseFractionAdvection::computeElemRightHandSideContribution()
 Real
 LinearFVMultiPhaseFractionAdvection::computeNeighborRightHandSideContribution()
 {
-  Real rhs = 0;
-  if (_dim > 1 && _use_nonorthogonal_correction && _c_alpha > 1e-42)
-    rhs += _lambda_f * computeCompressionVelocityMassFluxRHSContribution();
-
-  Real tol_mass_flux = _advected_interp_coeffs.second * _total_adv_mass_face_flux;
   Real alpha_holo = this->getHighOrderFaceValue(_var) - this->getLowOrderFaceValue(_var);
-  rhs -= tol_mass_flux * alpha_holo * _current_face_area;
+
+  Real comp_mass_flux = 0.0;
+  if(_c_alpha > 1e-42)
+  {
+    comp_mass_flux += _compression_interp_coeffs.second * _total_comp_mass_face_flux;
+    if (_dim > 1 && _use_nonorthogonal_correction)
+      comp_mass_flux += _compression_interp_coeffs.second *
+                        computeCompressionVelocityMassFluxNonOrthogonalRHSContribution();
+  }
+
+  Real tol_mass_flux = -_advected_interp_coeffs.second * _total_adv_mass_face_flux - comp_mass_flux;
+  const auto rhs = _lambda_f * tol_mass_flux * alpha_holo * _current_face_area;
 
   return rhs;
 }
@@ -185,17 +200,25 @@ LinearFVMultiPhaseFractionAdvection::setupFaceData(const FaceInfo * face_info)
   // Caching the interpolation coefficients so they will be reused for the matrix and right hand
   // side terms
   _advected_interp_coeffs =
-      interpCoeffs(_advected_interp_method, *_current_face_info, true, _total_adv_mass_face_flux);
+      interpCoeffs(_advected_interp_method, *_current_face_info, true, _total_adv_mass_face_flux > 0);
 
   // Store low-order face
   _low_order_face = makeFace(
-      *_current_face_info, limiterType(_advected_interp_method), _total_adv_mass_face_flux);
+      *_current_face_info, limiterType(_advected_interp_method), _total_adv_mass_face_flux > 0);
+
+  /// Get fluxes and interpolation cofficients for compression velocity
+  if (_c_alpha > 1e-42)
+  {
+    _total_comp_mass_face_flux = computeCompressionVelocityMassFlux();
+    _compression_interp_coeffs = 
+      interpCoeffs(_advected_interp_method, *_current_face_info, true, _total_comp_mass_face_flux > 0);
+  }
 
   // MULES
   if(_use_mules)
   {
     const auto total_adv_volume_flux =
-        _mass_flux_provider.getVolumetricFaceFlux(*face_info) * _current_face_area * _dt;
+        _mass_flux_provider.getVolumetricFaceFlux(*face_info) * _current_face_area * _dt / static_cast<Real>(_MULES_iterations);
 
     const bool donor_is_elem = _low_order_face.elem_is_upwind;
 
@@ -236,13 +259,7 @@ LinearFVMultiPhaseFractionAdvection::setupFaceData(const FaceInfo * face_info)
 }
 
 Real
-LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFluxMatrixContribution()
-{
-  return computeCompressionVelocityMassFlux();
-}
-
-Real
-LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFluxRHSContribution()
+LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFluxNonOrthogonalRHSContribution()
 {
   // Get the gradients from the adjacent cells
   const auto grad_elem = _var.gradSln(*_current_face_info->elemInfo());
@@ -270,10 +287,11 @@ LinearFVMultiPhaseFractionAdvection::computeCompressionVelocityMassFlux()
 
   // const auto alpha_f = this->getHighOrderFaceValue(_var);
   const auto alpha_f = this->getLowOrderFaceValue(_var);
+
   if (alpha_f <= 1e-12 || alpha_f >= 1.0 - 1e-12) // pure phase ⇒ no compression
     return 0.0;
 
-  const auto grad = MetaPhysicL::raw_value(_var.gradSln(*_current_face_info->elemInfo()));
+  const auto grad = _var.gradSln(*_current_face_info->elemInfo());
   const auto grad_mag = grad.norm();
 
   if (grad_mag < 1e-14)
@@ -332,8 +350,8 @@ LinearFVMultiPhaseFractionAdvection::getHighOrderFaceValue(MooseLinearVariableFV
   //---------------------------------------------------------------------------
   // 2. Cell-centred values and donor increment \Delta \phi_P (=\nabla \phi_P \cdot dP)
   //---------------------------------------------------------------------------
-  const Real phi_P = MetaPhysicL::raw_value(variable(donor, determineState()));
-  const Real phi_N = MetaPhysicL::raw_value(variable(acceptor, determineState()));
+  const Real phi_P  = MetaPhysicL::raw_value(variable(donor, determineState()));
+  const Real phi_N  = MetaPhysicL::raw_value(variable(acceptor, determineState()));
   const auto  gradP = variable.gradSln(*donor_info);               // \phi_P
   const Point face_c   = _current_face_info->faceCentroid();
   const Point donor_c  = donor_info->centroid();
@@ -351,22 +369,40 @@ LinearFVMultiPhaseFractionAdvection::getHighOrderFaceValue(MooseLinearVariableFV
 
   Real psi = 1.0;   // default = second-order (\psi=1)
 
-  if (_limiter_method == "min_mod")
-    psi = std::max(0.0, std::min(1.0, r));
-  else if (_limiter_method == "vanLeer")
-    psi = (r + std::fabs(r)) / (1.0 + std::fabs(r));
-  else if (_limiter_method == "vanAlbada")
-    psi = (r * r + r) / (r * r + 1.0);
-  else if (_limiter_method == "quick")           // Koren QUICK
-    psi = std::max(0.0,
-                   std::min({ 2.0 / 3.0 * r + 1.0 / 6.0,  // bounded cubic
-                              2.0 / 3.0,                  // upper plateaux
-                              r }));                      // monotone
-  else if (_limiter_method == "venkatakrishnan")
-    psi = (r * r + 2.0 * r) / (r * r + r + 2.0);
-  else if (_limiter_method == "average" || _limiter_method == "upwind")      // retain first-order
-    psi = 0.0;
-  // 'sou' (second-order upwind) and anything unrecognised fall back to \psi = 1
+  // Map the MooseEnum value to the LimiterMethod enumerator
+  LimiterMethod limiter_method = this->getLimiterMethod(_limiter_method);
+
+  // Use the enumerator instead of string comparisons
+  switch (limiter_method)
+  {
+    case MIN_MOD:
+      psi = std::max(0.0, std::min(1.0, r));
+      break;
+    case VANLEER:
+      psi = (r + std::fabs(r)) / (1.0 + std::fabs(r));
+      break;
+    case VANALBADA:
+      psi = (r * r + r) / (r * r + 1.0);
+      break;
+    case QUICK:           // Koren QUICK
+      psi = std::max(0.0,
+                     std::min({ 2.0 / 3.0 * r + 1.0 / 6.0,  // bounded cubic
+                                2.0 / 3.0,                  // upper plateaux
+                                r }));                      // monotone
+      break;
+    case VENKATAKRISHNAN:
+      psi = (r * r + 2.0 * r) / (r * r + r + 2.0);
+      break;
+    case AVERAGE:
+      mooseError("`average` limiting not implemented. Please consider switching to average in the interpolation method.");
+      break;
+    case UPWIND:      // retain first-order
+      psi = 0.0;
+      break;
+    default:
+      psi = 1.0;  // 'sou' (second-order upwind) and anything unrecognised fall back to \psi = 1
+      break;
+  }
 
   //---------------------------------------------------------------------------
   // 4. High-order face value \phi_f  and storage for later access

@@ -43,6 +43,9 @@ protected:
   /// on how many states are required in the history.
   const TimeIntegrator & _time_integrator;
 
+  /// Number of internal MULES iterations to perform
+  const unsigned int _MULES_iterations;
+
 private:
   /// Current and older values of the material property multiplier.
   std::vector<Real> _rho_alpha_history;

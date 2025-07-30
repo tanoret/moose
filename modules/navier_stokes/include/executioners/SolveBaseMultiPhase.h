@@ -215,6 +215,9 @@ protected:
   /// The user-defined relaxation parameter for the phase equation
   const Real _phase_equation_relaxation;
 
+  /// Number of internal MULES iterations to perform
+  const unsigned int _MULES_iterations;
+
   /// Options which hold the petsc settings for the phase equation
   Moose::PetscSupport::PetscOptions _phase_petsc_options;
 
