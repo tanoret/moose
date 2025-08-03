@@ -9,9 +9,11 @@ domain_dims = ${fparse 4.0*to_m}
 dam_dims_x = ${fparse 0.5*0.1461}
 dam_dims_y = ${fparse 3.5*0.1461}
 
-c_alpha = 0.0
+c_alpha = 0.01
 advected_interp_method = 'upwind'
-limiter_method = 'upwind'
+limiter_method = 'vanLeer'
+
+MULES_iterations = 3
 
 [Mesh]
   [mesh]
@@ -231,6 +233,7 @@ limiter_method = 'upwind'
     variable = alpha_1
     rho = 1.0 #${rho1}
     alpha = alpha_1
+    MULES_iterations = ${MULES_iterations}
   []
   [alpha_1_advection]
     type = LinearFVMultiPhaseFractionAdvection
@@ -241,6 +244,7 @@ limiter_method = 'upwind'
     advected_interp_method = ${advected_interp_method}
     limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
+    MULES_iterations = ${MULES_iterations}
   []
 
   [alpha_2_time]
@@ -248,6 +252,7 @@ limiter_method = 'upwind'
     variable = alpha_2
     rho = 1.0 #${rho2}
     alpha = alpha_2
+    MULES_iterations = ${MULES_iterations}
   []
   [alpha_2_advection]
     type = LinearFVMultiPhaseFractionAdvection
@@ -258,6 +263,7 @@ limiter_method = 'upwind'
     advected_interp_method = ${advected_interp_method}
     limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
+    MULES_iterations = ${MULES_iterations}
   []
 []
 
@@ -409,8 +415,10 @@ limiter_method = 'upwind'
 
   momentum_l_abs_tol = 1e-12
   pressure_l_abs_tol = 1e-12
+  phase_l_abs_tol = 1e-12
   momentum_l_tol = 1e-12
   pressure_l_tol = 1e-12
+  phase_l_tol = 1e-12
 
   rhie_chow_user_objects = 'rc_p1 rc_p2'
   momentum_systems = 'u_system_p1 v_system_p1; u_system_p2 v_system_p2'
@@ -445,6 +453,7 @@ limiter_method = 'upwind'
   activate_interface_shapening = false
   shapening_type = 'heaviside'
   smoothing_constant = 100.0
+  MULES_iterations = ${MULES_iterations}
 []
 
 [Outputs]

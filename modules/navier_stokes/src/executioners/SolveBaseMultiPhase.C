@@ -686,11 +686,11 @@ SolveBaseMultiPhase::SolveBaseMultiPhase(Executioner & ex)
   {
     for(unsigned int i = 0; i < _number_of_phases; ++i)
     {
-      if (_turbulence_system_names->size() != _turbulence_equation_relaxation.size())
+      if ((*_turbulence_system_names)[i].size() != _turbulence_equation_relaxation.size())
         paramError("turbulence_equation_relaxation",
                   "The number of equation relaxation parameters does not match the number of "
                   "turbulence equations!");
-      if (_turbulence_system_names->size() != _turbulence_absolute_tolerance.size())
+      if ((*_turbulence_system_names)[i].size() != _turbulence_absolute_tolerance.size())
         paramError("turbulence_absolute_tolerance",
                   "The number of absolute tolerances does not match the number of "
                   "turbulence equations!");
@@ -698,11 +698,11 @@ SolveBaseMultiPhase::SolveBaseMultiPhase(Executioner & ex)
 
     if (_turbulence_field_min_limit.empty())
       // If no minimum bounds are given, initialize to default value 1e-8
-      _turbulence_field_min_limit.resize(_turbulence_system_names->size(), 1e-8);
+      _turbulence_field_min_limit.resize((*_turbulence_system_names)[0].size(), 1e-8);
 
     // Assign turbulence field relaxation as 1.0 if not defined
     if (_turbulence_field_relaxation.empty())
-      _turbulence_field_relaxation.resize(_turbulence_system_names->size(), 1.0);
+      _turbulence_field_relaxation.resize((*_turbulence_system_names)[0].size(), 1.0);
 
     const auto & turbulence_petsc_options = getParam<MultiMooseEnum>("turbulence_petsc_options");
     const auto & turbulence_petsc_pair_options = getParam<MooseEnumItem, std::string>(
@@ -771,15 +771,16 @@ SolveBaseMultiPhase::SolveBaseMultiPhase(Executioner & ex)
   {
     _turbulence_system_numbers.resize(_number_of_phases);
     _turbulence_systems.resize(_number_of_phases);
-    for(unsigned int i = 0; i < _number_of_phases; ++i)
-      for (auto system_i : index_range((*_turbulence_system_names)[i]))
+    for(unsigned int phase_number = 0; phase_number < _number_of_phases; ++phase_number)
+    {
+      for (auto system_i : index_range((*_turbulence_system_names)[phase_number]))
       {
-        _turbulence_system_numbers[i].push_back(
-            _problem.linearSysNum((*_turbulence_system_names)[i][system_i]));
-        _turbulence_systems[i].push_back(
-            &_problem.getLinearSystem(_turbulence_system_numbers[i][system_i]));
+        const auto linear_system_number = _problem.linearSysNum((*_turbulence_system_names)[phase_number][system_i]);
+        _turbulence_system_numbers[phase_number].push_back(linear_system_number);
+        _turbulence_systems[phase_number].push_back(&_problem.getLinearSystem(linear_system_number));
       }
     }
+  }
 
   // and for the passive scalar equations
   if (_has_passive_scalar_systems)
@@ -1193,50 +1194,69 @@ SolveBaseMultiPhase::solve()
   if (!_problem.shouldSolve())
     return true;
 
-  // Dummy solver parameter file which is needed for switching petsc options
+  // ------------------------------------------------------------------
+  //  Helper counts of equations per phase
+  // ------------------------------------------------------------------
+  const unsigned int n_vel  = _momentum_systems.front().size();
+  const unsigned int n_turb = _has_turbulence_systems
+                                ? (*_turbulence_system_names)[0].size()
+                                : 0;
+
+  // ------------------------------------------------------------------
+  //  Residual and tolerance vectors – sized *exactly* once
+  // ------------------------------------------------------------------
+  unsigned int no_systems =
+        n_vel * _number_of_phases                       // momentum
+      + 1                                               // pressure
+      + (_has_energy_system       ? _number_of_phases : 0)
+      + (_has_solid_energy_system ? 1                 : 0)
+      + _number_of_solved_phases                        // phase fractions
+      + n_turb * _number_of_phases;                    // turbulence
+
+  std::vector<std::pair<unsigned int, Real>> ns_residuals(no_systems, std::make_pair(0u, 1.0));
+  std::vector<Real> ns_abs_tols;
+  ns_abs_tols.reserve(no_systems);
+
+  // momentum tolerances
+  for (unsigned int p = 0; p < _number_of_phases; ++p)
+    for (unsigned int c = 0; c < n_vel; ++c)
+      ns_abs_tols.push_back(_momentum_absolute_tolerance);
+
+  // pressure
+  ns_abs_tols.push_back(_pressure_absolute_tolerance);
+
+  // energy (fluid)
+  if (_has_energy_system)
+    for (unsigned int p = 0; p < _number_of_phases; ++p)
+      ns_abs_tols.push_back(_energy_absolute_tolerance);
+
+  // energy (solid)
+  if (_has_solid_energy_system)
+    ns_abs_tols.push_back(_solid_energy_absolute_tolerance);
+
+  // phases
+  for (unsigned int i = 0; i < _number_of_solved_phases; ++i)
+    ns_abs_tols.push_back(_phase_absolute_tolerance);
+
+  // turbulence
+  if (_has_turbulence_systems)
+    for (unsigned int p = 0; p < _number_of_phases; ++p)
+      for (unsigned int eq = 0; eq < n_turb; ++eq)
+        ns_abs_tols.push_back(_turbulence_absolute_tolerance[eq]);
+
+  // ------------------------------------------------------------------
+  //  Constant solver parameters
+  // ------------------------------------------------------------------
   SolverParams solver_params;
   solver_params._type = Moose::SolveType::ST_LINEAR;
   solver_params._line_search = Moose::LineSearchType::LS_NONE;
 
-  // Initialize the SIMPLE iteration counter
+  // ------------------------------------------------------------------
+  //  SIMPLE / PIMPLE outer loop
+  // ------------------------------------------------------------------
   unsigned int simple_iteration_counter = 0;
-
-  // Assign residuals to general residual vector
-  unsigned int no_systems =
-      _momentum_systems.size() * _number_of_phases // momentum systems
-      + 1 // pressure system
-      + _has_energy_system * _number_of_phases // energy systems
-      + _has_solid_energy_system // solid energy systems
-      + _number_of_solved_phases; // phases
-
-  // Adding the turbulence system to the numbering
-  if (_has_turbulence_systems)
-    no_systems += _turbulence_systems.size() * _number_of_phases; // Turbuleny Systems
-
-  std::vector<std::pair<unsigned int, Real>> ns_residuals(no_systems, std::make_pair(0, 1.0));
-  std::vector<Real> ns_abs_tols(_momentum_systems.size(), _momentum_absolute_tolerance);
-  ns_abs_tols.push_back(_pressure_absolute_tolerance);
-
-  // Push back energy tolerances
-  if (_has_energy_system)
-    for(unsigned int pn = 0; pn < _number_of_phases; ++pn)
-      ns_abs_tols.push_back(_energy_absolute_tolerance);
-  if (_has_solid_energy_system)
-    ns_abs_tols.push_back(_solid_energy_absolute_tolerance);
-
-  // Push back tolerances for the phase system
-  for(unsigned int pn = 0; pn < _number_of_solved_phases; ++pn)
-    ns_abs_tols.push_back(_phase_absolute_tolerance);
-
-  // Push back turbulence tolerances
-  if (_has_turbulence_systems)
-    for (const auto turbulence_tol : _turbulence_absolute_tolerance)
-    {
-      for(unsigned int pn = 0; pn < _number_of_phases; ++pn)
-        ns_abs_tols.push_back(turbulence_tol);
-    }
-
   bool converged = false;
+
   // Loop until converged or hit the maximum allowed iteration number
   while (simple_iteration_counter < _num_iterations && !converged)
   {
@@ -1256,6 +1276,9 @@ SolveBaseMultiPhase::solve()
 
     unsigned int residual_counter = 0;
 
+    // ---------------------------------------------------------------
+    // 1. Momentum predictor
+    // ---------------------------------------------------------------
     // Solve the momentum predictor step
     for(unsigned int phase_number = 0; phase_number < _number_of_phases; ++phase_number)
     {
@@ -1265,11 +1288,17 @@ SolveBaseMultiPhase::solve()
         residual_counter++;
     }
 
+    // ---------------------------------------------------------------
+    // 2. Pressure corrector (and cell/face velocity update)
+    // ---------------------------------------------------------------
     // Now we correct the velocity, this function depends on the method, it differs for
     // SIMPLE/PIMPLE, this returns the pressure errors
     ns_residuals[residual_counter] = correctVelocities(true, true, solver_params);
     residual_counter++;
 
+    // ---------------------------------------------------------------
+    // 3. Fluid energy (per phase)
+    // ---------------------------------------------------------------
     // If we have an energy equation, solve it here.We assume the material properties in the
     // Navier-Stokes equations depend on temperature, therefore we can not solve for temperature
     // outside of the velocity-pressure loop
@@ -1289,6 +1318,10 @@ SolveBaseMultiPhase::solve()
         residual_counter++;
       }
     }
+
+    // ---------------------------------------------------------------
+    // 4. Solid energy
+    // ---------------------------------------------------------------
     if (_has_solid_energy_system)
     {
       // We set the preconditioner/controllable parameters through petsc options. Linear
@@ -1298,6 +1331,9 @@ SolveBaseMultiPhase::solve()
       residual_counter++;
     }
 
+    // ---------------------------------------------------------------
+    // 5. Phase transport with optional MULES sub-iterations
+    // ---------------------------------------------------------------
     // Solved the equation of phase transport for all tjhe solved phases
     // We solve right ater the piso iteration and temperature are solved so that
     // we get the right conditions in case there is phase exchange
@@ -1337,6 +1373,9 @@ SolveBaseMultiPhase::solve()
       }
     }
 
+    // ---------------------------------------------------------------
+    // 6. Turbulence surrogate equations
+    // ---------------------------------------------------------------
     // If we have turbulence equations, solve them here.
     // The turbulent viscosity depends on the value of the turbulence surrogate variables
     if (_has_turbulence_systems)
@@ -1347,7 +1386,7 @@ SolveBaseMultiPhase::solve()
 
       for(unsigned int phase_number = 0; phase_number < _number_of_phases; ++phase_number)
       {
-        for (const auto i : index_range(*_turbulence_system_names))
+        for (const auto i : index_range((*_turbulence_system_names)[phase_number]))
         {
             ns_residuals[residual_counter] =
                 solveAdvectedSystem(_turbulence_system_numbers[phase_number][i],
@@ -1371,13 +1410,19 @@ SolveBaseMultiPhase::solve()
       }
     }
 
+    // ---------------------------------------------------------------
+    // 7. Material properties & user kernels that depend on new fields
+    // ---------------------------------------------------------------
     _problem.execute(EXEC_NONLINEAR);
 
+    // ---------------------------------------------------------------
+    // 8. Check convergence of the flow block
+    // ---------------------------------------------------------------
     converged = NS::FV::converged(ns_residuals, ns_abs_tols);
   }
 
   // -----------------------------------------------------------
-  // Interface constrain and sharpening
+  // 9. Interface constrain and sharpening
   // -----------------------------------------------------------
   // Apply interface sharpening
   if(_activate_interface_shapening)
@@ -1412,6 +1457,9 @@ SolveBaseMultiPhase::solve()
     NS::FV::constrainPhaseUpdate(phase_solutions);
   }
 
+  // ------------------------------------------------------------------
+  // 10. Passive scalars (outside main loop)
+  // ------------------------------------------------------------------
   // If we have passive scalar equations, solve them here. We assume the material properties in the
   // Navier-Stokes equations do not depend on passive scalars, as they are passive, therefore we
   // solve outside of the velocity-pressure loop

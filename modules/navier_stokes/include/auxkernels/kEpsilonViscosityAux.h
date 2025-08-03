@@ -68,8 +68,15 @@ protected:
   /// Method used to limit the k-e time scale
   const MooseEnum _scale_limiter;
 
+  /// Wall distance
+  const Moose::Functor<Real> * _d;
+
   /// Whether we are using a newton solve
   const bool _newton_solve;
+
+  /// Two-layer closure parameters
+  const Real _Re_y_star;
+  const Real _delta_Re_y;
 
   // -- Parameters of the wall function method
 

@@ -13,7 +13,7 @@ dam_dims_y_out = ${fparse 2.5*to_m}
 
 c_alpha = 0.0
 advected_interp_method = 'upwind'
-limiter_method = 'upwind' #'quick'
+limiter_method = 'quick' #'quick'
 
 [Mesh]
   [mesh]

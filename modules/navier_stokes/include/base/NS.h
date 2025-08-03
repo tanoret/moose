@@ -184,7 +184,8 @@ enum class WallTreatmentEnum
   EQ_NEWTON = 0,
   EQ_INCREMENTAL = 1,
   EQ_LINEARIZED = 2,
-  NEQ = 3
+  NEQ = 3,
+  TWO_LAYER = 4
 };
 
 // Turbulence constants

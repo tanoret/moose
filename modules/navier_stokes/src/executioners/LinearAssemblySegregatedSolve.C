@@ -575,6 +575,8 @@ LinearAssemblySegregatedSolve::solve()
       ns_abs_tols.push_back(turbulence_tol);
 
   bool converged = false;
+  _problem.execute(EXEC_INITIAL);
+
   // Loop until converged or hit the maximum allowed iteration number
   while (simple_iteration_counter < _num_iterations && !converged)
   {

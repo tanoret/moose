@@ -24,16 +24,16 @@ WallDistanceAux::validParams()
 WallDistanceAux::WallDistanceAux(const InputParameters & parameters)
   : AuxKernel(parameters), _wall_boundary_names(getParam<std::vector<BoundaryName>>("walls"))
 {
-  const MeshBase & mesh = _subproblem.mesh().getMesh();
-  if (!mesh.is_replicated())
-    mooseError("WallDistanceAux only supports replicated meshes");
-  if (!dynamic_cast<MooseVariableFV<Real> *>(&_var))
-    paramError("variable",
-               "'",
-               name(),
-               "' is currently programmed to use finite volume machinery, so make sure that '",
-               _var.name(),
-               "' is a finite volume variable.");
+  // const MeshBase & mesh = _subproblem.mesh().getMesh();
+  // if (!mesh.is_replicated())
+  //   mooseError("WallDistanceAux only supports replicated meshes");
+  // if (!dynamic_cast<MooseVariableFV<Real> *>(&_var))
+  //   paramError("variable",
+  //              "'",
+  //              name(),
+  //              "' is currently programmed to use finite volume machinery, so make sure that '",
+  //              _var.name(),
+  //              "' is a finite volume variable.");
 }
 
 Real
