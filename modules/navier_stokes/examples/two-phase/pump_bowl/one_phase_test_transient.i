@@ -15,6 +15,8 @@ C2_eps = 1.92
 C_mu = 0.09
 wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearized, neq
 
+alpha_frac = 0.5
+
 [Mesh]
   [fmg]
     type = FileMeshGenerator
@@ -81,6 +83,7 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
   [alpha_1]
     type = MooseLinearVariableFVReal
     solver_sys = alpha_1_system
+    initial_condition = ${alpha_frac}
   []
 []
 
@@ -110,7 +113,7 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     w = vel_z
     momentum_component = 'x'
     rhie_chow_user_object = 'rc'
-    alpha = 1.0
+    alpha = ${alpha_frac}
     use_nonorthogonal_correction = false
   []
   [v_advection_stress]
@@ -123,7 +126,7 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     w = vel_z
     momentum_component = 'y'
     rhie_chow_user_object = 'rc'
-    alpha = 1.0
+    alpha = ${alpha_frac}
     use_nonorthogonal_correction = false
   []
   [w_advection_stress]
@@ -136,7 +139,7 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     w = vel_z
     momentum_component = 'z'
     rhie_chow_user_object = 'rc'
-    alpha = 1.0
+    alpha = ${alpha_frac}
     use_nonorthogonal_correction = false
   []
   [u_diffusion]
@@ -161,21 +164,21 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     type = LinearFVMultiPhaseMomentumPressure
     variable = vel_x
     pressure = pressure
-    alpha = 1.0
+    alpha = ${alpha_frac}
     momentum_component = 'x'
   []
   [v_pressure]
     type = LinearFVMultiPhaseMomentumPressure
     variable = vel_y
     pressure = pressure
-    alpha = 1.0
+    alpha = ${alpha_frac}
     momentum_component = 'y'
   []
   [w_pressure]
     type = LinearFVMultiPhaseMomentumPressure
     variable = vel_z
     pressure = pressure
-    alpha = 1.0
+    alpha = ${alpha_frac}
     momentum_component = 'z'
   []
 
@@ -196,18 +199,18 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     type = LinearFVMultiPhaseTimeDerivative
     variable = TKE
     rho = ${rho}
-    alpha = 1.0
+    alpha = ${alpha_frac}
   []
   [TKE_advection]
     type = LinearFVTurbulentMultiPhaseAdvection
     variable = TKE
-    alpha = 1.0
+    alpha = ${alpha_frac}
   []
   [TKE_diffusion]
     type = LinearFVTurbulentMultiPhaseDiffusion
     variable = TKE
     diffusion_coeff = ${mu}
-    alpha = 1.0
+    alpha = ${alpha_frac}
     use_nonorthogonal_correction = false
   []
   [TKE_turb_diffusion]
@@ -215,7 +218,7 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = TKE
     diffusion_coeff = 'mu_t'
     scaling_coeff = ${sigma_k}
-    alpha = 1.0
+    alpha = ${alpha_frac}
     use_nonorthogonal_correction = false
   []
   [TKE_source_sink]
@@ -228,22 +231,22 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     rho = ${rho}
     mu = ${mu}
     wall_distance = 'd'
-    alpha = 1.0
+    alpha = ${alpha_frac}
   []
 
   [TKED_time]
     type = LinearFVMultiPhaseTimeDerivative
     variable = TKED
     rho = ${rho}
-    alpha = 1.0
+    alpha = ${alpha_frac}
   []
   [TKED_advection]
     type = LinearFVTurbulentMultiPhaseAdvection
     variable = TKED
-    tke = 'TKE'
+    tke = 'TKE_aux'
     rho = ${rho}
     mu = ${mu}
-    alpha = 1.0
+    alpha = ${alpha_frac}
     Re_y_star = 60.0
     wall_distance = 'd'
   []
@@ -252,10 +255,10 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = TKED
     diffusion_coeff = '${mu}'
     use_nonorthogonal_correction = false
-    tke = 'TKE'
+    tke = 'TKE_aux'
     rho = ${rho}
     mu = 0.004 #'${mu}'
-    alpha = 1.0
+    alpha = ${alpha_frac}
     Re_y_star = 60.0
     wall_distance = 'd'
   []
@@ -265,10 +268,10 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     diffusion_coeff = 'mu_t'
     scaling_coeff = ${sigma_eps}
     use_nonorthogonal_correction = false
-    tke = 'TKE'
+    tke = 'TKE_aux'
     rho = ${rho}
     mu = ${mu}
-    alpha = 1.0
+    alpha = ${alpha_frac}
     Re_y_star = 60.0
     wall_distance = 'd'
   []
@@ -284,14 +287,14 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     C1_eps = ${C1_eps}
     C2_eps = ${C2_eps}
     wall_distance = 'd'
-    alpha = 1.0
+    alpha = ${alpha_frac}
   []
 
   [alpha_1_time]
     type = LinearFVMultiPhaseTimeDerivative
     variable = alpha_1
     rho = ${rho}
-    alpha = 1.0
+    alpha = ${alpha_frac}
   []
   # [alpha_1_advection]
   #   type = LinearFVMultiPhaseFractionAdvection
@@ -420,6 +423,10 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     type = MooseLinearVariableFVReal
     initial_condition = '1.0'
   []
+  [TKE_aux]
+    type = MooseLinearVariableFVReal
+    initial_condition = '0.1'
+  []
 []
 
 [AuxKernels]
@@ -457,6 +464,12 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = d
     walls = '${walls_all}'
     execute_on = 'INITIAL'
+  []
+  [compute_TKE_aux]
+    type = FunctorAux
+    variable = 'TKE_aux'
+    functor = 'TKE'
+    execute_on = 'NONLINEAR'
   []
 []
 

@@ -247,7 +247,7 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
   [TKED_advection]
     type = LinearFVTurbulentMultiPhaseAdvection
     variable = TKED
-    tke = 'TKE'
+    tke = 'TKE_aux'
     rho = ${rho}
     mu = ${mu}
     alpha = 1.0
@@ -259,11 +259,11 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = TKED
     diffusion_coeff = '${mu}'
     use_nonorthogonal_correction = false
-    tke = 'TKE'
+    tke = 'TKE_aux'
     rho = ${rho}
     mu = 0.004 #'${mu}'
     alpha = 1.0
-    Re_y_star = 0.0 #60.0
+    Re_y_star = 60.0
     wall_distance = 'd'
   []
   [TKED_turb_diffusion]
@@ -272,11 +272,11 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     diffusion_coeff = 'mu_t'
     scaling_coeff = ${sigma_eps}
     use_nonorthogonal_correction = false
-    tke = 'TKE'
+    tke = 'TKE_aux'
     rho = ${rho}
     mu = ${mu}
     alpha = 1.0
-    Re_y_star = 0.0 #60.0
+    Re_y_star = 60.0
     wall_distance = 'd'
   []
   [TKED_source_sink]
@@ -372,6 +372,10 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     type = MooseLinearVariableFVReal
     initial_condition = '1.0'
   []
+  [TKE_aux]
+    type = MooseLinearVariableFVReal
+    initial_condition = '0.1'
+  []
 []
 
 [AuxKernels]
@@ -409,6 +413,12 @@ wall_treatment = 'two_layer'  # Options: eq_newton, eq_incremental, eq_linearize
     variable = d
     walls = '${walls_all}'
     execute_on = 'INITIAL'
+  []
+  [compute_TKE_aux]
+    type = FunctorAux
+    variable = 'TKE_aux'
+    functor = 'TKE'
+    execute_on = 'NONLINEAR'
   []
 []
 
