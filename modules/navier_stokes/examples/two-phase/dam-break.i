@@ -1,13 +1,18 @@
-rho1 = 1000.0
-rho2 = 1.0
+# Reference case: Martin & Moyce (1952)
+
+rho1 = 998.19
+rho2 = 1.185
 mu_1 = 1e-3
 mu_2 = 1.48e-5
-gravity = 9.81 #9.81
+gravity = 9.81
+#surface_tension = 0.0007
+timestep = 0.0001
 
-to_m = 0.146
-domain_dims = ${fparse 4.0*to_m}
-dam_dims_x = ${fparse 0.5*0.1461}
-dam_dims_y = ${fparse 3.5*0.1461}
+initial_length = 0.05715
+domain_dims_x = ${fparse 5*initial_length}
+domain_dims_y = ${fparse 1.25*initial_length}
+dam_x = ${initial_length}
+dam_y = ${initial_length}
 
 c_alpha = 0.01
 advected_interp_method = 'upwind'
@@ -19,11 +24,12 @@ MULES_iterations = 3
   [mesh]
     type = CartesianMeshGenerator
     dim = 2
-    dx = '${domain_dims}'
-    dy = '${domain_dims}'
-    ix = '100'
-    iy = '100'
+    dx = '${domain_dims_x}'
+    dy = '${domain_dims_y}'
+    ix = '200'
+    iy = '50'
   []
+  uniform_refine = 0
 []
 
 [Problem]
@@ -231,7 +237,7 @@ MULES_iterations = 3
   [alpha_1_time]
     type = LinearFVMultiPhaseTimeDerivative
     variable = alpha_1
-    rho = 1.0 #${rho1}
+    rho = ${rho1}
     alpha = alpha_1
     MULES_iterations = ${MULES_iterations}
   []
@@ -240,7 +246,7 @@ MULES_iterations = 3
     variable = alpha_1
     rhie_chow_user_object = 'rc_p1'
     c_alpha = ${c_alpha}
-    rho = 1.0 #${rho1}
+    rho = ${rho1}
     advected_interp_method = ${advected_interp_method}
     limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
@@ -250,7 +256,7 @@ MULES_iterations = 3
   [alpha_2_time]
     type = LinearFVMultiPhaseTimeDerivative
     variable = alpha_2
-    rho = 1.0 #${rho2}
+    rho = ${rho2}
     alpha = alpha_2
     MULES_iterations = ${MULES_iterations}
   []
@@ -259,12 +265,27 @@ MULES_iterations = 3
     variable = alpha_2
     rhie_chow_user_object = 'rc_p2'
     c_alpha = ${c_alpha}
-    rho = 1.0 #${rho2}
+    rho = ${rho2}
     advected_interp_method = ${advected_interp_method}
     limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
     MULES_iterations = ${MULES_iterations}
   []
+
+#  [u_surface_tension_p1]
+#    type = LinearFVMomentumSurfaceTensionForce
+#    variable = vel_x_p1
+#    sigma = ${surface_tension}
+#    alpha = alpha_1
+#    momentum_component = 'x'
+#  []
+#  [v_surface_tension_p1]
+#    type = LinearFVMomentumSurfaceTensionForce
+#    variable = vel_y_p1
+#    sigma = ${surface_tension}
+#    alpha = alpha_1
+#    momentum_component = 'y'
+#  []
 []
 
 [LinearFVBCs]
@@ -356,6 +377,7 @@ MULES_iterations = 3
     use_two_term_expansion = false
     boundary = 'top'
   []
+
 []
 
 [ICs]
@@ -374,29 +396,14 @@ MULES_iterations = 3
 [Functions]
   [alpha_1_init]
     type = ParsedFunction
-    expression = 'if((x < ${dam_dims_x} & y < ${dam_dims_y}), 1.0, 0.0)'
+    expression = 'if((x < ${dam_x} & y < ${dam_y}), 1.0, 0.0)'
   []
   [alpha_2_init]
     type = ParsedFunction
-    expression = 'if((x > ${dam_dims_x} | y > ${dam_dims_y}), 1.0, 0.0)'
+    expression = 'if((x > ${dam_x} | y > ${dam_y}), 1.0, 0.0)'
   []
 []
 
-# [AuxVariables]
-#   [alpha_2]
-#     type = MooseLinearVariableFVReal
-#   []
-# []
-
-# [AuxKernels]
-#   [populate_alpha_2]
-#     type = ParsedAux
-#     variable = alpha_2
-#     coupled_variables = 'alpha_1'
-#     expression = 'min(max(1.0 - alpha_1, 0), 1)'
-#     execute_on = 'NONLINEAR'
-#   []
-# []
 
 [FunctorMaterials]
   [mixture_velocities]
@@ -444,8 +451,21 @@ MULES_iterations = 3
 
   print_fields = false
   continue_on_max_its = true
-  dt = 0.0001
-  num_steps = 10000
+  dt = ${timestep}
+#  [TimeSteppers]
+#    [IterDT]
+#      type = IterationAdaptiveDT
+#      optimal_iterations = 7
+#      dt = ${timestep}
+#      linear_iteration_ratio = 1e6
+#      growth_factor = 1.2
+#    []
+#    [ConstDT]
+#      type = ConstantDT
+#      dt = 0.001
+#    []
+#  []
+  end_time = 0.4
   num_piso_iterations = 0
 
   # Interface tratment
@@ -456,6 +476,51 @@ MULES_iterations = 3
   MULES_iterations = ${MULES_iterations}
 []
 
+[AuxVariables]
+   [water_heights]
+     type = MooseLinearVariableFVReal
+   []
+
+    [water_lengths]
+     type = MooseLinearVariableFVReal
+   []
+[]
+
+[AuxKernels]
+   [compute_water_heights]
+     type = ParsedAux
+     variable = 'water_heights'
+     coupled_variables = 'alpha_1'
+     expression = 'if(alpha_1>0.5,y,0)'
+     use_xyzt = true
+     execute_on = 'TIMESTEP_END'
+   []
+
+    [compute_water_lengths]
+     type = ParsedAux
+     variable = 'water_lengths'
+     coupled_variables = 'alpha_1'
+     expression = 'if(alpha_1>0.5,x,0)'
+     use_xyzt = true
+     execute_on = 'TIMESTEP_END'
+   []
+[]
+
+[Postprocessors]
+   [compute_front_height]
+     type = ElementExtremeValue
+     variable = 'water_heights'
+     execute_on = 'TIMESTEP_END'
+   []
+
+   [compute_front_length]
+     type = ElementExtremeValue
+     variable = 'water_lengths'
+     execute_on = 'TIMESTEP_END'
+   []
+[]
+
 [Outputs]
   exodus = true
+  csv = true
 []
