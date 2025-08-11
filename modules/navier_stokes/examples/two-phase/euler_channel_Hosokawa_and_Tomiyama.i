@@ -1,28 +1,42 @@
-rho1 = 1.0
-rho2 = 1000.0
-mu_1 = 1.0 #1.48e-5
-mu_2 = 1.0 #1e-3
-surface_tension = 0.0007
+# phase 1 is water, phase 2 is gas
+# Hosokawa and Tomiyama (2013)
 
-to_m = 0.146
-domain_dims = ${fparse 4.0*to_m}
-dam_dims_x_in = ${fparse 1.5*to_m}
-dam_dims_x_out = ${fparse 2.5*to_m}
-dam_dims_y_in = ${fparse 1.5*to_m}
-dam_dims_y_out = ${fparse 2.5*to_m}
+# flow regime bubbly
+# void fraction(%)       0.18     0.71     1.56     1.27
+# liquid velocity(m/s)   25       6.25     2.88     3.54
+# gas velocity(m/s)      2.22e-1  2.22e-1  2.31e-1  2.36e-1
+# bubble diameter(m)     3.48e-3  3.52e-3  3.59e-3 2.62e-3
 
-c_alpha = 0.0
+mu_1 = 8.899e-4
+mu_2 = 1.831e-5
+rho_1 = 998.19
+rho_2 = 1.185
+pipe_diameter = 0.02 # m
+length = 2 # m
+U_1 = 2.88   # m/s
+U_2 = 2.31e-1   # m/s
+g = -9.81
+inlet_phase_2 = 0.0156
 advected_interp_method = 'upwind'
-limiter_method = 'quick' #'quick'
+velocity_interp_method = 'rc'
+average_bubble_diameter = 3.59e-3
+
+rho1 = 100.0
+rho2 = 100.0
+advected_interp_method = 'upwind'
+phase_1_in = 0.7
+phase_2_in = 0.3
+mu_1 = 2.6
+mu_2 = 2.6
 
 [Mesh]
   [mesh]
     type = CartesianMeshGenerator
     dim = 2
-    dx = '${domain_dims}'
-    dy = '${domain_dims}'
-    ix = '200'
-    iy = '200'
+    dx = '1.'
+    dy = '0.2'
+    ix = '100'
+    iy = '20'
   []
 []
 
@@ -60,7 +74,7 @@ limiter_method = 'quick' #'quick'
   [vel_x_p1]
     type = MooseLinearVariableFVReal
     solver_sys = u_system_p1
-    initial_condition = 0.0
+    initial_condition = 0.5
   []
   [vel_y_p1]
     type = MooseLinearVariableFVReal
@@ -70,7 +84,7 @@ limiter_method = 'quick' #'quick'
   [vel_x_p2]
     type = MooseLinearVariableFVReal
     solver_sys = u_system_p2
-    initial_condition = 0.0
+    initial_condition = 0.5
   []
   [vel_y_p2]
     type = MooseLinearVariableFVReal
@@ -80,29 +94,31 @@ limiter_method = 'quick' #'quick'
   [pressure]
     type = MooseLinearVariableFVReal
     solver_sys = pressure_system
-    initial_condition = 0.0
+    initial_condition = 0.2
   []
   [alpha_1]
     type = MooseLinearVariableFVReal
     solver_sys = alpha_1_system
+    initial_condition = ${phase_1_in}
   []
   [alpha_2]
     type = MooseLinearVariableFVReal
     solver_sys = alpha_2_system
+    initial_condition = ${phase_2_in}
   []
 []
 
 [LinearFVKernels]
-  [u_time_p1]
-    type = LinearFVTimeDerivative
-    variable = vel_x_p1
-    factor = ${rho1}
-  []
-  [v_time_p1]
-    type = LinearFVTimeDerivative
-    variable = vel_y_p1
-    factor = ${rho1}
-  []
+  # [u_time_p1]
+  #   type = LinearFVTimeDerivative
+  #   variable = vel_x_p1
+  #   factor = ${rho1}
+  # []
+  # [v_time_p1]
+  #   type = LinearFVTimeDerivative
+  #   variable = vel_y_p1
+  #   factor = ${rho1}
+  # []
   [u_advection_stress_p1]
     type = LinearWCNSFVMultiPhaseMomentumFlux
     variable = vel_x_p1
@@ -141,31 +157,17 @@ limiter_method = 'quick' #'quick'
     alpha = 'alpha_1'
     momentum_component = 'y'
   []
-  [u_surface_tension_p1]
-    type = LinearFVMomentumSurfaceTensionForce
-    variable = vel_x_p1
-    sigma = ${surface_tension}
-    alpha = alpha_1
-    momentum_component = 'x'
-  []
-  [v_surface_tension_p1]
-    type = LinearFVMomentumSurfaceTensionForce
-    variable = vel_y_p1
-    sigma = ${surface_tension}
-    alpha = alpha_1
-    momentum_component = 'y'
-  []
 
-  [u_time_p2]
-    type = LinearFVTimeDerivative
-    variable = vel_x_p2
-    factor = ${rho2}
-  []
-  [v_time_p2]
-    type = LinearFVTimeDerivative
-    variable = vel_y_p2
-    factor = ${rho2}
-  []
+  # [u_time_p2]
+  #   type = LinearFVTimeDerivative
+  #   variable = vel_x_p2
+  #   factor = ${rho2}
+  # []
+  # [v_time_p2]
+  #   type = LinearFVTimeDerivative
+  #   variable = vel_y_p2
+  #   factor = ${rho2}
+  # []
   [u_advection_stress_p2]
     type = LinearWCNSFVMultiPhaseMomentumFlux
     variable = vel_x_p2
@@ -230,58 +232,51 @@ limiter_method = 'quick' #'quick'
     force_boundary_execution = true
   []
 
-  [alpha_1_time]
-    type = LinearFVMultiPhaseTimeDerivative
-    variable = alpha_1
-    rho = 1.0 #${rho1}
-    alpha = alpha_1
-  []
+  # [alpha_1_time]
+  #   type = LinearFVTimeDerivative
+  #   factor = ${rho1}
+  #   variable = alpha_1
+  # []
   [alpha_1_advection]
     type = LinearFVMultiPhaseFractionAdvection
     variable = alpha_1
     rhie_chow_user_object = 'rc_p1'
-    c_alpha = ${c_alpha}
-    rho = 1.0 #${rho1}
-    advected_interp_method = ${advected_interp_method}
-    limiter_method = ${limiter_method}
-    use_nonorthogonal_correction = false
-    activate_mules = false
   []
-  # [alpha_1_diff]
-  #   type = LinearFVDiffusion
-  #   variable = alpha_1
-  #   diffusion_coeff = 0.01
-  # []
 
-  [alpha_2_time]
-    type = LinearFVMultiPhaseTimeDerivative
-    variable = alpha_2
-    rho = 1.0 #${rho2}
-    alpha = alpha_2
-  []
+  # [alpha_2_time]
+  #   type = LinearFVTimeDerivative
+  #   factor = ${rho2}
+  #   variable = alpha_2
+  # []
   [alpha_2_advection]
     type = LinearFVMultiPhaseFractionAdvection
     variable = alpha_2
     rhie_chow_user_object = 'rc_p2'
-    c_alpha = ${c_alpha}
-    rho = 1.0 #${rho2}
-    advected_interp_method = ${advected_interp_method}
-    limiter_method = ${limiter_method}
-    use_nonorthogonal_correction = false
-    activate_mules = false
   []
 []
 
 [LinearFVBCs]
+  [inlet-u_p1]
+    type = LinearFVAdvectionDiffusionFunctorDirichletBC
+    boundary = 'left'
+    variable = vel_x_p1
+    functor = '1.1'
+  []
+  [inlet-v_p1]
+    type = LinearFVAdvectionDiffusionFunctorDirichletBC
+    boundary = 'left'
+    variable = vel_y_p1
+    functor = '0.0'
+  []
   [walls-u_p1]
     type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'left right bottom'
+    boundary = 'top bottom'
     variable = vel_x_p1
     functor = 0.0
   []
   [walls-v_p1]
     type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'left right bottom'
+    boundary = 'top bottom'
     variable = vel_y_p1
     functor = 0.0
   []
@@ -289,24 +284,36 @@ limiter_method = 'quick' #'quick'
     type = LinearFVAdvectionDiffusionOutflowBC
     variable = vel_x_p1
     use_two_term_expansion = false
-    boundary = 'top'
+    boundary = right
   []
   [outlet_v_p1]
     type = LinearFVAdvectionDiffusionOutflowBC
     variable = vel_y_p1
     use_two_term_expansion = false
-    boundary = 'top'
+    boundary = right
   []
 
+  [inlet-u_p2]
+    type = LinearFVAdvectionDiffusionFunctorDirichletBC
+    boundary = 'left'
+    variable = vel_x_p2
+    functor = '1.1'
+  []
+  [inlet-v_p2]
+    type = LinearFVAdvectionDiffusionFunctorDirichletBC
+    boundary = 'left'
+    variable = vel_y_p2
+    functor = '0.0'
+  []
   [walls-u_p2]
     type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'left right bottom'
+    boundary = 'top bottom'
     variable = vel_x_p2
     functor = 0.0
   []
   [walls-v_p2]
     type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'left right bottom'
+    boundary = 'top bottom'
     variable = vel_y_p2
     functor = 0.0
   []
@@ -314,94 +321,60 @@ limiter_method = 'quick' #'quick'
     type = LinearFVAdvectionDiffusionOutflowBC
     variable = vel_x_p2
     use_two_term_expansion = false
-    boundary = 'top'
+    boundary = right
   []
   [outlet_v_p2]
     type = LinearFVAdvectionDiffusionOutflowBC
     variable = vel_y_p2
     use_two_term_expansion = false
-    boundary = 'top'
+    boundary = right
   []
 
   [outlet_p]
     type = LinearFVAdvectionDiffusionFunctorDirichletBC
-    boundary = 'top'
+    boundary = 'right'
     variable = pressure
-    functor = 0.0
-  []
-  [pressure-extrapolation]
-    type = LinearFVExtrapolatedPressureBC
-    boundary = 'left right bottom'
-    variable = pressure
-    use_two_term_expansion = true
+    functor = 1.4
   []
 
+  [inlet_alpha_1]
+    type = LinearFVAdvectionDiffusionFunctorDirichletBC
+    variable = alpha_1
+    functor = ${phase_1_in}
+    boundary = 'left'
+  []
   [walls_alpha_1]
     type = LinearFVAdvectionDiffusionFunctorNeumannBC
     variable = alpha_1
     functor = 0.0
-    boundary = 'left right bottom'
+    boundary = 'top bottom'
   []
   [outlet_alpha_1]
     type = LinearFVAdvectionDiffusionOutflowBC
     variable = alpha_1
     use_two_term_expansion = false
-    boundary = 'top'
+    boundary = 'right'
   []
 
+  [inlet_alpha_2]
+    type = LinearFVAdvectionDiffusionFunctorDirichletBC
+    variable = alpha_2
+    functor = ${phase_2_in}
+    boundary = 'left'
+  []
   [walls_alpha_2]
     type = LinearFVAdvectionDiffusionFunctorNeumannBC
     variable = alpha_2
     functor = 0.0
-    boundary = 'left right bottom'
+    boundary = 'top bottom'
   []
   [outlet_alpha_2]
     type = LinearFVAdvectionDiffusionOutflowBC
     variable = alpha_2
     use_two_term_expansion = false
-    boundary = 'top'
+    boundary = 'right'
   []
 []
-
-[ICs]
-  [alpha_1]
-    type = FunctionIC
-    variable = 'alpha_1'
-    function = alpha_1_init
-  []
-  [alpha_2]
-    type = FunctionIC
-    variable = 'alpha_2'
-    function = alpha_2_init
-  []
-[]
-
-[Functions]
-  [alpha_1_init]
-    type = ParsedFunction
-    expression = 'if((x > ${dam_dims_x_in} & y > ${dam_dims_y_in} & x < ${dam_dims_x_out} & y < ${dam_dims_y_out}), 1.0, 0.0)'
-  []
-  [alpha_2_init]
-    type = ParsedFunction
-    expression = 'if((x < ${dam_dims_x_in} | y < ${dam_dims_y_in} | x > ${dam_dims_x_out} | y > ${dam_dims_y_out}), 1.0, 0.0)'
-  []
-[]
-
-# [AuxVariables]
-#   [alpha_2]
-#     type = MooseLinearVariableFVReal
-#   []
-# []
-
-# [AuxKernels]
-#   [populate_alpha_2]
-#     type = ParsedAux
-#     variable = alpha_2
-#     coupled_variables = 'alpha_1'
-#     expression = 'min(max(1.0 - alpha_1, 0), 1)'
-#     execute_on = 'NONLINEAR'
-#   []
-# []
 
 [Executioner]
   type = PIMPLEMultiPhase
@@ -418,11 +391,11 @@ limiter_method = 'quick' #'quick'
   pressure_system = 'pressure_system'
   phase_systems = 'alpha_1_system alpha_2_system'
 
-  momentum_equation_relaxation = 0.7
+  momentum_equation_relaxation = 0.8
   pressure_variable_relaxation = 0.3
-  phase_equation_relaxation = 0.9
+  phase_equation_relaxation = 0.7
 
-  num_iterations = 100
+  num_iterations = 200
 
   pressure_absolute_tolerance = 1e-11
   momentum_absolute_tolerance = 1e-11
@@ -437,15 +410,45 @@ limiter_method = 'quick' #'quick'
 
   print_fields = false
   continue_on_max_its = true
-  dt = 0.000002
-  num_steps = 1000
+  dt = 1.0
+  num_steps = 1
   num_piso_iterations = 0
+[]
 
-  # Interface tratment
-  enforce_phase_sum = false
-  activate_interface_shapening = false
-  shapening_type = 'heaviside'
-  smoothing_constant = 100.0
+[Postprocessors]
+  [Re]
+    type = ParsedPostprocessor
+    expression = '${rho_1} * ${fparse pipe_diameter} * ${U_1}'
+    pp_names = 'Re'
+  []
+  [lin]
+    type = NumLinearIterations
+  []
+  [cum_lin]
+    type = CumulativeValuePostprocessor
+    postprocessor = lin
+  []
+  [pavg]
+    type = ElementAverageValue
+    variable = pressure
+  []
+  [vg_x]
+     type = SideAverageValue
+     boundary = 'right'
+     variable = 'vel_x_phase_2'
+     outputs=none
+  []
+  [vg_y]
+     type = SideAverageValue
+     boundary = 'right'
+     variable = 'vel_y_phase_2'
+     outputs=none
+  []
+  [vg_value]
+     type = ParsedPostprocessor
+     expression = 'sqrt(vg_x*vg_x + vg_y*vg_y)*vg_x/abs(vg_x)'
+     pp_names = 'vg_x vg_y'
+  []
 []
 
 [Outputs]

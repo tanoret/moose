@@ -1,29 +1,35 @@
-rho1 = 1.0
-rho2 = 1000.0
-mu_1 = 1.0 #1.48e-5
-mu_2 = 1.0 #1e-3
-surface_tension = 0.0007
+# Reference case: Zhengyi Wang, Qingping Zou, Dominic Reeve(2005)
 
-to_m = 0.146
-domain_dims = ${fparse 4.0*to_m}
-dam_dims_x_in = ${fparse 1.5*to_m}
-dam_dims_x_out = ${fparse 2.5*to_m}
-dam_dims_y_in = ${fparse 1.5*to_m}
-dam_dims_y_out = ${fparse 2.5*to_m}
+rho1 = 998.19
+rho2 = 1.185
+mu_1 = 1e-3
+mu_2 = 1.48e-5
+gravity = 9.81
+#surface_tension = 0.0007
+timestep = 0.0001
 
-c_alpha = 0.0
+initial_length = 0.05715
+domain_dims_x = ${fparse 5*initial_length}
+domain_dims_y = ${fparse 1.25*initial_length}
+dam_x = ${initial_length}
+dam_y = ${initial_length}
+
+c_alpha = 0.01
 advected_interp_method = 'upwind'
-limiter_method = 'quick' #'quick'
+limiter_method = 'vanLeer'
+
+MULES_iterations = 3
 
 [Mesh]
   [mesh]
     type = CartesianMeshGenerator
     dim = 2
-    dx = '${domain_dims}'
-    dy = '${domain_dims}'
+    dx = '${domain_dims_x}'
+    dy = '${domain_dims_y}'
     ix = '200'
-    iy = '200'
+    iy = '50'
   []
+  uniform_refine = 0
 []
 
 [Problem]
@@ -141,19 +147,11 @@ limiter_method = 'quick' #'quick'
     alpha = 'alpha_1'
     momentum_component = 'y'
   []
-  [u_surface_tension_p1]
-    type = LinearFVMomentumSurfaceTensionForce
-    variable = vel_x_p1
-    sigma = ${surface_tension}
-    alpha = alpha_1
-    momentum_component = 'x'
-  []
-  [v_surface_tension_p1]
-    type = LinearFVMomentumSurfaceTensionForce
+  [v_gravity_p1]
+    type = LinearFVSource
     variable = vel_y_p1
-    sigma = ${surface_tension}
-    alpha = alpha_1
-    momentum_component = 'y'
+    source_density = 'alpha_1'
+    scaling_factor = ${fparse -rho1 * gravity}
   []
 
   [u_time_p2]
@@ -204,6 +202,12 @@ limiter_method = 'quick' #'quick'
     alpha = 'alpha_2'
     momentum_component = 'y'
   []
+  [v_gravity_p2]
+    type = LinearFVSource
+    variable = vel_y_p2
+    source_density = 'alpha_2'
+    scaling_factor = ${fparse -rho2 * gravity}
+  []
 
   [p_diffusion_p1]
     type = LinearFVAnisotropicDiffusion
@@ -233,43 +237,55 @@ limiter_method = 'quick' #'quick'
   [alpha_1_time]
     type = LinearFVMultiPhaseTimeDerivative
     variable = alpha_1
-    rho = 1.0 #${rho1}
+    rho = ${rho1}
     alpha = alpha_1
+    MULES_iterations = ${MULES_iterations}
   []
   [alpha_1_advection]
     type = LinearFVMultiPhaseFractionAdvection
     variable = alpha_1
     rhie_chow_user_object = 'rc_p1'
     c_alpha = ${c_alpha}
-    rho = 1.0 #${rho1}
+    rho = ${rho1}
     advected_interp_method = ${advected_interp_method}
     limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
-    activate_mules = false
+    MULES_iterations = ${MULES_iterations}
   []
-  # [alpha_1_diff]
-  #   type = LinearFVDiffusion
-  #   variable = alpha_1
-  #   diffusion_coeff = 0.01
-  # []
 
   [alpha_2_time]
     type = LinearFVMultiPhaseTimeDerivative
     variable = alpha_2
-    rho = 1.0 #${rho2}
+    rho = ${rho2}
     alpha = alpha_2
+    MULES_iterations = ${MULES_iterations}
   []
   [alpha_2_advection]
     type = LinearFVMultiPhaseFractionAdvection
     variable = alpha_2
     rhie_chow_user_object = 'rc_p2'
     c_alpha = ${c_alpha}
-    rho = 1.0 #${rho2}
+    rho = ${rho2}
     advected_interp_method = ${advected_interp_method}
     limiter_method = ${limiter_method}
     use_nonorthogonal_correction = false
-    activate_mules = false
+    MULES_iterations = ${MULES_iterations}
   []
+
+#  [u_surface_tension_p1]
+#    type = LinearFVMomentumSurfaceTensionForce
+#    variable = vel_x_p1
+#    sigma = ${surface_tension}
+#    alpha = alpha_1
+#    momentum_component = 'x'
+#  []
+#  [v_surface_tension_p1]
+#    type = LinearFVMomentumSurfaceTensionForce
+#    variable = vel_y_p1
+#    sigma = ${surface_tension}
+#    alpha = alpha_1
+#    momentum_component = 'y'
+#  []
 []
 
 [LinearFVBCs]
@@ -361,6 +377,7 @@ limiter_method = 'quick' #'quick'
     use_two_term_expansion = false
     boundary = 'top'
   []
+
 []
 
 [ICs]
@@ -379,29 +396,24 @@ limiter_method = 'quick' #'quick'
 [Functions]
   [alpha_1_init]
     type = ParsedFunction
-    expression = 'if((x > ${dam_dims_x_in} & y > ${dam_dims_y_in} & x < ${dam_dims_x_out} & y < ${dam_dims_y_out}), 1.0, 0.0)'
+    expression = 'if((x < ${dam_x} & y < ${dam_y}), 1.0, 0.0)'
   []
   [alpha_2_init]
     type = ParsedFunction
-    expression = 'if((x < ${dam_dims_x_in} | y < ${dam_dims_y_in} | x > ${dam_dims_x_out} | y > ${dam_dims_y_out}), 1.0, 0.0)'
+    expression = 'if((x > ${dam_x} | y > ${dam_y}), 1.0, 0.0)'
   []
 []
 
-# [AuxVariables]
-#   [alpha_2]
-#     type = MooseLinearVariableFVReal
-#   []
-# []
 
-# [AuxKernels]
-#   [populate_alpha_2]
-#     type = ParsedAux
-#     variable = alpha_2
-#     coupled_variables = 'alpha_1'
-#     expression = 'min(max(1.0 - alpha_1, 0), 1)'
-#     execute_on = 'NONLINEAR'
-#   []
-# []
+[FunctorMaterials]
+  [mixture_velocities]
+    type = NSFVMixtureFunctorMaterial
+    phase_1_names = 'vel_x_p1 vel_y_p2'
+    phase_2_names = 'vel_x_p2 vel_y_p2'
+    prop_names = 'vel_x_mixture vel_y_mixture'
+    phase_1_fraction = 'alpha_1'
+  []
+[]
 
 [Executioner]
   type = PIMPLEMultiPhase
@@ -410,8 +422,10 @@ limiter_method = 'quick' #'quick'
 
   momentum_l_abs_tol = 1e-12
   pressure_l_abs_tol = 1e-12
+  phase_l_abs_tol = 1e-12
   momentum_l_tol = 1e-12
   pressure_l_tol = 1e-12
+  phase_l_tol = 1e-12
 
   rhie_chow_user_objects = 'rc_p1 rc_p2'
   momentum_systems = 'u_system_p1 v_system_p1; u_system_p2 v_system_p2'
@@ -437,17 +451,76 @@ limiter_method = 'quick' #'quick'
 
   print_fields = false
   continue_on_max_its = true
-  dt = 0.000002
-  num_steps = 1000
+  dt = ${timestep}
+#  [TimeSteppers]
+#    [IterDT]
+#      type = IterationAdaptiveDT
+#      optimal_iterations = 7
+#      dt = ${timestep}
+#      linear_iteration_ratio = 1e6
+#      growth_factor = 1.2
+#    []
+#    [ConstDT]
+#      type = ConstantDT
+#      dt = 0.001
+#    []
+#  []
+  end_time = 0.4
   num_piso_iterations = 0
 
   # Interface tratment
-  enforce_phase_sum = false
+  enforce_phase_sum = true
   activate_interface_shapening = false
   shapening_type = 'heaviside'
   smoothing_constant = 100.0
+  MULES_iterations = ${MULES_iterations}
+[]
+
+[AuxVariables]
+   [water_heights]
+     type = MooseLinearVariableFVReal
+   []
+
+    [water_lengths]
+     type = MooseLinearVariableFVReal
+   []
+[]
+
+[AuxKernels]
+   [compute_water_heights]
+     type = ParsedAux
+     variable = 'water_heights'
+     coupled_variables = 'alpha_1'
+     expression = 'if(alpha_1>0.5,y,0)'
+     use_xyzt = true
+     execute_on = 'TIMESTEP_END'
+   []
+
+    [compute_water_lengths]
+     type = ParsedAux
+     variable = 'water_lengths'
+     coupled_variables = 'alpha_1'
+     expression = 'if(alpha_1>0.5,x,0)'
+     use_xyzt = true
+     execute_on = 'TIMESTEP_END'
+   []
+[]
+
+[Postprocessors]
+   [compute_front_height]
+     type = ElementExtremeValue
+     variable = 'water_heights'
+     execute_on = 'TIMESTEP_END'
+   []
+
+   [compute_front_length]
+     type = ElementExtremeValue
+     variable = 'water_lengths'
+     execute_on = 'TIMESTEP_END'
+   []
 []
 
 [Outputs]
   exodus = true
+  csv = true
 []
