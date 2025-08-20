@@ -53,7 +53,6 @@ FVSP3TemperatureBC::computeQpResidual()
   const Moose::FaceArg face{
       _face_info, Moose::FV::LimiterType::CentralDifference, true, false, nullptr, nullptr};
   const auto state = determineState();
-  const auto old_state = Moose::StateArg(1, Moose::SolutionIterationType::Time);
 
   // Build the convective source at the boundary
   const auto T = _var(face, state);
@@ -66,18 +65,10 @@ FVSP3TemperatureBC::computeQpResidual()
   const Real abs_tol = 1E-8;
   const Real rel_tol = 1E-6;
 
-  const auto boundary_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, 1.0, Tb, _nu_min, _nu1, abs_tol, rel_tol); // put kappa = 1
-  const auto cell_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, 1.0, T, _nu_min, _nu1, abs_tol, rel_tol); // put kappa = 1
+  const auto boundary_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, 1.0, Tb, _nu_min, _nu1, abs_tol, rel_tol);
+  const auto cell_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, 1.0, T, _nu_min, _nu1, abs_tol, rel_tol);
 
-  const auto thermal_rad_source = _alpha(face, state) * Utility::pow<2>(_n2(face, state)/_n1(face, state)) * (boundary_source - cell_source) / (4.0); //*pi); // divided by 4 to get integrated PI*B(\nu)
+  const auto thermal_rad_source = _alpha(face, state) * Utility::pow<2>(_n2(face, state)/_n1(face, state)) * (boundary_source - cell_source) / (4.0); // divided by 4 to get integrated PI*B(\nu)
 
-  const auto flux = (thermal_conv_source + thermal_rad_source ) / epsilon;
-  const auto facenorm = _face_info->normal();
-  const auto x_coord = _face_info->faceCentroid()(0);
-
-  // Print for Debug
-  // printf("Temerature BC(@ %.2f): %f (T = %f)\n",x_coord, flux.value(), T.value());
-  // printf("Old %f Curr %f\n", T.value(), _var(face, state).value());
-
-  return  -1 * (thermal_conv_source + thermal_rad_source ) / epsilon; //(_k(face, state) * epsilon);
+  return  -1 * (thermal_conv_source + thermal_rad_source) / epsilon;
 }
