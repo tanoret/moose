@@ -41,7 +41,7 @@ protected:
   /// Conductivitiy of medium
   const Moose::Functor<ADReal> & _k;
 
-  //
+  /// Optical thickness of medium
   const Moose::Functor<ADReal> & _epsilon;
 
   /// hemispheric emissivity

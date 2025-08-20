@@ -29,56 +29,37 @@ protected:
   /// Temperature at the boundary
   const Moose::Functor<ADReal> & _Tb;
 
-  /// Frquency
+  /// Frequency of thermal radiation band
   const Moose::Functor<ADReal> & _nu;
 
-  /// Frequency bounds for numerical integration
+  /// Frequency bounds of thermal radiation band for numerical integration
   const Moose::Functor<ADReal> * _nu_low;
   const Moose::Functor<ADReal> * _nu_high;
 
   /// Refraction index
   const Moose::Functor<ADReal> & _n1;
 
-  /// kappa Thickness
+  /// Kappa Thickness of medium
   const Moose::Functor<ADReal> & _absorptivity;
 
-  /// Optical Thickness
+  /// Optical Thickness of medium
   const Moose::Functor<ADReal> & _optical_thickness;
 
-  /// Radiation from the other moment
+  /// Radiation function from the conjugated other
   const Moose::Functor<ADReal> & _psi;
 
-  // /// Order
+  /// Order or radiation moment
   const MooseEnum & _order;
 
-  /// Coefficients
+  /// Coefficients for SP3
   const Moose::Functor<ADReal> & _alpha;
   const Moose::Functor<ADReal> & _beta;
   const Moose::Functor<ADReal> & _eta;
 
   /// Governing parameters for SP3 moments
-  // Real _alpha_order;
-  // Real _beta_order;
-  // Real _eta_order;
   Real _squared_mu_order;
 
   /// Closure parameters
   const Real _squared_mu_1 = 3./7. - 2./7.*std::sqrt(6./5.);
   const Real _squared_mu_2 = 3./7. + 2./7.*std::sqrt(6./5.);
-
-
-  /// Coefficients
-  // const Real _alpha_1 = 0.2115609606560856;
-  // const Real _alpha_2 = 0.5970451183268032;
-  // const Real _beta_1 = 0.19452369229011088; 
-  // const Real _beta_2 = -0.4203259177124563;
-  // const Real _eta_1 = -2.623417821661131; 
-  // const Real _eta_2 = 9.947147040979628; 
-
-  // const Real _alpha_1 = 5./96. * (34. + 11. * std::sqrt(6./5.));
-  // const Real _alpha_2 = 5./96. * (34. - 11. * std::sqrt(6./5.));
-  // const Real _beta_1 = 5./96. * (2. - std::sqrt(6./5.));
-  // const Real _beta_2 = 5./96. * (2. + std::sqrt(6./5.));
-  // const Real _eta_1 = 5.*libMesh::pi/2. * (3. + std::sqrt(6./5.));
-  // const Real _eta_2 = 5.*libMesh::pi/2. * (3. - std::sqrt(6./5.));
 };

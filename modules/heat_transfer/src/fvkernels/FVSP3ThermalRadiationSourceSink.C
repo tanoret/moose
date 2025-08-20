@@ -68,9 +68,7 @@ FVSP3ThermalRadiationSourceSink::computeQpResidual()
     const Real rel_tol = 1E-6;
   
     thermal_rad_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, kappa, T, nu_low, nu_high, abs_tol, rel_tol);
-    
-    // printf("T = %f, K = %f, nu_low = %f, nu_high = %f, thermal_rad_source = %f\n", T.value(), kappa.value(), nu_low.value(), nu_high.value(), thermal_rad_source.value()/(kappa.value()*4*libMesh::pi));
-  }
+      }
   else {
     const auto n1_pow_2 = Utility::pow<2>(_n1(elem_arg, state));
     const auto nu = _nu(elem_arg, state);
@@ -83,12 +81,6 @@ FVSP3ThermalRadiationSourceSink::computeQpResidual()
 
   // Build the absorption sink
   const auto thermal_rad_sink = _absorptivity(elem_arg, state) * _var(elem_arg, state);
-
-  // Print for Debug
-  // const libMesh::Point & p = _current_elem->vertex_average();
-  // const auto x_coord = p(0);
-  // const auto tempflux = thermal_rad_sink - thermal_rad_source;
-  // if(x_coord <= 0.05 || x_coord >= 0.95) printf("ThermalSS %.3f : %.2f(T) %.2f(var) %.2f(flux)\n", x_coord, T.value(), _var(elem_arg, state).value(), tempflux.value());
 
   // Return the residual
   return thermal_rad_sink - thermal_rad_source;

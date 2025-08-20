@@ -27,13 +27,13 @@ protected:
 
   virtual ADReal computeQpResidual() override;
 
-  /// kappa thickness per bank
+  /// kappa absorptivities per bank
   const std::vector<MooseFunctorName> & _absorptivity_vec;
 
-  /// Order 1 irradiation moments
+  /// Order 1 thermal radiation flux moments
   const std::vector<MooseFunctorName> & _psi1_vec;
 
-  /// Order 2 irradiation moments
+  /// Order 2 thermal radiation flux moments
   const std::vector<MooseFunctorName> & _psi2_vec;
 
   /// Vector to store the functors

@@ -94,15 +94,5 @@ FVSP3ThermalRadiationDiffusion::computeQpResidual()
   // Scaling with order of the diffusion coefficient
   coef_face *= _mu_order;
 
-  // Print for Debug
-  // const auto facenorm = _face_info->normal();
-  // const auto x_coord = _face_info->faceCentroid()(0);
-  // const auto tempflux= -1 * coef_face * dudn;
-  // if(coef_face != _mu_order) printf("ThermalDf %.3f: %.5f * %.5f = %.5f\n", x_coord, coef_face.value(), dudn.value(), tempflux.value());
-  // int numorder = -1;
-  // if(_order == "first") numorder = 1;
-  // else if(_order == "second") numorder = 2;
-  // if(x_coord >0.4 && x_coord < 0.47) printf("ThermalDf %.3f(%d) : %.5f\n", x_coord, numorder, tempflux.value());
-
   return -1 * coef_face * dudn;
 }
