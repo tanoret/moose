@@ -19,7 +19,7 @@ FVSP3ThermalRadiationBC::validParams()
   params.addClassDescription("Marshak Boundary Condition for SP3 Radiation Transport");
 
   params.addRequiredRangeCheckedParam<MooseFunctorName>("Tb", "Tb>0", "The temperature of the boundary.");
-  params.addRequiredRangeCheckedParam<MooseFunctorName>("nu", "nu>0", "The mean frequency of the thermal radiation band.");
+  params.addRangeCheckedParam<MooseFunctorName>("nu", "nu>0", "The mean frequency of the thermal radiation band.");
   params.addRangeCheckedParam<MooseFunctorName>("nu_low", "nu_low>0", "The lower frequency for integration of the thermal radiation band.");
   params.addRangeCheckedParam<MooseFunctorName>("nu_high", "nu_high>0", "The higher frequency for integration of the thermal radiation band.");
   
@@ -27,7 +27,7 @@ FVSP3ThermalRadiationBC::validParams()
   params.addRequiredParam<MooseFunctorName>("kappa", "The absorptivity of the medium.");
 
   params.addRequiredParam<MooseFunctorName>("epsilon", "The optical thickness of the medium.");
-  params.addRequiredParam<MooseFunctorName>("psi", "The incoming momentum flux from the conjugated SP3 order.");
+  params.addRequiredParam<MooseFunctorName>("psi", "The incoming radiation heat flux moments from the conjugated SP3 order.");
 
   MooseEnum order("first second", "first");
   params.addParam<MooseEnum>("order", order, "The order of the diffusion term.");
@@ -74,7 +74,6 @@ ADReal
 FVSP3ThermalRadiationBC::computeQpResidual()
 {
   // Negative means incoming flux
-
   // Allow the functors to pick their side evaluation
   const Moose::FaceArg face{
       _face_info, Moose::FV::LimiterType::CentralDifference, true, false, nullptr, nullptr};
@@ -84,7 +83,7 @@ FVSP3ThermalRadiationBC::computeQpResidual()
   const auto Tb = _Tb(face, state);
   ADReal thermal_rad_source;
 
-  if (_nu_low)
+  if (_nu_low) // equation integrated by frequency band
   {
     const auto n1 = _n1(face, state);
     const auto kappa = _absorptivity(face, state);
@@ -96,36 +95,22 @@ FVSP3ThermalRadiationBC::computeQpResidual()
     const auto rad_source = HeatTransferModels::integratedPlanckBand<ADReal>(n1, 1.0, Tb, nu_low, nu_high, abs_tol, rel_tol);
     thermal_rad_source = -1 * _eta(face, state) * rad_source  / (4.0 * libMesh::pi);
   }
-  // else{
-  //   const auto n1_pow_2 = Utility::pow<2>(_n1(face, state));
-  //   const auto nu = _nu(face, state);
-  //   const auto nu_pow_3 = Utility::pow<3>(nu);
+  else{ // equatino remains in single frequency
+    const auto n1_pow_2 = Utility::pow<2>(_n1(face, state));
+    const auto nu = _nu(face, state);
+    const auto nu_pow_3 = Utility::pow<3>(nu);
 
-  //   const auto pre_factor = n1_pow_2 * 2.0 * HeatConduction::Constants::hp * nu_pow_3 / (Utility::pow<2>(HeatConduction::Constants::c));
-  //   const auto inv_thermal_source = std::exp(HeatConduction::Constants::hp*nu/(HeatConduction::Constants::kb * Tb)) - 1.0;
-  //   thermal_rad_source = -1 * _eta(face, state) * pre_factor / inv_thermal_source;
-  // }
+    const auto pre_factor = n1_pow_2 * 2.0 * HeatConduction::Constants::hp * nu_pow_3 / (Utility::pow<2>(HeatConduction::Constants::c));
+    const auto inv_thermal_source = std::exp(HeatConduction::Constants::hp*nu/(HeatConduction::Constants::kb * Tb)) - 1.0;
+    thermal_rad_source = -1 * _eta(face, state) * pre_factor / inv_thermal_source;
+  }
 
   // Radiation leaking the boundary
   const auto thermal_rad_sink = _beta(face,state) * _psi(face, state) + _alpha(face, state) * _var(face, state);
   
   // Compute Marshak flux
   const auto protected_epsilon = (_optical_thickness(face, state) > 1e-12 ? _optical_thickness(face, state) : 1e-12);
-  
   const auto flux = (thermal_rad_source + thermal_rad_sink) * protected_epsilon * _squared_mu_order;
-
-  // Print for Debug
-  // const auto facenorm = _face_info->normal();
-  // const auto x_coord = _face_info->faceCentroid()(0);
-  // int numorder = -1;
-  // if(_order == "first") numorder = 1;
-  // else if(_order == "second") numorder = 2;
-
-  // const auto bsink = _beta * _psi(face, state);
-  // const auto asink = _alpha * _var(face, state);
-  // printf("ThermalBC %.3f(%d) : flux %.2f | bsink %.2f (psi %.2f)  asink %.2f (var %.2f) | source %.2f\n", x_coord, numorder, flux.value(), bsink.value(), _psi(face, state).value(), asink.value(), _var(face, state).value(), thermal_rad_source.value());
-  
-  // printf("ThermalBC %.2f(%d) : %f\n", x_coord, numorder, (flux.value()/_squared_mu_order));
 
   return flux;
 }

@@ -154,6 +154,7 @@ cylindricalGapRadiationHeatFlux(const T1 & r_inner,
                           (HeatConduction::Constants::kb * T);
 
       const Scalar inv  = std::exp(expo) - Scalar(1);
+      // if(nu_a < 1e5) std::cout << std::scientific << std::setprecision(7) << nu_a << "  " << nu_b << "  " << nu << "  " << T <<" >>> " << pre/inv << pre << inv << std::endl;
 
       return pre / inv; // spectral emissive power
     };

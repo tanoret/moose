@@ -47,81 +47,47 @@ kappa6to7 = 7.7
 kappa7to8 = 0.5
 kappa8tomax = 0.4
 
-bias_x = 0.9
-bias_y = 0.9
-bias_z = 0.9
+bias_x = 0.71
+bias_y = 0.71
+bias_z = 0.71
 
-nx = 31
-ny = 31
-nz = 31
+nx = 23
+ny = 23
+nz = 23
+
+mid = 0.98
+nmid = 18
 
 [Mesh]
-  # [gmg]
-  #   type = GeneratedMeshGenerator
-  #   dim = 3
-  #   nx = 61
-  #   ny = 61
-  #   nz = 61
-  #   xmin = 0
-  #   xmax = 1
-  #   ymin = 0
-  #   ymax = 1
-  #   zmin = 0
-  #   zmax = 1
-  #   gauss_lobatto_grid = true
-  # []
-
-  # [ref]
-  #   type = RefineSidesetGenerator
-  #   boundaries = 'left right top bottom front back'
-  #   refinement = '1    1    1    1    1    1'
-  #   boundary_side = 'both both both both both both'
-  #   input = gmg
-  # []
-
-  # [tri]
-  #   type = ElementsToSimplicesConverter
-  #   input = ref
-  # []
-
-  # [cmg]
-  #   type = CartesianMeshGenerator
-  #   dim = 3
-
-  #   dx = '0.00030 0.00035 0.00087 0.00356 0.01492 0.04 0.07 0.07 0.6 0.07 0.07 0.04 0.01492 0.00356 0.00087 0.00035 0.00030'
-  #   dy = '0.00030 0.00035 0.00087 0.00356 0.01492 0.04 0.07 0.07 0.6 0.07 0.07 0.04 0.01492 0.00356 0.00087 0.00035 0.00030'
-  #   dz = '0.00030 0.00035 0.00087 0.00356 0.01492 0.04 0.07 0.07 0.6 0.07 0.07 0.04 0.01492 0.00356 0.00087 0.00035 0.00030'
-
-  #   # dx = '0.04 0.02 0.03 0.04 0.06 0.11 0.4 0.11 0.06 0.04 0.03 0.02 0.04'
-  #   # dy = '0.04 0.02 0.03 0.04 0.06 0.11 0.4 0.11 0.06 0.04 0.03 0.02 0.04'
-  #   # dz = '0.04 0.02 0.03 0.04 0.06 0.11 0.4 0.11 0.06 0.04 0.03 0.02 0.04'
-
-  #   ix = '4 4 3 4 4 3 4 2 5 2 4 3 4 4 3 4 4'
-  #   iy = '4 4 4 4 4 3 4 2 5 2 4 3 4 4 4 4 4'
-  #   iz = '4 4 4 4 4 3 4 2 5 2 4 3 4 4 4 4 4'
-
-  #   # ix = '4 2 2 2 2 2 3 2 2 2 2 2 4'
-  #   # iy = '4 2 2 2 2 2 3 2 2 2 2 2 4'
-  #   # iz = '4 2 2 2 2 2 3 2 2 2 2 2 4'
-
-  #   # ix = '2 1 1 1 1 1 1 1 1 1 1 1 2'
-  #   # iy = '2 1 1 1 1 1 1 1 1 1 1 1 2'
-  #   # iz = '2 1 1 1 1 1 1 1 1 1 1 1 2'
-  # []
-  
-  [front_top_rignt]
+  [front_top_right]
     type = GeneratedMeshGenerator
     dim = 3
     nx = ${nx}
     ny = ${ny}
     nz = ${nz}
-    xmin = 0.0
+    xmin = ${fparse mid/2}
     xmax = 0.5
-    ymin = 0.0
+    ymin = ${fparse mid/2}
     ymax = 0.5
-    zmin = 0.0
+    zmin = ${fparse mid/2}
     zmax = 0.5
     bias_x = ${fparse bias_x}
+    bias_y = ${fparse bias_y}
+    bias_z = ${fparse bias_z}
+  []
+
+  [front_top_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = ${fparse mid/2}
+    ymax = 0.5
+    zmin = ${fparse mid/2}
+    zmax = 0.5
     bias_y = ${fparse bias_y}
     bias_z = ${fparse bias_z}
   []
@@ -133,13 +99,60 @@ nz = 31
     ny = ${ny}
     nz = ${nz}
     xmin = -0.5
-    xmax = 0.0
-    ymin = 0.0
+    xmax = ${fparse -mid/2}
+    ymin = ${fparse mid/2}
     ymax = 0.5
-    zmin = 0.0
+    zmin = ${fparse mid/2}
     zmax = 0.5
     bias_x = ${fparse 1/bias_x}
     bias_y = ${fparse bias_y}
+    bias_z = ${fparse bias_z}
+  []
+
+  [front_mid_right]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${nmid}
+    nz = ${nz}
+    xmin = ${fparse mid/2}
+    xmax = 0.5
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = ${fparse mid/2}
+    zmax = 0.5
+    bias_x = ${fparse bias_x}
+    bias_z = ${fparse bias_z}
+  []
+
+  [front_mid_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${nmid}
+    nz = ${nz}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = ${fparse mid/2}
+    zmax = 0.5
+    bias_z = ${fparse bias_z}
+  []
+
+  [front_mid_left]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${nmid}
+    nz = ${nz}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = ${fparse mid/2}
+    zmax = 0.5
+    bias_x = ${fparse 1/bias_x}
     bias_z = ${fparse bias_z}
   []
 
@@ -149,130 +162,408 @@ nz = 31
     nx = ${nx}
     ny = ${ny}
     nz = ${nz}
-    xmin = 0.0
+    xmin = ${fparse mid/2}
     xmax = 0.5
     ymin = -0.5
-    ymax = 0.0
-    zmin = 0.0
+    ymax = ${fparse -mid/2}
+    zmin = ${fparse mid/2}
     zmax = 0.5
     bias_x = ${fparse bias_x}
     bias_y = ${fparse 1/bias_y}
     bias_z = ${fparse bias_z}
   []
-  [front_bottom_left]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = -0.5
-      xmax = 0.0
-      ymin = -0.5
-      ymax = 0.0
-      zmin = 0.0
-      zmax = 0.5
-      bias_x = ${fparse 1/bias_x}
-      bias_y = ${fparse 1/bias_y}
-      bias_z = ${fparse bias_z}
+
+  [front_bottom_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = ${fparse mid/2}
+    zmax = 0.5
+    bias_y = ${fparse 1/bias_y}
+    bias_z = ${fparse bias_z}
   []
+
+  [front_bottom_left]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = ${fparse mid/2}
+    zmax = 0.5
+    bias_x = ${fparse 1/bias_x}
+    bias_y = ${fparse 1/bias_y}
+    bias_z = ${fparse bias_z}
+  []
+
+  
+  [mid_top_right]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nmid}
+    xmin = ${fparse mid/2}
+    xmax = 0.5
+    ymin = ${fparse mid/2}
+    ymax = 0.5
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_x = ${fparse bias_x}
+    bias_y = ${fparse bias_y}
+  []
+
+  [mid_top_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${ny}
+    nz = ${nmid}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = ${fparse mid/2}
+    ymax = 0.5
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_y = ${fparse bias_y}
+  []
+
+  [mid_top_left]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nmid}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = ${fparse mid/2}
+    ymax = 0.5
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_x = ${fparse 1/bias_x}
+    bias_y = ${fparse bias_y}
+  []
+
+  [mid_mid_right]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${nmid}
+    nz = ${nmid}
+    xmin = ${fparse mid/2}
+    xmax = 0.5
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_x = ${fparse bias_x}
+  []
+
+  [mid_mid_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${nmid}
+    nz = ${nmid}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+  []
+
+  [mid_mid_left]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${nmid}
+    nz = ${nmid}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_x = ${fparse 1/bias_x}
+
+  []
+
+  [mid_bottom_right]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nmid}
+    xmin = ${fparse mid/2}
+    xmax = 0.5
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_x = ${fparse bias_x}
+    bias_y = ${fparse 1/bias_y}
+  []
+
+  [mid_bottom_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${ny}
+    nz = ${nmid}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_y = ${fparse 1/bias_y}
+  []
+
+  [mid_bottom_left]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nmid}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = ${fparse -mid/2}
+    zmax = ${fparse mid/2}
+    bias_x = ${fparse 1/bias_x}
+    bias_y = ${fparse 1/bias_y}
+  []
+
+
   [back_top_right]
     type = GeneratedMeshGenerator
     dim = 3
     nx = ${nx}
     ny = ${ny}
     nz = ${nz}
-    xmin = 0.0
+    xmin = ${fparse mid/2}
     xmax = 0.5
-    ymin = 0.0
+    ymin = ${fparse mid/2}
     ymax = 0.5
     zmin = -0.5
-    zmax = 0.0
+    zmax = ${fparse -mid/2}
     bias_x = ${fparse bias_x}
     bias_y = ${fparse bias_y}
     bias_z = ${fparse 1/bias_z}
   []
+
+  [back_top_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = ${fparse mid/2}
+    ymax = 0.5
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_y = ${fparse bias_y}
+    bias_z = ${fparse 1/bias_z}
+  []
+
   [back_top_left]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = -0.5
-      xmax = 0.0
-      ymin = 0.0
-      ymax = 0.5
-      zmin = -0.5
-      zmax = 0.0
-      bias_x = ${fparse 1/bias_x}
-      bias_y = ${fparse bias_y}
-      bias_z = ${fparse 1/bias_z}
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = ${fparse mid/2}
+    ymax = 0.5
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_x = ${fparse 1/bias_x}
+    bias_y = ${fparse bias_y}
+    bias_z = ${fparse 1/bias_z}
   []
+
+  [back_mid_right]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${nmid}
+    nz = ${nz}
+    xmin = ${fparse mid/2}
+    xmax = 0.5
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_x = ${fparse bias_x}
+    bias_z = ${fparse 1/bias_z}
+  []
+
+  [back_mid_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${nmid}
+    nz = ${nz}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_z = ${fparse 1/bias_z}
+  []
+
+  [back_mid_left]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${nmid}
+    nz = ${nz}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = ${fparse -mid/2}
+    ymax = ${fparse mid/2}
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_x = ${fparse 1/bias_x}
+    bias_z = ${fparse 1/bias_z}
+  []
+
   [back_bottom_right]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = 0.0
-      xmax = 0.5
-      ymin = -0.5
-      ymax = 0.0
-      zmin = -0.5
-      zmax = 0.0
-      bias_x = ${fparse bias_x}
-      bias_y = ${fparse 1/bias_y}
-      bias_z = ${fparse 1/bias_z}
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = ${fparse mid/2}
+    xmax = 0.5
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_x = ${fparse bias_x}
+    bias_y = ${fparse 1/bias_y}
+    bias_z = ${fparse 1/bias_z}
   []
+
+  [back_bottom_mid]
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nmid}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = ${fparse -mid/2}
+    xmax = ${fparse mid/2}
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_y = ${fparse 1/bias_y}
+    bias_z = ${fparse 1/bias_z}
+  []
+
   [back_bottom_left]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = -0.5
-      xmax = 0.0
-      ymin = -0.5
-      ymax = 0.0
-      zmin = -0.5
-      zmax = 0.0
-      bias_x = ${fparse 1/bias_x}
-      bias_y = ${fparse 1/bias_y}
-      bias_z = ${fparse 1/bias_z}
+    type = GeneratedMeshGenerator
+    dim = 3
+    nx = ${nx}
+    ny = ${ny}
+    nz = ${nz}
+    xmin = -0.5
+    xmax = ${fparse -mid/2}
+    ymin = -0.5
+    ymax = ${fparse -mid/2}
+    zmin = -0.5
+    zmax = ${fparse -mid/2}
+    bias_x = ${fparse 1/bias_x}
+    bias_y = ${fparse 1/bias_y}
+    bias_z = ${fparse 1/bias_z}
   []
+  
+  
   [join_front_top]
       type = StitchedMeshGenerator
-      inputs = 'front_top_rignt front_top_left'
-      stitch_boundaries_pairs = 'left right'
+      inputs = 'front_top_right front_top_mid front_top_left'
+      stitch_boundaries_pairs = 'left right; left right'
+  []
+  [join_front_mid]
+    type = StitchedMeshGenerator
+    inputs = 'front_mid_right front_mid_mid front_mid_left'
+    stitch_boundaries_pairs = 'left right; left right'
   []
   [join_front_bottom]
     type = StitchedMeshGenerator
-    inputs = 'front_bottom_right front_bottom_left'
-    stitch_boundaries_pairs = 'left right'
+    inputs = 'front_bottom_right front_bottom_mid front_bottom_left'
+    stitch_boundaries_pairs = 'left right; left right'
   []
+
+  [join_mid_top]
+    type = StitchedMeshGenerator
+    inputs = 'mid_top_right mid_top_mid mid_top_left'
+    stitch_boundaries_pairs = 'left right; left right'
+  []
+  [join_mid_mid]
+    type = StitchedMeshGenerator
+    inputs = 'mid_mid_right mid_mid_mid mid_mid_left'
+    stitch_boundaries_pairs = 'left right; left right'
+  []
+  [join_mid_bottom]
+    type = StitchedMeshGenerator
+    inputs = 'mid_bottom_right mid_bottom_mid mid_bottom_left'
+    stitch_boundaries_pairs = 'left right; left right'
+  []
+
   [join_back_top]
     type = StitchedMeshGenerator
-    inputs = 'back_top_right back_top_left'
-    stitch_boundaries_pairs = 'left right'
+    inputs = 'back_top_right back_top_mid back_top_left'
+    stitch_boundaries_pairs = 'left right; left right'
+  []
+  [join_back_mid]
+    type = StitchedMeshGenerator
+    inputs = 'back_mid_right back_mid_mid back_mid_left'
+    stitch_boundaries_pairs = 'left right; left right'
   []
   [join_back_bottom]
     type = StitchedMeshGenerator
-    inputs = 'back_bottom_right back_bottom_left'
-    stitch_boundaries_pairs = 'left right'
+    inputs = 'back_bottom_right back_bottom_mid back_bottom_left'
+    stitch_boundaries_pairs = 'left right; left right'
   []
+
+  
   [join_front]
     type = StitchedMeshGenerator
-    inputs = 'join_front_top join_front_bottom'
-    stitch_boundaries_pairs = 'bottom top'
+    inputs = 'join_front_top join_front_mid join_front_bottom'
+    stitch_boundaries_pairs = 'bottom top; bottom top'
+  []
+  [join_mid]
+    type = StitchedMeshGenerator
+    inputs = 'join_mid_top join_mid_mid join_mid_bottom'
+    stitch_boundaries_pairs = 'bottom top; bottom top'
   []
   [join_back]
     type = StitchedMeshGenerator
-    inputs = 'join_back_top join_back_bottom'
-    stitch_boundaries_pairs = 'bottom top'
+    inputs = 'join_back_top join_back_mid join_back_bottom'
+    stitch_boundaries_pairs = 'bottom top; bottom top'
   []
+
   [joint_all]
     type = StitchedMeshGenerator
-    inputs = 'join_front join_back'
-    stitch_boundaries_pairs = 'back front'
+    inputs = 'join_front join_mid join_back'
+    stitch_boundaries_pairs = 'back front; back front'
   []
 []
 
@@ -1007,12 +1298,12 @@ nz = 31
   # petsc_options_iname = '-pc_type -pc_factor_shift_type -pc_factor_mat_solver_type'
   # petsc_options_value = 'lu       NONZERO                superlu_dist' 
   petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart'
-  petsc_options_value = 'hypre boomeramg 10000'
+  petsc_options_value = 'hypre boomeramg 500'
 
   nl_rel_tol = 5e-3
   l_tol = 1e-2
-  l_max_its = 100
-  nl_max_its = 10000
+  l_max_its = 2000
+  nl_max_its = 500
   
   start_time = 0.0
   dt = 0.00005 #2.5e-6

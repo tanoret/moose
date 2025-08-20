@@ -20,8 +20,8 @@ FVSP3TemperatureSourceSink::validParams()
       "Computes residual for the derived temperature source in the SP3 thermal radiation transport model.");
 
   params.addParam<std::vector<MooseFunctorName>>("absorptivities", "The vector of absorptivities of the energy bands considered.");
-  params.addParam<std::vector<MooseFunctorName>>("psi_1", "The vector of radiation heat flux from group 1.");
-  params.addParam<std::vector<MooseFunctorName>>("psi_2", "The vector of radiation heat flux from group 1");
+  params.addParam<std::vector<MooseFunctorName>>("psi_1", "The vector of radiation flux moments from group 1.");
+  params.addParam<std::vector<MooseFunctorName>>("psi_2", "The vector of radiation flux moments from group 2");
   params.addParam<std::vector<Real>>("band_frequency_width", "The width in Hz of the frequency bands used in the multi-band approximation.");
 
   params.set<bool>("force_boundary_execution") = true;
@@ -82,28 +82,7 @@ FVSP3TemperatureSourceSink::computeQpResidual()
     const auto band_kappa = (*_absorptivity_vec_functors[index])(face_arg, state);
 
     thermal_flux += 1./band_kappa * (band_grad_phi_1 + band_grad_phi_2);
-
-    // const auto facenorm = _face_info->normal();
-    // const auto x_coord = _face_info->faceCentroid()(0);
-    // printf("[%d / %d] %.2f : %f %f\n", index, N, x_coord, band_grad_phi_1.value(), band_grad_phi_2.value());
   }
-
-  // for(auto neighbor : _current_elem->neighbor_ptr_range()){
-  //   if(neighbor == nullptr){
-  //     return 0.0;
-  //   }
-  // }
-
-  // if(onBoundary(_face_info)) return 0.0;
-
-  // // Print for Debug
-  // const auto facenorm = _face_info->normal();
-  // const auto x_coord = _face_info->faceCentroid()(0);
-  // const auto toprint1 = _psi1_vec_functors[0]->gradient(face_arg, state) * _face_info->normal();
-  // const auto toprint2 = _psi2_vec_functors[0]->gradient(face_arg, state) * _face_info->normal();
-  // const auto side1 = (*_psi1_vec_functors[0])(face_arg, state);
-  // printf("%.3f TSS %.5f | %.3f %.3f (%.2f) \n", x_coord, thermal_flux.value(), toprint1.value(), toprint2.value(), side1.value());
-  // printf("%.3f %.5f\n", x_coord, thermal_flux.value());
 
   return -1 * thermal_flux;
 }

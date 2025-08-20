@@ -15,17 +15,7 @@ Tb = 300
 T0 = 1000
 epsilon = 1.0
 endt = 0.001
-
-# nu_min = 3e-3
-# nu1 = 2.9334638e13
-# nu2 = 3.4223744e13
-# nu3 = 3.7334994e13
-# nu4 = 4.5631659e13
-# nu5 = 5.1335616e13
-# nu6 = 5.8669276e13
-# nu7 = 6.8447489e13
-# nu8 = 102.6712329e13
-# nu_max = 1e17
+dt = 0.00005 #2.5e-5#
 
 nu_min = 1e-2
 nu1 = 2.93e13
@@ -47,239 +37,19 @@ kappa6to7 = 7.7
 kappa7to8 = 0.5
 kappa8tomax = 0.4
 
-bias_x = 0.9
-bias_y = 0.9
-bias_z = 0.9
-
-nx = 31
-ny = 31
-nz = 31
-
 [Mesh]
-  # [gmg]
-  #   type = GeneratedMeshGenerator
-  #   dim = 3
-  #   nx = 61
-  #   ny = 61
-  #   nz = 61
-  #   xmin = 0
-  #   xmax = 1
-  #   ymin = 0
-  #   ymax = 1
-  #   zmin = 0
-  #   zmax = 1
-  #   gauss_lobatto_grid = true
-  # []
-
-  # [ref]
-  #   type = RefineSidesetGenerator
-  #   boundaries = 'left right top bottom front back'
-  #   refinement = '1    1    1    1    1    1'
-  #   boundary_side = 'both both both both both both'
-  #   input = gmg
-  # []
-
-  # [tri]
-  #   type = ElementsToSimplicesConverter
-  #   input = ref
-  # []
-
-  # [cmg]
-  #   type = CartesianMeshGenerator
-  #   dim = 3
-
-  #   dx = '0.00030 0.00035 0.00087 0.00356 0.01492 0.04 0.07 0.07 0.6 0.07 0.07 0.04 0.01492 0.00356 0.00087 0.00035 0.00030'
-  #   dy = '0.00030 0.00035 0.00087 0.00356 0.01492 0.04 0.07 0.07 0.6 0.07 0.07 0.04 0.01492 0.00356 0.00087 0.00035 0.00030'
-  #   dz = '0.00030 0.00035 0.00087 0.00356 0.01492 0.04 0.07 0.07 0.6 0.07 0.07 0.04 0.01492 0.00356 0.00087 0.00035 0.00030'
-
-  #   # dx = '0.04 0.02 0.03 0.04 0.06 0.11 0.4 0.11 0.06 0.04 0.03 0.02 0.04'
-  #   # dy = '0.04 0.02 0.03 0.04 0.06 0.11 0.4 0.11 0.06 0.04 0.03 0.02 0.04'
-  #   # dz = '0.04 0.02 0.03 0.04 0.06 0.11 0.4 0.11 0.06 0.04 0.03 0.02 0.04'
-
-  #   ix = '4 4 3 4 4 3 4 2 5 2 4 3 4 4 3 4 4'
-  #   iy = '4 4 4 4 4 3 4 2 5 2 4 3 4 4 4 4 4'
-  #   iz = '4 4 4 4 4 3 4 2 5 2 4 3 4 4 4 4 4'
-
-  #   # ix = '4 2 2 2 2 2 3 2 2 2 2 2 4'
-  #   # iy = '4 2 2 2 2 2 3 2 2 2 2 2 4'
-  #   # iz = '4 2 2 2 2 2 3 2 2 2 2 2 4'
-
-  #   # ix = '2 1 1 1 1 1 1 1 1 1 1 1 2'
-  #   # iy = '2 1 1 1 1 1 1 1 1 1 1 1 2'
-  #   # iz = '2 1 1 1 1 1 1 1 1 1 1 1 2'
-  # []
-  
-  [front_top_rignt]
-    type = GeneratedMeshGenerator
-    dim = 3
-    nx = ${nx}
-    ny = ${ny}
-    nz = ${nz}
-    xmin = 0.0
-    xmax = 0.5
-    ymin = 0.0
-    ymax = 0.5
-    zmin = 0.0
-    zmax = 0.5
-    bias_x = ${fparse bias_x}
-    bias_y = ${fparse bias_y}
-    bias_z = ${fparse bias_z}
-  []
-
-  [front_top_left]
-    type = GeneratedMeshGenerator
-    dim = 3
-    nx = ${nx}
-    ny = ${ny}
-    nz = ${nz}
-    xmin = -0.5
-    xmax = 0.0
-    ymin = 0.0
-    ymax = 0.5
-    zmin = 0.0
-    zmax = 0.5
-    bias_x = ${fparse 1/bias_x}
-    bias_y = ${fparse bias_y}
-    bias_z = ${fparse bias_z}
-  []
-
-  [front_bottom_right]
-    type = GeneratedMeshGenerator
-    dim = 3
-    nx = ${nx}
-    ny = ${ny}
-    nz = ${nz}
-    xmin = 0.0
-    xmax = 0.5
-    ymin = -0.5
-    ymax = 0.0
-    zmin = 0.0
-    zmax = 0.5
-    bias_x = ${fparse bias_x}
-    bias_y = ${fparse 1/bias_y}
-    bias_z = ${fparse bias_z}
-  []
-  [front_bottom_left]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = -0.5
-      xmax = 0.0
-      ymin = -0.5
-      ymax = 0.0
-      zmin = 0.0
-      zmax = 0.5
-      bias_x = ${fparse 1/bias_x}
-      bias_y = ${fparse 1/bias_y}
-      bias_z = ${fparse bias_z}
-  []
-  [back_top_right]
-    type = GeneratedMeshGenerator
-    dim = 3
-    nx = ${nx}
-    ny = ${ny}
-    nz = ${nz}
-    xmin = 0.0
-    xmax = 0.5
-    ymin = 0.0
-    ymax = 0.5
-    zmin = -0.5
-    zmax = 0.0
-    bias_x = ${fparse bias_x}
-    bias_y = ${fparse bias_y}
-    bias_z = ${fparse 1/bias_z}
-  []
-  [back_top_left]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = -0.5
-      xmax = 0.0
-      ymin = 0.0
-      ymax = 0.5
-      zmin = -0.5
-      zmax = 0.0
-      bias_x = ${fparse 1/bias_x}
-      bias_y = ${fparse bias_y}
-      bias_z = ${fparse 1/bias_z}
-  []
-  [back_bottom_right]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = 0.0
-      xmax = 0.5
-      ymin = -0.5
-      ymax = 0.0
-      zmin = -0.5
-      zmax = 0.0
-      bias_x = ${fparse bias_x}
-      bias_y = ${fparse 1/bias_y}
-      bias_z = ${fparse 1/bias_z}
-  []
-  [back_bottom_left]
-      type = GeneratedMeshGenerator
-      dim = 3
-      nx = ${nx}
-      ny = ${ny}
-      nz = ${nz}
-      xmin = -0.5
-      xmax = 0.0
-      ymin = -0.5
-      ymax = 0.0
-      zmin = -0.5
-      zmax = 0.0
-      bias_x = ${fparse 1/bias_x}
-      bias_y = ${fparse 1/bias_y}
-      bias_z = ${fparse 1/bias_z}
-  []
-  [join_front_top]
-      type = StitchedMeshGenerator
-      inputs = 'front_top_rignt front_top_left'
-      stitch_boundaries_pairs = 'left right'
-  []
-  [join_front_bottom]
-    type = StitchedMeshGenerator
-    inputs = 'front_bottom_right front_bottom_left'
-    stitch_boundaries_pairs = 'left right'
-  []
-  [join_back_top]
-    type = StitchedMeshGenerator
-    inputs = 'back_top_right back_top_left'
-    stitch_boundaries_pairs = 'left right'
-  []
-  [join_back_bottom]
-    type = StitchedMeshGenerator
-    inputs = 'back_bottom_right back_bottom_left'
-    stitch_boundaries_pairs = 'left right'
-  []
-  [join_front]
-    type = StitchedMeshGenerator
-    inputs = 'join_front_top join_front_bottom'
-    stitch_boundaries_pairs = 'bottom top'
-  []
-  [join_back]
-    type = StitchedMeshGenerator
-    inputs = 'join_back_top join_back_bottom'
-    stitch_boundaries_pairs = 'bottom top'
-  []
-  [joint_all]
-    type = StitchedMeshGenerator
-    inputs = 'join_front join_back'
-    stitch_boundaries_pairs = 'back front'
-  []
+  [mesh]
+      type = FileMeshGenerator
+      file = 'adaptive2D.cpr'
+    []
 []
 
 [Problem]
   nl_sys_names = 'T
                   psi11 psi12 psi13 psi14 psi15 psi16 psi17 psi18
                   psi21 psi22 psi23 psi24 psi25 psi26 psi27 psi28'
+
+  verbose_setup = true
 []
 
 [Variables]
@@ -699,7 +469,7 @@ nz = 31
 [FVBCs]
   [BC11]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi11
     Tb = ${Tb}
     nu = ${nu1}
@@ -717,7 +487,7 @@ nz = 31
 
   [BC21]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi21
     Tb = ${Tb}
     nu = ${nu1}
@@ -735,7 +505,7 @@ nz = 31
 
   [BC12]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi12
     Tb = ${Tb}
     nu = ${nu2}
@@ -753,7 +523,7 @@ nz = 31
 
   [BC22]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi22
     Tb = ${Tb}
     nu = ${nu2}
@@ -771,7 +541,7 @@ nz = 31
 
   [BC13]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi13
     Tb = ${Tb}
     nu = ${nu3}
@@ -789,7 +559,7 @@ nz = 31
 
   [BC23]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi23
     Tb = ${Tb}
     nu = ${nu3}
@@ -807,7 +577,7 @@ nz = 31
 
   [BC14]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi14
     Tb = ${Tb}
     nu = ${nu4}
@@ -825,7 +595,7 @@ nz = 31
 
   [BC24]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi24
     Tb = ${Tb}
     nu = ${nu4}
@@ -843,7 +613,7 @@ nz = 31
 
   [BC15]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi15
     Tb = ${Tb}
     nu = ${nu5}
@@ -861,7 +631,7 @@ nz = 31
 
   [BC25]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi25
     Tb = ${Tb}
     nu = ${nu5}
@@ -879,7 +649,7 @@ nz = 31
 
   [BC16]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi16
     Tb = ${Tb}
     nu = ${nu6}
@@ -897,7 +667,7 @@ nz = 31
 
   [BC26]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi26
     Tb = ${Tb}
     nu = ${nu6}
@@ -915,7 +685,7 @@ nz = 31
 
   [BC17]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi17
     Tb = ${Tb}
     nu = ${nu7}
@@ -933,7 +703,7 @@ nz = 31
 
   [BC27]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi27
     Tb = ${Tb}
     nu = ${nu7}
@@ -951,7 +721,7 @@ nz = 31
 
   [BC18]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi18
     Tb = ${Tb}
     nu = ${nu8}
@@ -969,7 +739,7 @@ nz = 31
 
   [BC28]
     type = FVSP3ThermalRadiationBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = psi28
     Tb = ${Tb}
     nu = ${nu8}
@@ -987,7 +757,7 @@ nz = 31
 
   [BC_temperature]
     type = FVSP3TemperatureBC
-    boundary = 'left right top bottom front back'
+    boundary = 'left right top bottom'
     variable = T
     Tb = ${Tb}
     n1 = ${n1}
@@ -1001,40 +771,47 @@ nz = 31
   []
 []
 
+[VectorPostprocessors]
+  [y0]
+    num_points = 102
+    start_point = '-0.5 0.0 0.0'
+    end_point = '0.5 0.0 0.0'
+    sort_by = 'x'
+    variable = T
+    type = LineValueSampler
+  []
+[]
+
+[Debug]
+  show_actions = true
+[]
+
 [Executioner]
   type = Transient
-  solve_type = 'PJFNK'
-  # petsc_options_iname = '-pc_type -pc_factor_shift_type -pc_factor_mat_solver_type'
-  # petsc_options_value = 'lu       NONZERO                superlu_dist' 
+  solve_type = 'Newton'
   petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart'
-  petsc_options_value = 'hypre boomeramg 10000'
+  petsc_options_value = 'hypre boomeramg 500'
 
-  nl_rel_tol = 5e-3
-  l_tol = 1e-2
-  l_max_its = 100
-  nl_max_its = 10000
+  nl_rel_tol = 1e-6
+  nl_abs_tol = 1e-6
+  l_tol = 1e-6
+
+  l_max_its = 2000
+  nl_max_its = 500
   
   start_time = 0.0
-  dt = 0.00005 #2.5e-6
+  dt = ${dt}
   end_time = ${endt}
 []
 
-# [VectorPostprocessors]
-#   [./lv1]
-#     num_points = 60
-#     start_point = '0.0 0.5 0.5'
-#     end_point = '1.0 0.5 0.5'
-#     sort_by = 'x'
-#     variable = T
-#     type = LineValueSampler
-#   [../]
-# []
-
 [Outputs]
-  exodus = true
+  [e]
+    type = Exodus
+    # exodus = true
+  []
   [csv]
     type = CSV
-    file_base = Larsen_adaptive3D_
+    # csv = true
     execute_on = final
   []
 []
