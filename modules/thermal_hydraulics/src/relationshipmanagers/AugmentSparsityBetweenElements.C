@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -38,7 +38,7 @@ AugmentSparsityBetweenElements::AugmentSparsityBetweenElements(
 std::unique_ptr<GhostingFunctor>
 AugmentSparsityBetweenElements::clone() const
 {
-  return std::make_unique<AugmentSparsityBetweenElements>(*this);
+  return _app.getFactory().clone(*this);
 }
 
 void

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,8 +22,7 @@ BoundaryRestrictable::validParams()
 
   // Create user-facing 'boundary' input for restricting inheriting object to boundaries
   params.addParam<std::vector<BoundaryName>>(
-      "boundary",
-      "The list of boundaries (ids or names) from the mesh where this boundary condition applies");
+      "boundary", "The list of boundaries (ids or names) from the mesh where this object applies");
 
   // A parameter for disabling error message for objects restrictable by boundary and block,
   // if the parameter is valid it was already set so don't do anything

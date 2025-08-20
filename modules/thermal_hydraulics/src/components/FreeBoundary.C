@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,8 @@ InputParameters
 FreeBoundary::validParams()
 {
   InputParameters params = FlowBoundary::validParams();
+  params.addClassDescription(
+      "Component to create a free flow boundary for 1D flow. This component is deprecated.");
   return params;
 }
 

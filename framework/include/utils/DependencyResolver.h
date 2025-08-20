@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,49 +18,20 @@
 
 // C++ includes
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 #include <list>
-#include <unordered_set>
 #include <algorithm>
 #include <sstream>
 #include <exception>
 
-template <typename T>
+template <class T, class Compare>
 class CyclicDependencyException;
-
-template <typename T>
-class DependencyResolverComparator
-{
-public:
-  DependencyResolverComparator(const std::vector<T> & original_order)
-    : _original_order(original_order)
-  {
-  }
-
-  bool operator()(const T & a, const T & b) const
-  {
-    auto a_it = std::find(_original_order.begin(), _original_order.end(), a);
-    auto b_it = std::find(_original_order.begin(), _original_order.end(), b);
-
-    mooseAssert(a_it != _original_order.end(), "Bad DependencyResolverComparator request");
-    mooseAssert(b_it != _original_order.end(), "Bad DependencyResolverComparator request");
-
-    /**
-     * Compare the iterators based on their original ordering.
-     */
-    return a_it < b_it;
-  }
-
-private:
-  const std::vector<T> & _original_order;
-};
 
 /**
  * Class that represents the dependecy as a graph
  */
-template <typename T>
+template <class T, class Compare = std::less<T>>
 class DependencyResolver
 {
 public:
@@ -123,7 +94,7 @@ public:
    * Returns a vector of sets that represent dependency resolved values.  Items in the same
    * subvector have no dependence upon one and other.
    */
-  const std::vector<std::vector<T>> & getSortedValuesSets();
+  [[nodiscard]] const std::vector<std::vector<T>> & getSortedValuesSets();
 
   /**
    * This function also returns dependency resolved values but with a simpler single vector
@@ -132,7 +103,7 @@ public:
    * can't
    * be represented in a single vector.  This isn't a problem in practice though.
    */
-  const std::vector<T> & getSortedValues() { return dfs(); }
+  [[nodiscard]] const std::vector<T> & getSortedValues() { return dfs(); }
 
   /**
    * Return true if key depends on value.
@@ -145,17 +116,17 @@ public:
    * has been performed.
    * dependsOn(x, x) always returns true
    */
-  bool dependsOn(const T & key, const T & value);
+  [[nodiscard]] bool dependsOn(const T & key, const T & value);
 
   /**
    * Return true if any of elements of keys depends on value
    */
-  bool dependsOn(const std::vector<T> & keys, const T & value);
+  [[nodiscard]] bool dependsOn(const std::vector<T> & keys, const T & value);
 
   /**
    * Returns a list of all values that a given key depends on
    */
-  std::list<T> getAncestors(const T & key);
+  [[nodiscard]] std::list<T> getAncestors(const T & key);
 
   /**
    * Returns the number of unique items stored in the dependency resolver. lindsayad comment: does
@@ -169,7 +140,7 @@ protected:
    * @param root The node we start from
    * @param item The node we are searching for
    */
-  bool dependsOnFromNode(const T & root, const T & item);
+  [[nodiscard]] bool dependsOnFromNode(const T & root, const T & item);
 
   /**
    * Perform a depth-first-search from the specified \p root node. Populates _visited and
@@ -180,13 +151,15 @@ protected:
   bool dfsFromNode(const T & root);
 
   /// adjacency lists (from leaves to roots)
-  std::map<T, std::list<T>> _adj;
+  std::map<T, std::list<T>, Compare> _adj;
   /// adjacency lists (from roots to leaves)
-  std::map<T, std::list<T>> _inv_adj;
+  std::map<T, std::list<T>, Compare> _inv_adj;
   /// vector of visited nodes
-  std::map<T, bool> _visited;
+  std::map<T, bool, Compare> _visited;
+  /// number of visited nodes; used to avoid iterating through _visited
+  std::size_t _num_visited = 0;
   /// recursive stack
-  std::map<T, bool> _rec_stack;
+  std::map<T, bool, Compare> _rec_stack;
   /// "sorted" vector of nodes
   std::vector<T> _sorted_vector;
   /// The sorted vector of sets
@@ -200,12 +173,12 @@ protected:
   /// Data member for storing nodes that appear circularly in the graph
   T _circular_node = T{};
 
-  friend class CyclicDependencyException<T>;
+  friend class CyclicDependencyException<T, Compare>;
 };
 
-template <typename T>
+template <class T, class Compare>
 void
-DependencyResolver<T>::addNode(const T & a)
+DependencyResolver<T, Compare>::addNode(const T & a)
 {
 #ifndef NDEBUG
   bool new_adj_insertion = false, new_inv_insertion = false;
@@ -231,9 +204,9 @@ DependencyResolver<T>::addNode(const T & a)
               "insertion/non-insertion.");
 }
 
-template <typename T>
+template <class T, class Compare>
 void
-DependencyResolver<T>::addEdge(const T & a, const T & b)
+DependencyResolver<T, Compare>::addEdge(const T & a, const T & b)
 {
   addNode(a);
   addNode(b);
@@ -242,9 +215,9 @@ DependencyResolver<T>::addEdge(const T & a, const T & b)
   _inv_adj[b].push_back(a);
 }
 
-template <typename T>
+template <class T, class Compare>
 void
-DependencyResolver<T>::removeEdge(const T & a, const T & b)
+DependencyResolver<T, Compare>::removeEdge(const T & a, const T & b)
 {
   auto remove_item = [](auto & list, const auto & item)
   {
@@ -256,9 +229,9 @@ DependencyResolver<T>::removeEdge(const T & a, const T & b)
   remove_item(_inv_adj[b], a);
 }
 
-template <typename T>
+template <class T, class Compare>
 void
-DependencyResolver<T>::removeEdgesInvolving(const T & a)
+DependencyResolver<T, Compare>::removeEdgesInvolving(const T & a)
 {
   const auto & inv_adjs = _inv_adj[a];
   for (const auto & inv_adj : inv_adjs)
@@ -272,21 +245,22 @@ DependencyResolver<T>::removeEdgesInvolving(const T & a)
   _inv_adj[a].clear();
 }
 
-template <typename T>
+template <class T, class Compare>
 void
-DependencyResolver<T>::clear()
+DependencyResolver<T, Compare>::clear()
 {
   _adj.clear();
   _inv_adj.clear();
   _insertion_order.clear();
 }
 
-template <typename T>
+template <class T, class Compare>
 const std::vector<T> &
-DependencyResolver<T>::dfs()
+DependencyResolver<T, Compare>::dfs()
 {
   _sorted_vector.clear();
   _visited.clear();
+  _num_visited = 0;
   _rec_stack.clear();
   _circular_node = T{};
 
@@ -297,6 +271,7 @@ DependencyResolver<T>::dfs()
   }
 
   bool is_cyclic = false;
+
   // If there are no adjacencies, then all nodes are both roots and leaves
   bool roots_found = _adj.empty();
   for (auto & n : _insertion_order)
@@ -307,7 +282,24 @@ DependencyResolver<T>::dfs()
       if (is_cyclic)
         break;
     }
-  if (!roots_found)
+
+  if (roots_found)
+  {
+    // At this point, if we have any sub-graphs that are cyclic that do not have any
+    // roots _and_ we have found one more or more separate sub-graphs with a root,
+    // we will have never visited the aforementioned cyclic sub-graphs. Therefore,
+    // at this point if we haven't visited something it's a part of a cyclic sub-graph
+    if (!is_cyclic && _num_visited != _insertion_order.size())
+    {
+      for (const auto & [n, visited] : _visited)
+        if (!visited && (is_cyclic = dfsFromNode(n)))
+          break;
+
+      mooseAssert(is_cyclic, "Should have found a cyclic dependency");
+    }
+  }
+  // Didn't find any roots
+  else
   {
     is_cyclic = true;
     // Create a cycle graph
@@ -317,14 +309,17 @@ DependencyResolver<T>::dfs()
   }
 
   if (is_cyclic)
-    throw CyclicDependencyException<T>("cyclic graph detected", *this);
+    throw CyclicDependencyException<T, Compare>("cyclic graph detected", *this);
+
+  mooseAssert(_sorted_vector.size() == _insertion_order.size(), "Unexpected sorted size");
+  mooseAssert(_num_visited == _insertion_order.size(), "Did not visit all nodes");
 
   return _sorted_vector;
 }
 
-template <typename T>
+template <class T, class Compare>
 const std::vector<std::vector<T>> &
-DependencyResolver<T>::getSortedValuesSets()
+DependencyResolver<T, Compare>::getSortedValuesSets()
 {
   _ordered_items.clear();
 
@@ -361,9 +356,9 @@ DependencyResolver<T>::getSortedValuesSets()
   return _ordered_items;
 }
 
-template <typename T>
+template <class T, class Compare>
 bool
-DependencyResolver<T>::dependsOn(const T & key, const T & value)
+DependencyResolver<T, Compare>::dependsOn(const T & key, const T & value)
 {
   if (_adj.find(value) == _adj.end())
     return false;
@@ -374,9 +369,9 @@ DependencyResolver<T>::dependsOn(const T & key, const T & value)
   return dependsOnFromNode(key, value);
 }
 
-template <typename T>
+template <class T, class Compare>
 bool
-DependencyResolver<T>::dependsOn(const std::vector<T> & keys, const T & value)
+DependencyResolver<T, Compare>::dependsOn(const std::vector<T> & keys, const T & value)
 {
   if (_adj.find(value) == _adj.end())
     return false;
@@ -391,9 +386,9 @@ DependencyResolver<T>::dependsOn(const std::vector<T> & keys, const T & value)
   return false;
 }
 
-template <typename T>
+template <class T, class Compare>
 std::list<T>
-DependencyResolver<T>::getAncestors(const T & key)
+DependencyResolver<T, Compare>::getAncestors(const T & key)
 {
   std::vector<T> ret_vec;
   // Our sorted vector is our work vector but we also return references to it. So we have to make
@@ -411,9 +406,9 @@ DependencyResolver<T>::getAncestors(const T & key)
   return {ret_vec.begin(), ret_vec.end()};
 }
 
-template <typename T>
+template <class T, class Compare>
 bool
-DependencyResolver<T>::dependsOnFromNode(const T & root, const T & item)
+DependencyResolver<T, Compare>::dependsOnFromNode(const T & root, const T & item)
 {
   if (root == item)
     return true;
@@ -429,12 +424,17 @@ DependencyResolver<T>::dependsOnFromNode(const T & root, const T & item)
   return false;
 }
 
-template <typename T>
+template <class T, class Compare>
 bool
-DependencyResolver<T>::dfsFromNode(const T & root)
+DependencyResolver<T, Compare>::dfsFromNode(const T & root)
 {
   bool cyclic = false;
-  _visited[root] = true;
+  auto & visited = libmesh_map_find(_visited, root);
+  if (!visited)
+  {
+    ++_num_visited;
+    visited = true;
+  }
   _rec_stack[root] = true;
 
   for (auto & i : _inv_adj[root])
@@ -458,11 +458,12 @@ DependencyResolver<T>::dfsFromNode(const T & root)
   return cyclic;
 }
 
-template <typename T>
+template <class T, class Compare = std::less<T>>
 class CyclicDependencyException : public std::runtime_error
 {
 public:
-  CyclicDependencyException(const std::string & error, const DependencyResolver<T> & graph) throw()
+  CyclicDependencyException(const std::string & error,
+                            const DependencyResolver<T, Compare> & graph) throw()
     : runtime_error(error)
   {
     const auto & sorted = graph._sorted_vector;

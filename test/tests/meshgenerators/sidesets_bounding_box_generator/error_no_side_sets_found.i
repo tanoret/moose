@@ -10,11 +10,10 @@
   [./createNewSidesetOne]
     type = SideSetsFromBoundingBoxGenerator
     input = gmg
-    boundaries_old = 'right'
+    included_boundaries = 'right'
     boundary_new = 11
     bottom_left = '-0.1 -0.1 0'
     top_right = '0.9 0.9 0'
-    block_id = 0
   []
 []
 

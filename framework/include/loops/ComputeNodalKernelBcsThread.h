@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -33,6 +33,9 @@ public:
   void join(const ComputeNodalKernelBcsThread & /*y*/);
 
 protected:
+  /// Print information about the loop, mostly order of execution of objects
+  void printGeneralExecutionInformation() const override;
+
   FEProblemBase & _fe_problem;
 
   AuxiliarySystem & _aux_sys;

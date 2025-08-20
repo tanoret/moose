@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -45,7 +45,6 @@ ParallelSubsetSimulation::validParams()
 
 ParallelSubsetSimulation::ParallelSubsetSimulation(const InputParameters & parameters)
   : Sampler(parameters),
-    ReporterInterface(this),
     _num_samplessub(getParam<unsigned int>("num_samplessub")),
     _num_subsets(getParam<unsigned int>("num_subsets")),
     _use_absolute_value(getParam<bool>("use_absolute_value")),

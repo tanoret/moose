@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,9 +27,6 @@ public:
 
   static void registerApps();
   static void registerAll(Factory & f, ActionFactory & af, Syntax & s);
-
-  virtual std::shared_ptr<Backup> backup() override;
-  virtual void restore(std::shared_ptr<Backup> backup, bool for_restart = false) override;
 
   TS & getPetscTS();
 

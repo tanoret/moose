@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SpiralAnnularMesh.h"
+
+#include "MooseApp.h"
 
 #include "libmesh/face_quad4.h"
 #include "libmesh/face_tri3.h"
@@ -65,7 +67,7 @@ SpiralAnnularMesh::SpiralAnnularMesh(const InputParameters & parameters)
 std::unique_ptr<MooseMesh>
 SpiralAnnularMesh::safeClone() const
 {
-  return std::make_unique<SpiralAnnularMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 void

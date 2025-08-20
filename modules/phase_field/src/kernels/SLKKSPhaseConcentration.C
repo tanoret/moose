@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -50,7 +50,7 @@ SLKKSPhaseConcentration::SLKKSPhaseConcentration(const InputParameters & paramet
     _eta(coupledValue("eta")),
     _eta_var(coupled("eta")),
     _prop_h(getMaterialProperty<Real>("h_name")),
-    _prop_dh(getMaterialPropertyDerivative<Real>("h_name", getVar("eta", 0)->name()))
+    _prop_dh(getMaterialPropertyDerivative<Real>("h_name", coupledName("eta", 0)))
 {
   if (_a_ca.size() != _nca)
     paramError("aa", "Specify one sublattice site fraction per sublattice concentration variable");

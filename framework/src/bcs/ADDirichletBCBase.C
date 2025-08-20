@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,31 +12,13 @@
 InputParameters
 ADDirichletBCBase::validParams()
 {
-  InputParameters params = ADNodalBC::validParams();
+  InputParameters params = NodalBCBase::validParams();
   params.addParam<bool>(
       "preset", true, "Whether or not to preset the BC (apply the value before the solve begins).");
   return params;
 }
 
 ADDirichletBCBase::ADDirichletBCBase(const InputParameters & parameters)
-  : ADNodalBC(parameters), _preset(getParam<bool>("preset"))
+  : NodalBCBase(parameters), _preset(getParam<bool>("preset"))
 {
-}
-
-void
-ADDirichletBCBase::computeValue(NumericVector<Number> & current_solution)
-{
-  mooseAssert(_preset, "BC is not preset");
-
-  if (_var.isNodalDefined())
-  {
-    auto && dof_idx = _var.nodalDofIndex();
-    current_solution.set(dof_idx, MetaPhysicL::raw_value(computeQpValue()));
-  }
-}
-
-ADReal
-ADDirichletBCBase::computeQpResidual()
-{
-  return _u - computeQpValue();
 }

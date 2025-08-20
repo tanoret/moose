@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,8 +24,6 @@ public:
   virtual void addMooseObjects() override;
 
 protected:
-  virtual void check() const override;
-
   /// Temperature from external application
   const VariableName & _T_ext_var_name;
   /// Heat transfer coefficient from external application

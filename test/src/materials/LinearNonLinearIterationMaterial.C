@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,5 +36,6 @@ void
 LinearNonLinearIterationMaterial::computeQpProperties()
 {
   _mat_prop[_qp] =
-      (_t_step + _fe_problem.nNonlinearIterations() * _fe_problem.nLinearIterations()) * _prefactor;
+      (_t_step + _fe_problem.nNonlinearIterations(0) * _fe_problem.nLinearIterations(0)) *
+      _prefactor;
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -40,18 +40,20 @@ NodalMaxValue::execute()
 }
 
 Real
-NodalMaxValue::getValue()
+NodalMaxValue::getValue() const
 {
   return _value;
 }
+
 void
 NodalMaxValue::finalize()
 {
   gatherMax(_value);
 }
+
 void
 NodalMaxValue::threadJoin(const UserObject & y)
 {
-  const NodalMaxValue & pps = static_cast<const NodalMaxValue &>(y);
+  const auto & pps = static_cast<const NodalMaxValue &>(y);
   _value = std::max(_value, pps._value);
 }

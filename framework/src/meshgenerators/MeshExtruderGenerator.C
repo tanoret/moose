@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,7 +15,7 @@
 #include "libmesh/boundary_info.h"
 #include "libmesh/elem.h"
 
-registerMooseObject("MooseApp", MeshExtruderGenerator);
+registerMooseObjectDeprecated("MooseApp", MeshExtruderGenerator, "12/31/2025 24:00");
 
 InputParameters
 MeshExtruderGenerator::validParams()
@@ -110,6 +110,7 @@ MeshExtruderGenerator::generate()
   if (isParamValid("top_sideset"))
     changeID(*dest_mesh, getParam<std::vector<BoundaryName>>("top_sideset"), old_top);
 
+  dest_mesh->set_isnt_prepared();
   return dynamic_pointer_cast<MeshBase>(dest_mesh);
 }
 

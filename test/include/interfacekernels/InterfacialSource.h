@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,6 +42,4 @@ protected:
 
   /// Optional Postprocessor value
   const PostprocessorValue & _postprocessor;
-
-  const MooseArray<Real> & _neighbor_JxW;
 };

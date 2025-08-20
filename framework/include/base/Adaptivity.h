@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,8 +30,9 @@ class DisplacedProblem;
 template <typename>
 class MooseVariableFE;
 typedef MooseVariableFE<Real> MooseVariable;
-typedef MooseVariableFE<VectorValue<Real>> VectorMooseVariable;
+typedef MooseVariableFE<libMesh::VectorValue<Real>> VectorMooseVariable;
 class MooseEnum;
+class MultiMooseEnum;
 
 // Forward declare classes in libMesh
 namespace libMesh
@@ -50,7 +51,7 @@ class Adaptivity : public ConsoleStreamInterface,
                    public libMesh::ParallelObject
 {
 public:
-  Adaptivity(FEProblemBase & subproblem);
+  Adaptivity(FEProblemBase & fe_problem);
   virtual ~Adaptivity();
 
   /**
@@ -58,8 +59,9 @@ public:
    * adaptivity cycles to perform before the simulation starts and steps indicates the
    * number of adaptivity cycles to run during a steady (not transient) solve.  steps is not used
    * for transient or eigen solves.
+   * p_refinement indicates whether the refinement will be p-refinement or h-refinement.
    */
-  void init(unsigned int steps, unsigned int initial_steps);
+  void init(const unsigned int steps, const unsigned int initial_steps, const bool p_refinement);
 
   /**
    * Set adaptivity parameter
@@ -81,7 +83,7 @@ public:
   /**
    * Set the error norm (FIXME: improve description)
    */
-  void setErrorNorm(SystemNorm & sys_norm);
+  void setErrorNorm(libMesh::SystemNorm & sys_norm);
 
   /**
    *
@@ -130,6 +132,13 @@ public:
 
   /**
    * Adapts the mesh based on the error estimator used
+   *
+   * This method calls DisplacedProblem::undisplaceMesh, so it is necessary to
+   * update the displaced problem's mesh (undoing the undisplacement) before any
+   * objects relying on the displaced mesh are executed. However, projection of
+   * the displacement variables is required before doing so; therefore, the
+   * DisplacedProblem::updateMesh call needs to happen outside of this method.
+   * @see FEProblemBase::adaptMesh and FEProblemMase::meshChangedHelper.
    *
    * @return a boolean that indicates whether the mesh was changed
    */
@@ -232,7 +241,7 @@ public:
    *
    * @param indicator_field The name of the field to get an ErrorVector for.
    */
-  ErrorVector & getErrorVector(const std::string & indicator_field);
+  libMesh::ErrorVector & getErrorVector(const std::string & indicator_field);
 
   /**
    * Update the ErrorVectors that have been requested through calls to getErrorVector().
@@ -245,7 +254,7 @@ public:
   bool isAdaptivityDue();
 
 protected:
-  FEProblemBase & _subproblem;
+  FEProblemBase & _fe_problem;
   MooseMesh & _mesh;
 
   /// on/off flag reporting if the adaptivity is being used
@@ -253,16 +262,16 @@ protected:
   /// on/off flag reporting if the adaptivity system has been initialized
   bool _initialized;
   /// A mesh refinement object to be used either with initial refinement or with Adaptivity.
-  std::unique_ptr<MeshRefinement> _mesh_refinement;
+  std::unique_ptr<libMesh::MeshRefinement> _mesh_refinement;
   /// Error estimator to be used by the apps.
-  std::unique_ptr<ErrorEstimator> _error_estimator;
+  std::unique_ptr<libMesh::ErrorEstimator> _error_estimator;
   /// Error vector for use with the error estimator.
-  std::unique_ptr<ErrorVector> _error;
+  std::unique_ptr<libMesh::ErrorVector> _error;
 
   std::shared_ptr<DisplacedProblem> _displaced_problem;
 
   /// A mesh refinement object for displaced mesh
-  std::unique_ptr<MeshRefinement> _displaced_mesh_refinement;
+  std::unique_ptr<libMesh::MeshRefinement> _displaced_mesh_refinement;
 
   /// the number of adaptivity steps to do at the beginning of simulation
   unsigned int _initial_steps;
@@ -301,7 +310,9 @@ protected:
   bool _recompute_markers_during_cycles;
 
   /// Stores pointers to ErrorVectors associated with indicator field names
-  std::map<std::string, std::unique_ptr<ErrorVector>> _indicator_field_to_error_vector;
+  std::map<std::string, std::unique_ptr<libMesh::ErrorVector>> _indicator_field_to_error_vector;
+
+  bool _p_refinement_flag = false;
 };
 
 template <typename T>

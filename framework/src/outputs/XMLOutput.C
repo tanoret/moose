@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -54,9 +54,9 @@ XMLOutput::outputVectorPostprocessors()
   // is not required.
   vec_node.append_attribute("time") = _problem_ptr->time();
   vec_node.append_attribute("timestep") = _problem_ptr->timeStep();
-  if (_execute_enum.contains(EXEC_LINEAR) && !_on_nonlinear_residual)
+  if (_execute_enum.isValueSet(EXEC_LINEAR) && !_on_nonlinear_residual)
     vec_node.append_attribute("linear_iteration") = _linear_iter;
-  if (_execute_enum.contains(EXEC_NONLINEAR))
+  if (_execute_enum.isValueSet(EXEC_NONLINEAR))
     vec_node.append_attribute("nonlinear_iteration") = _nonlinear_iter;
 
   // The VPP objects to be output
@@ -98,9 +98,9 @@ XMLOutput::outputVectorPostprocessors()
 }
 
 void
-XMLOutput::output(const ExecFlagType & type)
+XMLOutput::output()
 {
-  AdvancedOutput::output(type);
+  AdvancedOutput::output();
   if (processor_id() == 0 || _distributed)
     _xml_doc.save_file(filename().c_str());
 }

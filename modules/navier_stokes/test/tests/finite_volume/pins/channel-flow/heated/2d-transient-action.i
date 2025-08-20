@@ -55,6 +55,10 @@ top_side_temperature = 150
     specific_heat = 'cp'
     porosity = 'porosity'
 
+    # Reference file sets effective_conductivity by default that way
+    # so the conductivity is multiplied by the porosity in the kernel
+    effective_conductivity = false
+
     initial_velocity = '${u_inlet} 1e-6 0'
     initial_pressure = ${p_outlet}
     initial_temperature = 0.0
@@ -76,6 +80,10 @@ top_side_temperature = 150
 
     ambient_convection_alpha = 'h_cv'
     ambient_temperature = 'T_solid'
+
+    mass_advection_interpolation = 'average'
+    momentum_advection_interpolation = 'average'
+    energy_advection_interpolation = 'average'
   []
 []
 
@@ -112,7 +120,7 @@ top_side_temperature = 150
   []
 []
 
-[Materials]
+[FunctorMaterials]
   [constants]
     type = ADGenericFunctorMaterial
     prop_names = 'h_cv cp rho mu k'

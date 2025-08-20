@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,7 +21,8 @@ public:
   INSFVMassAdvection(const InputParameters & params);
 
 protected:
-  ADReal computeQpResidual() override;
+  virtual ADReal computeQpResidual() override;
+  virtual bool hasMaterialTimeDerivative() const override { return false; }
 
   /// Density
   const Moose::Functor<ADReal> & _rho;

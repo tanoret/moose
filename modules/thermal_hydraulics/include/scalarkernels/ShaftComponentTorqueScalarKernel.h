@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,6 +26,9 @@ public:
   virtual void computeJacobian() override;
 
 protected:
+  virtual Real computeQpResidual() override { mooseError("unused"); }
+  virtual Real computeQpJacobian() override { mooseError("unused"); }
+
   /// Shaft connected component user object
   const ShaftConnectableUserObjectInterface & _shaft_connected_component_uo;
 

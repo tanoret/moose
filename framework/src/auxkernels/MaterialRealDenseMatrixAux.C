@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,5 +32,5 @@ MaterialRealDenseMatrixAux::MaterialRealDenseMatrixAux(const InputParameters & p
 Real
 MaterialRealDenseMatrixAux::getRealValue()
 {
-  return _prop[_qp](_row, _col);
+  return _full_value(_row, _col);
 }

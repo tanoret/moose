@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,7 +26,15 @@ protected:
   void computeQpProperties() override;
 
   const Real & _input_diffusivity;
+
   const Real & _threshold;
 
   MaterialProperty<Real> & _diffusivity;
+
+  const bool _test_different_procs;
+
+  const bool _test_invalid_recover;
+  const Real _invalid_after_time = 0.0;
+
+  const bool _flag_solution_warning;
 };

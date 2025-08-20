@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,13 +32,11 @@ public:
   // Splitting Constructor
   MaxQpsThread(MaxQpsThread & x, Threads::split split);
 
-  void operator()(const ConstElemRange & range);
+  void operator()(const libMesh::ConstElemRange & range);
 
   void join(const MaxQpsThread & y);
 
   unsigned int max() const { return _max; }
-
-  unsigned int max_shape_funcs() const { return _max_shape_funcs; }
 
 protected:
   FEProblemBase & _fe_problem;
@@ -47,7 +45,4 @@ protected:
 
   /// Maximum number of qps encountered
   unsigned int _max;
-
-  /// Maximum number of shape functions encountered
-  unsigned int _max_shape_funcs;
 };

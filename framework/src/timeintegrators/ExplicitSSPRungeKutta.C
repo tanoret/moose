@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,8 @@
 
 // libMesh includes
 #include "libmesh/nonlinear_solver.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", ExplicitSSPRungeKutta);
 
@@ -30,13 +32,11 @@ ExplicitSSPRungeKutta::validParams()
 
 ExplicitSSPRungeKutta::ExplicitSSPRungeKutta(const InputParameters & parameters)
   : ExplicitTimeIntegrator(parameters),
-
     _order(getParam<MooseEnum>("order")),
-
     _stage(0),
-    _solution_intermediate_stage(_nl.addVector("solution_intermediate_stage", false, GHOSTED)),
-    _tmp_solution(_nl.addVector("tmp_solution", false, GHOSTED)),
-    _tmp_mass_solution_product(_nl.addVector("tmp_mass_solution_product", false, GHOSTED))
+    _solution_intermediate_stage(addVector("solution_intermediate_stage", false, GHOSTED)),
+    _tmp_solution(addVector("tmp_solution", false, GHOSTED)),
+    _tmp_mass_solution_product(addVector("tmp_mass_solution_product", false, GHOSTED))
 {
   // For SSPRK methods up to order 3, the number of stages equals the order
   _n_stages = _order;
@@ -69,13 +69,13 @@ void
 ExplicitSSPRungeKutta::computeTimeDerivatives()
 {
   // Only the Jacobian needs to be computed, since the mass matrix needs it
-  _du_dot_du = 1.0 / (_b[_stage] * _dt);
+  computeDuDotDu();
 }
 
 void
 ExplicitSSPRungeKutta::computeADTimeDerivatives(ADReal & ad_u_dot,
                                                 const dof_id_type & dof,
-                                                DualReal & /*ad_u_dotdot*/) const
+                                                ADReal & /*ad_u_dotdot*/) const
 {
   // Note that if the solution for the current stage is not a nullptr, then neither
   // are the previous stages.
@@ -123,9 +123,9 @@ ExplicitSSPRungeKutta::solve()
     else
     {
       // Else must be the intermediate stage of the 3-stage method
-      _solution_intermediate_stage = *_solution;
-      _solution_intermediate_stage.close();
-      _solution_stage[_stage] = &_solution_intermediate_stage;
+      *_solution_intermediate_stage = *_solution;
+      _solution_intermediate_stage->close();
+      _solution_stage[_stage] = _solution_intermediate_stage;
     }
 
     // Set stage time for residual evaluation
@@ -136,24 +136,30 @@ ExplicitSSPRungeKutta::solve()
     if (!converged)
       return;
   }
+
+  if (_stage == _n_stages)
+    // We made it to the end of the solve. We may call functions like computeTimeDerivatives later
+    // for postprocessing purposes in which case we need to ensure we're accessing our data
+    // correctly (e.g. not out-of-bounds)
+    --_stage;
 }
 
 bool
 ExplicitSSPRungeKutta::solveStage()
 {
   // Compute the mass matrix
-  _nl.computeTimeDerivatives();
+  computeTimeDerivatives();
   auto & mass_matrix = _nonlinear_implicit_system->get_system_matrix();
   _fe_problem.computeJacobianTag(
       *_nonlinear_implicit_system->current_local_solution, mass_matrix, _Ke_time_tag);
 
   // Compute RHS vector using previous stage solution in steady-state residual
-  _explicit_residual.zero();
-  _fe_problem.computeResidual(*_nonlinear_implicit_system->current_local_solution,
-                              _explicit_residual);
+  _explicit_residual->zero();
+  _fe_problem.computeResidual(
+      *_nonlinear_implicit_system->current_local_solution, *_explicit_residual, _nl->number());
 
   // Move the residual to the RHS
-  _explicit_residual *= -1.0;
+  *_explicit_residual *= -1.0;
 
   // Perform the linear solve
   bool converged = performExplicitSolve(mass_matrix);
@@ -161,7 +167,7 @@ ExplicitSSPRungeKutta::solveStage()
   // Update the solution: u^(s) = u^(s-1) + du^(s)
   (*_nonlinear_implicit_system->solution).zero();
   *_nonlinear_implicit_system->solution = *(_solution_stage[_stage]);
-  *_nonlinear_implicit_system->solution += _solution_update;
+  *_nonlinear_implicit_system->solution += *_solution_update;
 
   // Enforce contraints on the solution
   DofMap & dof_map = _nonlinear_implicit_system->get_dof_map();
@@ -169,7 +175,7 @@ ExplicitSSPRungeKutta::solveStage()
                                       _nonlinear_implicit_system->solution.get());
   _nonlinear_implicit_system->update();
 
-  _nl.setSolution(*_nonlinear_implicit_system->current_local_solution);
+  _nl->setSolution(*_nonlinear_implicit_system->current_local_solution);
 
   _nonlinear_implicit_system->nonlinear_solver->converged = converged;
 
@@ -180,24 +186,30 @@ void
 ExplicitSSPRungeKutta::postResidual(NumericVector<Number> & residual)
 {
   // The time residual is not included in the steady-state residual
-  residual += _Re_non_time;
+  residual += *_Re_non_time;
 
   // Compute \sum_{k=0}^{s-1} a_{s,k} u^(k) - u^(s-1)
-  _tmp_solution.zero();
+  _tmp_solution->zero();
   for (unsigned int k = 0; k <= _stage; k++)
-    _tmp_solution.add(_a[_stage][k], *(_solution_stage[k]));
-  _tmp_solution.add(-1.0, *(_solution_stage[_stage]));
-  _tmp_solution.close();
+    _tmp_solution->add(_a[_stage][k], *(_solution_stage[k]));
+  _tmp_solution->add(-1.0, *(_solution_stage[_stage]));
+  _tmp_solution->close();
 
   // Perform mass matrix product with the above vector
   auto & mass_matrix = _nonlinear_implicit_system->get_system_matrix();
-  mass_matrix.vector_mult(_tmp_mass_solution_product, _tmp_solution);
+  mass_matrix.vector_mult(*_tmp_mass_solution_product, *_tmp_solution);
 
   // Finish computing residual vector (before modification by nodal BCs)
-  residual -= _tmp_mass_solution_product;
+  residual -= *_tmp_mass_solution_product;
 
   residual.close();
 
   // Set time at which to evaluate nodal BCs
   _fe_problem.time() = _current_time;
+}
+
+Real
+ExplicitSSPRungeKutta::duDotDuCoeff() const
+{
+  return Real(1) / _b[_stage];
 }

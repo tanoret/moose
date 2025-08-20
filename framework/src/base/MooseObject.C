@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,7 @@
 #include "MooseObject.h"
 #include "MooseApp.h"
 #include "MooseUtils.h"
+#include "Factory.h"
 
 class FEProblem;
 class FEProblemBase;
@@ -18,13 +19,7 @@ class EigenProblem;
 class SubProblem;
 class SystemBase;
 class AuxiliarySystem;
-class Transient;
-
-std::string
-paramErrorPrefix(const InputParameters & params, const std::string & param)
-{
-  return params.errorPrefix(param);
-}
+class TransientBase;
 
 InputParameters
 MooseObject::validParams()
@@ -44,46 +39,53 @@ MooseObject::validParams()
   params.addPrivateParam<SubProblem *>("_subproblem", nullptr);
   params.addPrivateParam<SystemBase *>("_sys", nullptr);
   params.addPrivateParam<SystemBase *>("_nl_sys", nullptr);
-  params.addPrivateParam<AuxiliarySystem *>("_aux_sys", nullptr);
-  params.addPrivateParam<Transient *>("_executioner", nullptr);
+  params.addPrivateParam<TransientBase *>("_executioner", nullptr);
   params.addPrivateParam<THREAD_ID>("_tid");
   params.addPrivateParam<bool>("_residual_object", false);
   return params;
 }
 
 MooseObject::MooseObject(const InputParameters & parameters)
-  : ConsoleStreamInterface(*parameters.getCheckedPointerParam<MooseApp *>("_moose_app")),
-    ParallelObject(*parameters.getCheckedPointerParam<MooseApp *>("_moose_app")),
-    DataFileInterface<MooseObject>(*this),
-    _pars(parameters),
-    _app(*getCheckedPointerParam<MooseApp *>("_moose_app")),
-    _type(getParam<std::string>("_type")),
-    _name(getParam<std::string>("_object_name")),
+  : ParallelParamObject(parameters.get<std::string>("_type"),
+                        parameters.get<std::string>("_object_name"),
+                        *parameters.getCheckedPointerParam<MooseApp *>("_moose_app"),
+                        parameters),
     _enabled(getParam<bool>("enable"))
 {
+  if (Registry::isRegisteredObj(type()) && _app.getFactory().currentlyConstructing() != &parameters)
+    mooseError(
+        "This registered object was not constructed using the Factory, which is not supported.");
 }
 
-[[noreturn]] void
-callMooseErrorRaw(std::string & msg, MooseApp * app)
+namespace
 {
-  app->getOutputWarehouse().mooseConsole();
-  std::string prefix;
-  if (!app->isUltimateMaster())
-    prefix = app->name();
-  moose::internal::mooseErrorRaw(msg, prefix);
+const std::string not_shared_error =
+    "MooseObject::getSharedPtr() must only be called for objects that are managed by a "
+    "shared pointer. Make sure this object is build using Factory::create(...).";
 }
 
-std::string
-MooseObject::errorPrefix(const std::string & error_type) const
+std::shared_ptr<MooseObject>
+MooseObject::getSharedPtr()
 {
-  std::stringstream oss;
-  oss << "The following " << error_type << " occurred in the object \"" << name()
-      << "\", of type \"" << type() << "\".\n\n";
-  return oss.str();
+  try
+  {
+    return shared_from_this();
+  }
+  catch (std::bad_weak_ptr &)
+  {
+    mooseError(not_shared_error);
+  }
 }
 
-std::string
-MooseObject::typeAndName() const
+std::shared_ptr<const MooseObject>
+MooseObject::getSharedPtr() const
 {
-  return type() + std::string(" \"") + name() + std::string("\"");
+  try
+  {
+    return shared_from_this();
+  }
+  catch (std::bad_weak_ptr &)
+  {
+    mooseError(not_shared_error);
+  }
 }

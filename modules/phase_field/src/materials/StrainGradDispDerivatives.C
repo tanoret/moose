@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -51,7 +51,7 @@ StrainGradDispDerivatives::StrainGradDispDerivatives(const InputParameters & par
 
   for (unsigned int i = 0; i < _nvar; ++i)
     _dstrain[i] = &declarePropertyDerivative<RankTwoTensor>(
-        "elastic_strain", getVar("displacement_gradients", i)->name());
+        "elastic_strain", coupledName("displacement_gradients", i));
 }
 
 void

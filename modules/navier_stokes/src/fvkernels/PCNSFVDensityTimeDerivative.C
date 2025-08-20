@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,6 +24,7 @@ PCNSFVDensityTimeDerivative::validParams()
 
 PCNSFVDensityTimeDerivative::PCNSFVDensityTimeDerivative(const InputParameters & parameters)
   : FVTimeKernel(parameters),
+    _u_dot(_var.adUDot()),
     _eps(getMaterialProperty<Real>(NS::porosity)),
     _rho_dot(adCoupledDot(NS::density)),
     _rho(adCoupledValue(NS::density))

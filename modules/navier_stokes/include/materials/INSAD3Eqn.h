@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,6 +36,10 @@ protected:
   ADMaterialProperty<Real> & _temperature_td_strong_residual;
   ADMaterialProperty<Real> & _temperature_ambient_convection_strong_residual;
   ADMaterialProperty<Real> & _temperature_source_strong_residual;
+
+  /// The strong residual for the temperature transport term corresponding to mesh velocity in an
+  /// ALE simulation
+  ADMaterialProperty<Real> & _temperature_advected_mesh_strong_residual;
 
   bool _has_ambient_convection;
   Real _ambient_convection_alpha;

@@ -23,12 +23,11 @@
   [generated2]
     type = GeneratedMeshGenerator
     dim = 2
-    nx = 6
+    nx = 5
     ny = 15
     xmin = 0.1
     xmax = 0.6
-    # avoid edge-to-edge contact (work in progress)
-    ymax = 4.999
+    ymax = 5
     bias_y = 0.9
     boundary_name_prefix = pillar2
     boundary_id_offset = 4
@@ -41,7 +40,7 @@
   patch_update_strategy = iteration
 []
 
-[Modules/TensorMechanics/Master]
+[Physics/SolidMechanics/QuasiStatic]
   [all]
     add_variables = true
     strain = FINITE
@@ -55,6 +54,7 @@
     secondary = pillar2_left
     model = frictionless
     formulation = mortar
+    correct_edge_dropping = true
   []
 []
 
@@ -96,8 +96,8 @@
   type = Transient
   solve_type = NEWTON
   line_search = none
-  petsc_options_iname = '-pc_type'
-  petsc_options_value = 'lu'
+  petsc_options_iname = '-pc_type -pc_factor_shift_type'
+  petsc_options_value = 'lu       NONZERO'
   end_time = 5
   dt = 0.5
   [Predictor]

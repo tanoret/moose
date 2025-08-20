@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -56,13 +56,14 @@ ComputeMortarNodalAuxBndThread<AuxKernelType>::onNode(ConstBndNodeRange::const_i
   {
     const auto & kernel = _storage.getActiveBoundaryObjects(_bnd_id, _tid)[_object_container_index];
     mooseAssert(dynamic_cast<MortarNodalAuxKernel *>(kernel.get()),
-                "This should be amortar nodal aux kernel");
+                "This should be a mortar nodal aux kernel");
     _fe_problem.reinitNodeFace(node, _bnd_id, _tid);
+    kernel->compute();
+    // This is the same conditional check that the aux kernel performs internally before calling
+    // computeValue and _var.setNodalValue. We don't want to attempt to insert into the solution if
+    // we don't actually have any dofs on this node
     if (kernel->variable().isNodalDefined())
-    {
-      kernel->compute();
       kernel->variable().insert(_aux_sys.solution());
-    }
   }
 }
 

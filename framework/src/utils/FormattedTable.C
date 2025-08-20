@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,12 +15,6 @@
 
 #include <iomanip>
 #include <iterator>
-
-// Used for terminal width
-#ifndef __WIN32__
-#include <sys/ioctl.h>
-#endif
-#include <cstdlib>
 
 const unsigned short FormattedTable::_column_width = 15;
 const unsigned short FormattedTable::_min_pps_width = 40;
@@ -228,7 +222,9 @@ FormattedTable::printNoDataRow(char intersect_char,
                                std::vector<std::string>::iterator & col_end) const
 {
   out.fill(fill_char);
-  out << std::right << intersect_char << std::setw(_column_width + 2) << intersect_char;
+  out << std::right << intersect_char;
+  if (_output_time)
+    out << std::setw(_column_width + 2) << intersect_char;
   for (auto header_it = col_begin; header_it != col_end; ++header_it)
     out << std::setw(col_widths[*header_it] + 2) << intersect_char;
   out << "\n";
@@ -258,9 +254,9 @@ FormattedTable::printTable(std::ostream & out,
   unsigned short term_width;
 
   if (suggested_term_width == "ENVIRONMENT")
-    term_width = getTermWidth(true);
+    term_width = MooseUtils::getTermWidth(true);
   else if (suggested_term_width == "AUTO")
-    term_width = getTermWidth(false);
+    term_width = MooseUtils::getTermWidth(false);
   else
     term_width = MooseUtils::stringToInteger(suggested_term_width);
 
@@ -312,8 +308,10 @@ FormattedTable::printTablePiece(std::ostream & out,
    * Print out the header row
    */
   printRowDivider(out, col_widths, col_begin, col_end);
-  out << "|" << std::setw(_column_width) << std::left << " time"
-      << " |";
+  out << "|";
+  if (_output_time)
+    out << std::setw(_column_width) << std::left << " time"
+        << " |";
   for (auto header_it = col_begin; header_it != col_end; ++header_it)
     out << " " << std::setw(col_widths[*header_it]) << *header_it << "|";
   out << "\n";
@@ -334,8 +332,9 @@ FormattedTable::printTablePiece(std::ostream & out,
   // Now print the remaining data rows
   for (; data_it != _data.end(); ++data_it)
   {
-    out << "|" << std::right << std::setw(_column_width) << std::scientific << data_it->first
-        << " |";
+    out << "|";
+    if (_output_time)
+      out << std::right << std::setw(_column_width) << std::scientific << data_it->first << " |";
     for (auto header_it = col_begin; header_it != col_end; ++header_it)
     {
       auto & tmp = data_it->second;
@@ -581,50 +580,6 @@ FormattedTable::fillEmptyValues()
       if (!it.second[col_name])
         it.second[col_name] =
             std::dynamic_pointer_cast<TableValueBase>(std::make_shared<TableValue<char>>('0'));
-}
-
-unsigned short
-FormattedTable::getTermWidth(bool use_environment) const
-{
-#ifndef __WIN32__
-  struct winsize w;
-#else
-  struct
-  {
-    unsigned short ws_col;
-  } w;
-#endif
-  /**
-   * Initialize the value we intend to populate just in case
-   * the system call fails
-   */
-  w.ws_col = std::numeric_limits<unsigned short>::max();
-
-  if (use_environment)
-  {
-    char * pps_width = std::getenv("MOOSE_PPS_WIDTH");
-    if (pps_width != NULL)
-    {
-      std::stringstream ss(pps_width);
-      ss >> w.ws_col;
-    }
-  }
-  else
-  {
-#ifndef __WIN32__
-    try
-    {
-      ioctl(0, TIOCGWINSZ, &w);
-    }
-    catch (...)
-#endif
-    {
-      // Something bad happened, make sure we have a sane value
-      w.ws_col = std::numeric_limits<unsigned short>::max();
-    }
-  }
-
-  return w.ws_col;
 }
 
 MooseEnum

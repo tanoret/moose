@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,8 +22,14 @@ public:
 protected:
   virtual void check() const override;
 
+  /// Heat structure name
+  const std::string & _hs_name;
+
   /// Names of the heat structure regions where heat generation is to be applied
   const std::vector<std::string> & _region_names;
+
+  /// Names of the heat structure subdomains corresponding to the given regions
+  std::vector<SubdomainName> _subdomain_names;
 
 public:
   static InputParameters validParams();

@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,17 +27,25 @@ class SchemaDiff(RunApp):
     def __init__(self, name, params):
         RunApp.__init__(self, name, params)
         if self.specs['required_python_packages'] is None:
-            self.specs['required_python_packages'] = 'deepdiff'
+            self.specs['required_python_packages'] = 'deepdiff>=6.1.0'
         elif 'deepdiff' not in self.specs['required_python_packages']:
-            self.specs['required_python_packages'] += ' deepdiff'
+            self.specs['required_python_packages'] += ' deepdiff>=6.1.0'
+        if 'packaging' not in self.specs['required_python_packages']:
+            self.specs['required_python_packages'] += ' packaging'
+
+        # So that derived classes can internally pass skip regex paths
+        self.exclude_regex_paths = []
+
+    def getOutputFiles(self, options):
+        return self.specs['schemadiff']
 
     def prepare(self, options):
         if self.specs['delete_output_before_running'] == True:
-            util.deleteFilesAndFolders(self.getTestDir(), self.specs['schemadiff'])
+            util.deleteFilesAndFolders(self.getTestDir(), self.getOutputFiles(options))
 
-    def processResults(self, moose_dir, options, output):
-        output += self.testFileOutput(moose_dir, options, output)
-        self.testExitCodes(moose_dir, options, output)
+    def processResults(self, moose_dir, options, exit_code, runner_output):
+        output = super().processResults(moose_dir, options, exit_code, runner_output)
+
         specs = self.specs
 
         if self.isFail() or specs['skip_checks']:
@@ -93,6 +101,8 @@ class SchemaDiff(RunApp):
     def do_deepdiff(self,orig, comp, rel_err, abs_zero, exclude_values:list=None):
         import deepdiff
         from deepdiff.operator import BaseOperator
+        from packaging.version import Version
+
         class testcompare(BaseOperator):
             def __init__(self, rel_err,abs_zero,types,regex_paths=None):
                 self.rel_err = rel_err
@@ -140,19 +150,39 @@ class SchemaDiff(RunApp):
                         return True #if the values in the pseudo-list are different, but all fall within the accepted rel_err, the list is skipped for diffing.
                     except ValueError:
                         return False
-        to_exclude = []
+        exclude_paths = []
         if exclude_values:
             for value in exclude_values:
                 search = orig | deepdiff.search.grep(value, case_sensitive=True)
                 search2 = comp | deepdiff.search.grep(value, case_sensitive=True)
                 if search:
                     for path in search["matched_paths"]:
-                        to_exclude.append(path)
+                        exclude_paths.append(path)
                 if search2:
                     for path in search2["matched_paths"]:
-                        to_exclude.append(path)
+                        exclude_paths.append(path)
 
-        return deepdiff.DeepDiff(orig,comp,exclude_paths=to_exclude,custom_operators=[testcompare(types=[str,float],rel_err=rel_err,abs_zero=abs_zero)]).pretty()
+        custom_operators = [testcompare(types=[str,float],rel_err=rel_err,abs_zero=abs_zero)]
+        args = [orig, comp]
+        kwargs = {'exclude_paths': exclude_paths,
+                  'exclude_regex_paths': self.exclude_regex_paths,
+                  'custom_operators': custom_operators}
+
+        # 8.0.0 introduces and sets threshold_to_diff_deeper=0.33; this reverts
+        # to the previous behavior. If a dict is different enough, it'll report
+        # the whole thing as different instead of listing a large amount of keys
+        # that are different. We would prefer to see all of the individual
+        # keys that are different. It also seems like the "significant difference"
+        # measure is done before things are excluded, which doesn't work with
+        # how much we exclude from the system information by default. This might
+        # be a bug, but I'm not sure. Even if it is a bug, we still want to see
+        # each key individually as being different instead of the whole thing
+        # being different.
+        deepdiff_version = Version(deepdiff.__version__)
+        if deepdiff_version >= Version('8.0.0'):
+            kwargs['threshold_to_diff_deeper'] = 0
+
+        return deepdiff.DeepDiff(*args, **kwargs).pretty()
 
     #this is how we call the load_file in the derived classes, and also check for exceptions in the load
     #all python functions are virtual, so there is no templating, but some self shenanigans required
@@ -161,5 +191,3 @@ class SchemaDiff(RunApp):
             return self.load_file(path1)
         except Exception as e:
             return e
-
-

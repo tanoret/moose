@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,6 +16,9 @@
 #include "libmesh/enum_order.h"
 #include "libmesh/enum_quadrature_type.h"
 #include "libmesh/enum_fe_family.h"
+#include "libmesh/enum_elem_type.h"
+
+#include <variant>
 
 // Forward declarations
 class MultiMooseEnum;
@@ -31,10 +34,10 @@ template <typename T>
 T stringToEnum(const std::string & s);
 
 template <>
-QuadratureType stringToEnum<QuadratureType>(const std::string & s);
+libMesh::QuadratureType stringToEnum<libMesh::QuadratureType>(const std::string & s);
 
 template <>
-Order stringToEnum<Order>(const std::string & s);
+libMesh::Order stringToEnum<libMesh::Order>(const std::string & s);
 
 template <>
 CoordinateSystemType stringToEnum<CoordinateSystemType>(const std::string & s);
@@ -63,6 +66,13 @@ stringify(const T & t)
   std::ostringstream os;
   os << t;
   return os.str();
+}
+
+// overload for boolean type instead of simply printing 0 or 1
+inline std::string
+stringify(bool v)
+{
+  return v ? "true" : "false";
 }
 
 // overloads for integer types where std::to_string gives the same result and is faster
@@ -97,6 +107,23 @@ stringify(unsigned long long v)
   return std::to_string(v);
 }
 
+namespace internal
+{
+template <typename T, typename V>
+inline std::string
+stringify_variant(const V & value)
+{
+  return std::holds_alternative<T>(value) ? stringify(std::get<T>(value)) : "";
+}
+}
+
+template <typename... T>
+inline std::string
+stringify(std::variant<T...> v)
+{
+  return (internal::stringify_variant<T>(v) + ...);
+}
+
 /// Convert solve type into human readable string
 std::string stringify(const SolveType & t);
 
@@ -110,7 +137,16 @@ std::string stringify(const VarFieldType & t);
 std::string stringify(const std::string & s);
 
 /// Convert FEType from libMesh into string
-std::string stringify(FEFamily f);
+std::string stringify(libMesh::FEFamily f);
+
+/// Convert SolutionIterationType into string
+std::string stringify(SolutionIterationType t);
+
+/// Convert ElementType into string
+std::string stringify(ElementType t);
+
+/// Convert the libmesh ElemType into string
+std::string stringify(libMesh::ElemType t);
 
 /// Add pair stringify to support maps
 template <typename T, typename U>
@@ -136,7 +172,7 @@ stringify(const std::pair<T, U> & p, const std::string & delim = ":")
 template <template <typename...> class T, typename... U>
 std::string
 stringify(const T<U...> & c,
-          const std::string & delim = ",",
+          const std::string & delim = ", ",
           const std::string & elem_encl = "",
           bool enclose_list_in_curly_braces = false)
 {

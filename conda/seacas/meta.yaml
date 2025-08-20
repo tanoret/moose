@@ -1,7 +1,7 @@
 # MAKE SURE THAT seacas_version and seacas_git_rev match if performing a version update!
-{% set build = "0" %}
-{% set seacas_version = "2022.10.14" %}
-{% set seacas_git_rev = "v2022-10-14" %}
+{% set build = "1" %}
+{% set seacas_version = "2025.02.27" %}
+{% set seacas_git_rev = "v2025-02-27" %}
 {% set strbuild = "build_" + build|string %}
 
 package:
@@ -9,10 +9,11 @@ package:
   version: {{ seacas_version }}
 
 source:
-  git_url: https://github.com/sandialabs/seacas
-  git_rev: {{ seacas_git_rev }}
-  patches:
-    - use-curl-instead-of-wget.patch
+  - git_url: https://github.com/sandialabs/seacas
+  - git_rev: {{ seacas_git_rev }}
+  - path: ../functions/retry_build.sh
+  - patches:
+    - sequoia15.4_curl.patch
 
 build:
   number: {{ build }}
@@ -22,14 +23,19 @@ build:
 
 requirements:
   build:
-    - {{ compiler('c') }}
-    - {{ compiler('cxx') }}
-    - {{ compiler('fortran') }}
-    - xorg-libx11
-    - cmake
+    - {{ moose_cc }}
+    - {{ moose_cxx }}
+    - {{ moose_gfortran }}
+    - {{ moose_ccompiler }}
+    - {{ moose_cxxcompiler }}
+    - xorg-libx11 1.8.9
+    - {{ moose_cmake }}
     - make
     - automake
   run:
+    - {{ moose_gfortran }}
+    - {{ moose_ccompiler }}
+    - {{ moose_cxxcompiler }}
     - xorg-libx11
     - python 3
 

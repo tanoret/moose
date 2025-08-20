@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -92,7 +92,7 @@ ElementExtremeMaterialPropertyTempl<is_ad>::computeQpValue()
 
 template <bool is_ad>
 Real
-ElementExtremeMaterialPropertyTempl<is_ad>::getValue()
+ElementExtremeMaterialPropertyTempl<is_ad>::getValue() const
 {
   return _value;
 }
@@ -116,8 +116,7 @@ template <bool is_ad>
 void
 ElementExtremeMaterialPropertyTempl<is_ad>::threadJoin(const UserObject & y)
 {
-  const ElementExtremeMaterialPropertyTempl<is_ad> & pps =
-      static_cast<const ElementExtremeMaterialPropertyTempl<is_ad> &>(y);
+  const auto & pps = static_cast<const ElementExtremeMaterialPropertyTempl<is_ad> &>(y);
 
   switch (_type)
   {

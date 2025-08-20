@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,11 +8,16 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "DumpObjectsProblem.h"
+#include "DumpObjectsAction.h"
 #include "DumpObjectsNonlinearSystem.h"
+#include "DumpObjectsLinearSystem.h"
 #include "AuxiliarySystem.h"
+#include "InputParameters.h"
 #include <sstream>
 
 #include "libmesh/string_to_enum.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", DumpObjectsProblem);
 
@@ -23,23 +28,63 @@ DumpObjectsProblem::validParams()
   params.addClassDescription("Single purpose problem object that does not run the given input but "
                              "allows deconstructing actions into their series of underlying Moose "
                              "objects and variables.");
-  params.addRequiredParam<std::string>(
-      "dump_path", "Syntax path of the action of which to dump the generated syntax");
+  params.addParam<std::string>(
+      "dump_path", "all", "Syntax path of the action of which to dump the generated syntax");
+  params.addParam<bool>(
+      "include_all_user_specified_params",
+      true,
+      "Whether to include all parameters that have been specified by a user in the dump, even if "
+      "they match the default value of the parameter in the Factory");
+
+  // Change the default because any complex solve or executioners needs the problem to perform its
+  // setup duties (all the calls in initialSetup()) which are skipped by the DumpObjectsProblem
+  params.addParam<bool>(
+      "solve",
+      false,
+      "Whether to attempt to solve the Problem. This will only cause additional outputs of the "
+      "objects and their parameters. This is unlikely to succeed with more complex executioners.");
   return params;
 }
 
 DumpObjectsProblem::DumpObjectsProblem(const InputParameters & parameters)
-  : FEProblemBase(parameters), _nl_sys(std::make_shared<DumpObjectsNonlinearSystem>(*this, "nl0"))
+  : FEProblemBase(parameters),
+    _include_all_user_specified_params(getParam<bool>("include_all_user_specified_params"))
 {
-  _nl[0] = _nl_sys;
+  // Make dummy systems based on parameters passed
+  _solver_systems.resize(0);
+  for (const auto i : index_range(_nl_sys_names))
+  {
+    const auto & sys_name = _nl_sys_names[i];
+    const auto & new_sys = std::make_shared<DumpObjectsNonlinearSystem>(*this, sys_name);
+    _solver_systems.push_back(new_sys);
+    _nl[i] = new_sys;
+  }
+  for (const auto i : index_range(_linear_sys_names))
+  {
+    const auto & sys_name = _linear_sys_names[i];
+    const auto & new_sys = std::make_shared<DumpObjectsLinearSystem>(*this, sys_name);
+    _solver_systems.push_back(new_sys);
+    _linear_systems[i] = new_sys;
+  }
   _aux = std::make_shared<AuxiliarySystem>(*this, "aux0");
-  newAssemblyArray(_nl);
+
+  // Create a dummy assembly for the systems at hand
+  newAssemblyArray(_solver_systems);
 
   // Create extra vectors and matrices if any
   createTagVectors();
 
   // Create extra solution vectors if any
   createTagSolutions();
+
+  // Add an action to call printObjects at the end of the action/tasks phase
+  // NOTE: We previously relied on problem.solve() but some executioners (SIMPLE in NavierStokes) do
+  // not support this
+  auto action_params = _app.getActionFactory().getValidParams("DumpObjectsAction");
+  action_params.applyParameters(parameters);
+  auto dump_objects_action =
+      _app.getActionFactory().create("DumpObjectsAction", "dump_objects", action_params);
+  _app.actionWarehouse().addActionBlock(dump_objects_action);
 }
 
 std::string
@@ -56,8 +101,12 @@ DumpObjectsProblem::deduceNecessaryParameters(const std::string & type,
     const auto & param_name = value_pair.first;
     const auto & param_value = value_pair.second;
 
+    // determine whether to include the parameter
     auto factory_it = factory_params.find(param_name);
-    if (factory_it == factory_params.end() || factory_it->second != param_value)
+    bool include_param = (factory_it->second != param_value);
+    if (_include_all_user_specified_params)
+      include_param = include_param || parameters.isParamSetByUser(param_name);
+    if (factory_it == factory_params.end() || include_param)
       param_text += "    " + param_name + " = " + param_value + '\n';
   }
 
@@ -75,10 +124,10 @@ DumpObjectsProblem::dumpObjectHelper(const std::string & system,
 
   // clang-format off
   _generated_syntax[path][system] +=
-        "  [./" + name + "]\n"
+        "  [" + name + "]\n"
       + "    type = " + type + '\n'
       +      param_text
-      + "  [../]\n";
+      + "  []\n";
   // clang-format on
 }
 
@@ -123,16 +172,20 @@ DumpObjectsProblem::dumpVariableHelper(const std::string & system,
 
   // clang-format off
   _generated_syntax[path][system] +=
-        "  [./" + var_name + "]\n"
+        "  [" + var_name + "]\n"
       +      param_text
-      + "  [../]\n";
+      + "  []\n";
   // clang-format on
 }
 
 void
-DumpObjectsProblem::solve(unsigned int)
+DumpObjectsProblem::printObjects()
 {
-  dumpGeneratedSyntax(getParam<std::string>("dump_path"));
+  const auto path = getParam<std::string>("dump_path");
+  if (path != "all")
+    dumpGeneratedSyntax(path);
+  else
+    dumpAllGeneratedSyntax();
 }
 
 void
@@ -145,6 +198,17 @@ DumpObjectsProblem::dumpGeneratedSyntax(const std::string path)
   Moose::out << "**START DUMP DATA**\n";
   for (const auto & system_pair : pathit->second)
     Moose::out << '[' << system_pair.first << "]\n" << system_pair.second << "[]\n\n";
+  Moose::out << "**END DUMP DATA**\n";
+  Moose::out << std::flush;
+}
+
+void
+DumpObjectsProblem::dumpAllGeneratedSyntax() const
+{
+  Moose::out << "**START DUMP DATA**\n";
+  for (const auto & path : _generated_syntax)
+    for (const auto & system_pair : path.second)
+      Moose::out << '[' << system_pair.first << "]\n" << system_pair.second << "[]\n\n";
   Moose::out << "**END DUMP DATA**\n";
   Moose::out << std::flush;
 }

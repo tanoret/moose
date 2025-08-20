@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,6 +18,7 @@ THMSpecificInternalEnergyAux::validParams()
   params.addRequiredCoupledVar("rhoA", "Conserved density");
   params.addRequiredCoupledVar("rhouA", "Conserved momentum");
   params.addRequiredCoupledVar("rhoEA", "Conserved total energy");
+  params.addClassDescription("Computed the specific internal energy.");
   return params;
 }
 

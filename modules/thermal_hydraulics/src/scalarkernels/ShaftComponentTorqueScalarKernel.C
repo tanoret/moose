@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -55,5 +55,5 @@ ShaftComponentTorqueScalarKernel::computeJacobian()
   std::vector<dof_id_type> dofs_j;
   _shaft_connected_component_uo.getTorqueJacobianData(jacobian_block, dofs_j);
   jacobian_block.scale(-1);
-  _assembly.cacheJacobianBlock(jacobian_block, _var.dofIndices(), dofs_j, _var.scalingFactor());
+  addJacobian(_assembly, jacobian_block, _var.dofIndices(), dofs_j, _var.scalingFactor());
 }

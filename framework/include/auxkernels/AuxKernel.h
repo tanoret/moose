@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,7 +29,7 @@
 #include "MooseVariableInterface.h"
 #include "ElementIDInterface.h"
 #include "UserObject.h"
-#include "FunctorInterface.h"
+#include "NonADFunctorInterface.h"
 
 // forward declarations
 template <typename ComputeValueType>
@@ -67,7 +67,7 @@ class AuxKernelTempl : public MooseObject,
                        public MeshChangedInterface,
                        protected VectorPostprocessorInterface,
                        public ElementIDInterface,
-                       protected FunctorInterface
+                       protected NonADFunctorInterface
 {
 public:
   static InputParameters validParams();
@@ -115,6 +115,11 @@ public:
   const MaterialProperty<T> & getMaterialPropertyOld(const std::string & name);
   template <typename T>
   const MaterialProperty<T> & getMaterialPropertyOlder(const std::string & name);
+
+  /**
+   * Insert the just computed values into the auxiliary solution vector
+   */
+  void insert();
 
 protected:
   /**
@@ -174,9 +179,6 @@ protected:
   /// Holds the solution at current quadrature points
   const typename OutputTools<ComputeValueType>::VariableValue & _u;
 
-  /// Holds the the test functions
-  const typename OutputTools<ComputeValueType>::VariableTestValue & _test;
-
   /// Assembly class
   Assembly & _assembly;
 
@@ -186,6 +188,9 @@ protected:
   MooseMesh & _mesh;
   /// Dimension of the problem being solved
   //  unsigned int _dim;
+
+  /// Holds the the test functions
+  const typename OutputTools<ComputeValueType>::VariableTestValue & _test;
 
   /// Active quadrature points
   const MooseArray<Point> & _q_point;
@@ -213,6 +218,13 @@ protected:
 
   /// reference to the solution vector of auxiliary system
   NumericVector<Number> & _solution;
+
+  /// The current lower dimensional element
+  const Elem * const & _current_lower_d_elem;
+
+  /// Whether we are computing for a lower dimensional variable using boundary restriction, e.g. a
+  /// variable whose block restriction is coincident with a higher-dimensional boundary face
+  const bool _coincident_lower_d_calc;
 
   /// Quadrature point index
   unsigned int _qp;
@@ -321,3 +333,16 @@ AuxKernelTempl<ComputeValueType>::getMaterialPropertyOlder(const std::string & n
 
   return MaterialPropertyInterface::getMaterialPropertyOlder<T>(name);
 }
+
+// Declare all the specializations, as the template specialization declaration below must know
+template <>
+void AuxKernelTempl<Real>::setDofValueHelper(const Real & value);
+template <>
+void AuxKernelTempl<RealVectorValue>::setDofValueHelper(const RealVectorValue &);
+template <>
+void AuxKernelTempl<RealEigenVector>::compute();
+
+// Prevent implicit instantiation in other translation units where these classes are used
+extern template class AuxKernelTempl<Real>;
+extern template class AuxKernelTempl<RealVectorValue>;
+extern template class AuxKernelTempl<RealEigenVector>;

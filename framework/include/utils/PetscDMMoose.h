@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,7 +24,17 @@
 class NonlinearSystemBase;
 
 extern PetscErrorCode DMMooseRegisterAll();
-extern PetscErrorCode DMCreateMoose(MPI_Comm, NonlinearSystemBase &, DM *);
+
+/**
+ * Create a MOOSE DM
+ * @param comm The communicator that the DM should use
+ * @param nl The nonlinear system context that the DM is associated with
+ * @param dm_name A name to associate with the DM
+ * @param dm A pointer to the PETSc DM
+ */
+extern PetscErrorCode
+DMCreateMoose(MPI_Comm comm, NonlinearSystemBase & nl, const std::string & dm_name, DM * dm);
+
 extern PetscErrorCode DMMooseReset(DM);
 extern PetscErrorCode DMMooseSetNonlinearSystem(DM, NonlinearSystemBase &);
 extern PetscErrorCode DMMooseGetNonlinearSystem(DM, NonlinearSystemBase *&);

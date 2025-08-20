@@ -1,0 +1,168 @@
+//* This file is part of the MOOSE framework
+//* https://mooseframework.inl.gov
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
+#pragma once
+
+#include "HeatConductionNames.h"
+#include "MooseFunctor.h"
+#include "HeatTransferModels.h"
+
+namespace HeatTransferModels
+{
+
+/**
+ * Computes the thermal conductance across a cylindrical medium.
+ *
+ * Note that thermal conductance has the same units as a heat transfer coefficient.
+ *
+ * @param[in] k        Thermal conductivity of the medium
+ * @param[in] r_inner  Inner radius
+ * @param[in] r_outer  Outer radius
+ */
+template <typename T1, typename T2, typename T3>
+auto
+cylindricalThermalConductance(const T1 & k, const T2 & r_inner, const T3 & r_outer)
+{
+  mooseAssert(r_outer > r_inner, "Outer radius must be larger than inner radius.");
+
+  const auto r_avg = 0.5 * (r_inner + r_outer);
+  return k / (r_avg * std::log(r_outer / r_inner));
+}
+
+/**
+ * Computes the conduction heat flux across a cylindrical gap.
+ *
+ * The convention is that positive heat fluxes correspond to heat moving from
+ * the inner surface to the outer surface.
+ *
+ * @param[in] k_gap    Gap thermal conductivity
+ * @param[in] r_inner  Inner radius
+ * @param[in] r_outer  Outer radius
+ * @param[in] T_inner  Inner temperature
+ * @param[in] T_outer  Outer temperature
+ */
+template <typename T1, typename T2, typename T3, typename T4, typename T5>
+auto
+cylindricalGapConductionHeatFlux(const T1 & k_gap,
+                                 const T2 & r_inner,
+                                 const T3 & r_outer,
+                                 const T4 & T_inner,
+                                 const T5 & T_outer)
+{
+  return cylindricalThermalConductance(k_gap, r_inner, r_outer) * (T_inner - T_outer);
+}
+
+/**
+ * Computes the radiation heat flux across a cylindrical gap.
+ *
+ * The convention is that positive heat fluxes correspond to heat moving from
+ * the inner surface to the outer surface.
+ *
+ * @param[in] r_inner      Inner radius
+ * @param[in] r_outer      Outer radius
+ * @param[in] emiss_inner  Inner emissivity
+ * @param[in] emiss_outer  Outer emissivity
+ * @param[in] T_inner      Inner temperature
+ * @param[in] T_outer      Outer temperature
+ * @param[in] sigma        The Stefan-Boltzmann constant
+ */
+template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+auto
+cylindricalGapRadiationHeatFlux(const T1 & r_inner,
+                                const T2 & r_outer,
+                                const T3 & emiss_inner,
+                                const T4 & emiss_outer,
+                                const T5 & T_inner,
+                                const T6 & T_outer,
+                                const Real & sigma = HeatConduction::Constants::sigma)
+{
+  mooseAssert(r_outer > r_inner, "Outer radius must be larger than inner radius.");
+
+  const auto rad_resistance =
+      1.0 / emiss_inner + r_inner / r_outer * (1.0 - emiss_outer) / emiss_outer;
+  return sigma * (std::pow(T_inner, 4) - std::pow(T_outer, 4)) / rad_resistance;
+}
+
+
+  /* ------------------------------------------------------------------ */
+  /*        Generic, error‑controlled adaptive‑Simpson integrator        */
+  /* ------------------------------------------------------------------ */
+  template <typename Scalar, typename Fun>
+  Scalar
+  adaptiveSimpson(const Fun  & f,
+                  Scalar       a,
+                  Scalar       b,
+                  Scalar       abs_tol = Scalar(1E-8),
+                  Scalar       rel_tol = Scalar(1E-6),
+                  unsigned     max_depth = 20)
+  {
+    auto simpson = [&](Scalar x0, Scalar x1) -> Scalar
+    {
+      const Scalar xm = Scalar(0.5) * (x0 + x1);
+      return (x1 - x0) * (f(x0) + Scalar(4) * f(xm) + f(x1)) / Scalar(6);
+    };
+
+    std::function<Scalar(Scalar, Scalar, Scalar, Scalar, unsigned)> recurse =
+        [&](Scalar x0, Scalar x1, Scalar S0, Scalar tol, unsigned depth) -> Scalar
+    {
+      const Scalar xm = Scalar(0.5) * (x0 + x1);
+      const Scalar Sl = simpson(x0, xm);
+      const Scalar Sr = simpson(xm, x1);
+      const Scalar err = std::fabs(Sl + Sr - S0);
+
+      if (err < tol || depth == 0)
+        return Sl + Sr + err / Scalar(15);     // Richardson correction
+
+      return recurse(x0, xm, Sl, tol * Scalar(0.5), depth-1) +
+            recurse(xm, x1, Sr, tol * Scalar(0.5), depth-1);
+    };
+
+    const Scalar S0  = simpson(a, b);
+    const Scalar tol = std::max(abs_tol, rel_tol * std::fabs(S0));
+
+    return recurse(a, b, S0, tol, max_depth);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*      Band‑integrated Planck emission  (4π κ n₁² ϵ_bb(ν,T) dν)       */
+  /* ------------------------------------------------------------------ */
+  template <typename Scalar>
+  Scalar
+  integratedPlanckBand(Scalar n1,
+                      Scalar kappa,
+                      Scalar T,
+                      Scalar nu_a,
+                      Scalar nu_b,
+                      Scalar abs_tol = Scalar(1E-8),
+                      Scalar rel_tol = Scalar(1E-6))
+  {
+    const Scalar n1_sq = n1 * n1;
+
+    // Plank spectrum
+    auto planck = [=](Scalar nu) -> Scalar
+    {
+      const Scalar pre = Scalar(2) * n1_sq * HeatConduction::Constants::hp *
+                        nu * nu * nu / Utility::pow<2>(HeatConduction::Constants::c);
+
+      const Scalar expo = HeatConduction::Constants::hp * nu /
+                          (HeatConduction::Constants::kb * T);
+
+      const Scalar inv  = std::exp(expo) - Scalar(1);
+      // if(nu_a < 1e5) std::cout << std::scientific << std::setprecision(7) << nu_a << "  " << nu_b << "  " << nu << "  " << T <<" >>> " << pre/inv << pre << inv << std::endl;
+
+      return pre / inv; // spectral emissive power
+    };
+
+    const Scalar integral =
+        adaptiveSimpson<Scalar>(planck, nu_a, nu_b, abs_tol, rel_tol);
+
+    return Scalar(4.0) * pi * kappa * integral;
+  }
+
+}

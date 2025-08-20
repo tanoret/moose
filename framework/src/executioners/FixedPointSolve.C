@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -176,6 +176,19 @@ FixedPointSolve::FixedPointSolve(Executioner & ex)
     _secondary_transformed_variables = _app.fixedPointConfig().sub_transformed_vars;
     _secondary_transformed_pps = _app.fixedPointConfig().sub_transformed_pps;
   }
+
+  if (!_has_fixed_point_norm && parameters().isParamSetByUser("fixed_point_rel_tol"))
+    paramWarning(
+        "disable_fixed_point_residual_norm_check",
+        "fixed_point_rel_tol will be ignored because the fixed point residual check is disabled.");
+  if (!_has_fixed_point_norm && parameters().isParamSetByUser("fixed_point_abs_tol"))
+    paramWarning(
+        "disable_fixed_point_residual_norm_check",
+        "fixed_point_abs_tol will be ignored because the fixed point residual check is disabled.");
+  if (!_has_fixed_point_norm && parameters().isParamSetByUser("fixed_point_force_norms"))
+    paramWarning("disable_fixed_point_residual_norm_check",
+                 "fixed_point_force_norms will be ignored because the fixed point residual check "
+                 "is disabled.");
 }
 
 bool
@@ -194,8 +207,10 @@ FixedPointSolve::solve()
 
   // need to back up multi-apps even when not doing fixed point iteration for recovering from failed
   // multiapp solve
+  _problem.backupMultiApps(EXEC_MULTIAPP_FIXED_POINT_BEGIN);
   _problem.backupMultiApps(EXEC_TIMESTEP_BEGIN);
   _problem.backupMultiApps(EXEC_TIMESTEP_END);
+  _problem.backupMultiApps(EXEC_MULTIAPP_FIXED_POINT_END);
 
   // Prepare to relax variables as a main app
   std::set<dof_id_type> transformed_dofs;
@@ -203,7 +218,7 @@ FixedPointSolve::solve()
   {
     // Snag all of the local dof indices for all of these variables
     AllLocalDofIndicesThread aldit(_problem, _transformed_vars);
-    ConstElemRange & elem_range = *_problem.mesh().getActiveLocalElementRange();
+    libMesh::ConstElemRange & elem_range = *_problem.mesh().getActiveLocalElementRange();
     Threads::parallel_reduce(elem_range, aldit);
 
     transformed_dofs = aldit.getDofIndices();
@@ -217,7 +232,7 @@ FixedPointSolve::solve()
     {
       // Snag all of the local dof indices for all of these variables
       AllLocalDofIndicesThread aldit(_problem, _secondary_transformed_variables);
-      ConstElemRange & elem_range = *_problem.mesh().getActiveLocalElementRange();
+      libMesh::ConstElemRange & elem_range = *_problem.mesh().getActiveLocalElementRange();
       Threads::parallel_reduce(elem_range, aldit);
 
       secondary_transformed_dofs = aldit.getDofIndices();
@@ -305,6 +320,19 @@ FixedPointSolve::solve()
         current_dt; // _dt might be smaller than this at this point for multistep methods
   }
 
+  if (converged)
+  {
+    // Fixed point iteration loop ends right above
+    _problem.execute(EXEC_MULTIAPP_FIXED_POINT_END);
+    _problem.execTransfers(EXEC_MULTIAPP_FIXED_POINT_END);
+    if (!_problem.execMultiApps(EXEC_MULTIAPP_FIXED_POINT_END, autoAdvance()))
+    {
+      _fixed_point_status = MooseFixedPointConvergenceReason::DIVERGED_FAILED_MULTIAPP;
+      return false;
+    }
+    _problem.outputStep(EXEC_MULTIAPP_FIXED_POINT_END);
+  }
+
   // Save postprocessors after the solve and their potential timestep_end execution
   // The postprocessors could be overwritten at timestep_begin, which is why they are saved
   // after the solve. They could also be saved right after the transfers.
@@ -353,8 +381,20 @@ FixedPointSolve::solveStep(Real & begin_norm,
                                            : std::numeric_limits<Real>::max());
 
   _executioner.preSolve();
-
   _problem.execTransfers(EXEC_TIMESTEP_BEGIN);
+
+  if (_fixed_point_it == 0)
+  {
+    _problem.execute(EXEC_MULTIAPP_FIXED_POINT_BEGIN);
+    _problem.execTransfers(EXEC_MULTIAPP_FIXED_POINT_BEGIN);
+    if (!_problem.execMultiApps(EXEC_MULTIAPP_FIXED_POINT_BEGIN, autoAdvance()))
+    {
+      _fixed_point_status = MooseFixedPointConvergenceReason::DIVERGED_FAILED_MULTIAPP;
+      return false;
+    }
+    _problem.outputStep(EXEC_MULTIAPP_FIXED_POINT_BEGIN);
+  }
+
   if (!_problem.execMultiApps(EXEC_TIMESTEP_BEGIN, auto_advance))
   {
     _fixed_point_status = MooseFixedPointConvergenceReason::DIVERGED_FAILED_MULTIAPP;
@@ -489,16 +529,16 @@ FixedPointSolve::examineFixedPointConvergence(bool & converged)
       _fixed_point_status = MooseFixedPointConvergenceReason::CONVERGED_RELATIVE;
       return true;
     }
-  }
-  if (std::abs(_pp_new - _pp_old) < _custom_abs_tol)
-  {
-    _fixed_point_status = MooseFixedPointConvergenceReason::CONVERGED_CUSTOM;
-    return true;
-  }
-  if (std::abs((_pp_new - _pp_old) / _pp_scaling) < _custom_rel_tol)
-  {
-    _fixed_point_status = MooseFixedPointConvergenceReason::CONVERGED_CUSTOM;
-    return true;
+    if (std::abs(_pp_new - _pp_old) < _custom_abs_tol)
+    {
+      _fixed_point_status = MooseFixedPointConvergenceReason::CONVERGED_CUSTOM;
+      return true;
+    }
+    if (std::abs((_pp_new - _pp_old) / _pp_scaling) < _custom_rel_tol)
+    {
+      _fixed_point_status = MooseFixedPointConvergenceReason::CONVERGED_CUSTOM;
+      return true;
+    }
   }
   if (_fixed_point_it + 1 == _max_fixed_point_its)
   {

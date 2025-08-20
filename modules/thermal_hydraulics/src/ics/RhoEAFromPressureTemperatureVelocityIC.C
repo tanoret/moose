@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,6 +21,9 @@ RhoEAFromPressureTemperatureVelocityIC::validParams()
   params.addRequiredCoupledVar("T", "The temperature");
   params.addRequiredCoupledVar("vel", "The velocity");
   params.addRequiredCoupledVar("A", "Cross-sectional area");
+  params.addClassDescription(
+      "Set the initial condition for rho*E*A from pressure, temperature and a scalar"
+      "field velocity variable");
   return params;
 }
 

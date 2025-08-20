@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,10 +19,8 @@ SplitCHParsed::validParams()
       "Split formulation Cahn-Hilliard Kernel that uses a DerivativeMaterial Free Energy");
   params.addRequiredParam<MaterialPropertyName>(
       "f_name", "Base name of the free energy function F defined in a DerivativeParsedMaterial");
-  params.addDeprecatedCoupledVar("args",
-                                 "Vector of additional variable arguments to F",
-                                 "args is deprecated, use 'coupled_variables' instead");
-  params.addCoupledVar("coupled_variables", "Vector of additional variable arguments to F");
+  params.addCoupledVar("args", "Vector of additional variable arguments to F");
+  params.deprecateCoupledVar("args", "coupled_variables", "02/27/2024");
 
   return params;
 }

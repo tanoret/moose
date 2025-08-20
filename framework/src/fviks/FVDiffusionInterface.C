@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -51,18 +51,19 @@ FVDiffusionInterface::computeQpResidual()
   // Form a finite difference gradient across the interface
   Point one_over_gradient_support = _face_info->elemCentroid() - _face_info->neighborCentroid();
   one_over_gradient_support /= (one_over_gradient_support * one_over_gradient_support);
-  const auto gradient = elemIsOne() ? (var1().getElemValue(&_face_info->elem()) -
-                                       var2().getElemValue(_face_info->neighborPtr())) *
+  const auto state = determineState();
+  const auto gradient = elemIsOne() ? (var1().getElemValue(&_face_info->elem(), state) -
+                                       var2().getElemValue(_face_info->neighborPtr(), state)) *
                                           one_over_gradient_support
-                                    : (var1().getElemValue(_face_info->neighborPtr()) -
-                                       var2().getElemValue(&_face_info->elem())) *
+                                    : (var1().getElemValue(_face_info->neighborPtr(), state) -
+                                       var2().getElemValue(&_face_info->elem(), state)) *
                                           -one_over_gradient_support;
 
   ADReal diffusivity;
   interpolate(_coeff_interp_method,
               diffusivity,
-              coef_elem(elemArg()),
-              coef_neighbor(neighborArg()),
+              coef_elem(elemArg(), determineState()),
+              coef_neighbor(neighborArg(), determineState()),
               *_face_info,
               true);
 

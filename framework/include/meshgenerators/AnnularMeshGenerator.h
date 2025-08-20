@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -66,4 +66,10 @@ protected:
 
   /// Whether to construct rings to have equal areas
   const bool & _equal_area;
+
+  /// prefix string for the boundary names
+  const BoundaryName _boundary_name_prefix;
+
+  /// offset that is added to the boundary IDs
+  const boundary_id_type _boundary_id_offset;
 };

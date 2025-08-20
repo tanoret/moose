@@ -33,7 +33,7 @@
   [../]
 []
 
-[Modules/TensorMechanics/Master]
+[Physics/SolidMechanics/QuasiStatic]
   [./all]
     incremental = true
     save_in = 'react_x react_y react_z'
@@ -131,7 +131,7 @@
   [../]
   [./total_area]
     type = NodalSum
-    variable = nodal_area_dummy_name
+    variable = nodal_area
     boundary = 2
   [../]
 []

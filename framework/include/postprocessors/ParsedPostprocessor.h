@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,9 +22,10 @@ public:
 
   ParsedPostprocessor(const InputParameters & parameters);
 
-  void initialize() override final;
-  void execute() override final;
-  PostprocessorValue getValue() override final;
+  virtual void initialize() override final;
+  virtual void execute() override final;
+  virtual void finalize() override final;
+  virtual PostprocessorValue getValue() const override final;
 
 private:
   /// number of postprocessors in parsed expression
@@ -39,5 +40,9 @@ private:
   /// function parser object for the resudual and on-diagonal Jacobian
   SymFunctionPtr _func_F;
 
+  /// This post-processor value
+  Real _value;
+
+  using Moose::FunctorBase<Real>::evaluate;
   usingFunctionParserUtilsMembers(false);
 };

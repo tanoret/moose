@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -101,7 +101,8 @@ ForceStabilizedSmallStrainMechanicsNOSPD::computeNonlocalJacobian()
         vol_nb = _pdmesh.getNodeVolume(neighbors[nb]);
 
         // obtain bond ndnb's origin vector
-        origin_vec_nb = *neighbor_nb - *_pdmesh.nodePtr(_current_elem->node_id(nd));
+        origin_vec_nb = _pdmesh.getNodeCoord(neighbor_nb->id()) -
+                        _pdmesh.getNodeCoord(_current_elem->node_id(nd));
 
         dFdUk.zero();
         for (unsigned int i = 0; i < _dim; ++i)
@@ -118,7 +119,7 @@ ForceStabilizedSmallStrainMechanicsNOSPD::computeNonlocalJacobian()
                               (dSxdUkx * _shape2[nd].inverse()).row(_component) * _origin_vec *
                               _bond_status;
 
-        _assembly.cacheJacobianBlock(_local_ke, _ivardofs, ivardofs, _var.scalingFactor());
+        addJacobian(_assembly, _local_ke, _ivardofs, ivardofs, _var.scalingFactor());
 
         if (_has_diag_save_in)
         {
@@ -195,7 +196,8 @@ ForceStabilizedSmallStrainMechanicsNOSPD::computePDNonlocalOffDiagJacobian(
           vol_nb = _pdmesh.getNodeVolume(neighbors[nb]);
 
           // obtain bond ndnb's origin vector
-          origin_vec_nb = *neighbor_nb - *_pdmesh.nodePtr(_current_elem->node_id(nd));
+          origin_vec_nb = _pdmesh.getNodeCoord(neighbor_nb->id()) -
+                          _pdmesh.getNodeCoord(_current_elem->node_id(nd));
 
           dFdUk.zero();
           for (unsigned int i = 0; i < _dim; ++i)
@@ -212,7 +214,7 @@ ForceStabilizedSmallStrainMechanicsNOSPD::computePDNonlocalOffDiagJacobian(
                                 (dSxdUky * _shape2[nd].inverse()).row(_component) * _origin_vec *
                                 _bond_status;
 
-          _assembly.cacheJacobianBlock(_local_ke, _ivardofs, jvardofs, _var.scalingFactor());
+          addJacobian(_assembly, _local_ke, _ivardofs, jvardofs, _var.scalingFactor());
         }
     }
   }

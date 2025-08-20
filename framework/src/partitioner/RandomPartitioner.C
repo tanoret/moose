@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -40,7 +40,7 @@ RandomPartitioner::~RandomPartitioner() {}
 std::unique_ptr<Partitioner>
 RandomPartitioner::clone() const
 {
-  return std::make_unique<RandomPartitioner>(_pars);
+  return _app.getFactory().clone(*this);
 }
 
 void

@@ -27,8 +27,8 @@ the overall type of property. The overall design of this module is as follows:
    of dependent quantities (temperature, porosity, etc.). Different "categories" of
    solid properties are grouped together into different userobjects. For example,
    common solid properties used in thermal simulations (specific heat, thermal conductivity),
-   are provided by derived classes of the [ThermalSolidProperties](/userobjects/ThermalSolidProperties.md)
-   userobject. Mechanics properties (Youngs modulus, Poisson ratio), would be provided by
+   are provided by derived classes of the [ThermalSolidProperties](/solidproperties/ThermalSolidProperties.md)
+   userobject. Mechanics properties (Young's modulus, Poisson ratio), would be provided by
    a separate "family" of userobjects.
 2. *Materials* call these userobject functions to compute the material properties at
    quadrature points. Like the userobjects, these materials are grouped into "categories."
@@ -38,8 +38,8 @@ the overall type of property. The overall design of this module is as follows:
 ## Thermal properties
 
 Thermal properties (density, specific heat, and thermal conductivity) are computed by
-userobjects inheriting from the [ThermalSolidProperties](/userobjects/ThermalSolidProperties.md) base class. This class
-defines functions to compute these material properties as a function of temperature:
+userobjects inheriting from the [ThermalSolidProperties](/solidproperties/ThermalSolidProperties.md) base class. This class
+defines functions to compute these properties as a function of temperature:
 
 - compute isobaric specific heat - `Real cp_from_T(const Real & T)`
 - compute thermal conductivity - `Real k_from_T(const Real & T)`
@@ -62,12 +62,20 @@ Userobjects available in the Solid Properties module that provide thermal proper
 
 An example will be provided later on this page for creating a new solid userobject.
 
-Then, in the [ThermalSolidPropertiesMaterial](/materials/ThermalSolidPropertiesMaterial.md) material,
-the `computeQpProperties` method evaluates the thermal conductivity, isobaric specific heat, and density at
-the quadrature points using the values of a coupled variable representing temperature plus the functions provided by
-the selected userobject.
+On their own, these userobjects do not execute; their functions must be called from other
+objects. Some potentially useful classes that call them are:
 
-!listing modules/solid_properties/src/materials/ThermalSolidPropertiesMaterial.C start=computeQpProperties
+- [ThermalSolidPropertiesFunctorMaterial.md]: A functor material that declares
+  functor material properties for density, thermal conductivity, isobaric specific heat,
+  and specific internal energy. An option is provided for using a constant density.
+  This functor material can have its functor material properties converted to
+  regular AD or non-AD material properties by using it in conjunction with
+  [(AD)MaterialFunctorConverter](MaterialFunctorConverter.md).
+- [ThermalSolidPropertiesMaterial.md] and [ConstantDensityThermalSolidPropertiesMaterial.md],
+  which declare AD or non-AD material properties for density, thermal conductivity, and isobaric specific heat,
+  using variable density and constant density, respectively.
+- [ThermalSolidPropertiesPostprocessor.md] evaluates density, thermal conductivity,
+  or isobaric specific heat at a single temperature value.
 
 ## Usage
 
@@ -151,7 +159,7 @@ to the formulation and overriding the methods that describe the solid properties
 
 For example, suppose new thermal solid properties were desired for granite.
 The first step is to create a userobject named `ThermalGraniteProperties` by
-inheriting from [ThermalSolidProperties](/userobjects/ThermalSolidProperties.md) and
+inheriting from [ThermalSolidProperties](/solidproperties/ThermalSolidProperties.md) and
 overriding all methods that you would like to implement.
 The header file for your new userobject indicates all methods that will be defined.
 

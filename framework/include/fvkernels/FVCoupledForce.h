@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,6 +25,8 @@ protected:
   ADReal computeQpResidual() override;
 
 protected:
-  const ADVariableValue & _v;
+  /// The coupled functor applying the force
+  const Moose::Functor<ADReal> & _v;
+  /// An optional coefficient multiplying the coupled force
   const Real _coef;
 };

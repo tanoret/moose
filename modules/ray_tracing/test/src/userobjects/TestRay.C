@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -64,7 +64,15 @@ TestRay::validParams()
       "set_distance_negative", false, "Test setting a Ray's max distance to a negative value");
   params.addParam<bool>(
       "set_start_inactive", false, "Tests setting a Ray's starting element to an inactive element");
-
+  params.addParam<bool>("set_stationary_before_start",
+                        false,
+                        "Test setting a Ray as stationary before its start point");
+  params.addParam<bool>("set_stationary_with_direction",
+                        false,
+                        "Test setting a Ray as stationary after setting its direction");
+  params.addParam<bool>("set_stationary_with_end",
+                        false,
+                        "Test setting a Ray as stationary after setting its endpoint");
   params.set<bool>("_use_ray_registration") = false;
 
   return params;
@@ -83,6 +91,8 @@ TestRay::generateRays()
 
     if (getParam<bool>("set_distance_before_start"))
       ray->setStartingMaxDistance(1);
+    if (getParam<bool>("set_stationary_before_start"))
+      ray->setStationary();
     if (getParam<bool>("at_end_without_set"))
       ray->atEnd();
     if (getParam<bool>("end_point_without_set"))
@@ -145,5 +155,15 @@ TestRay::generateRays()
       ray->setStartingEndPoint(Point(1e6, 1e6, 1e6));
     if (getParam<bool>("set_distance_negative"))
       ray->setStartingMaxDistance(-1);
+    if (getParam<bool>("set_stationary_with_direction"))
+    {
+      ray->setStartingDirection(Point(1, 0, 0));
+      ray->setStationary();
+    }
+    if (getParam<bool>("set_stationary_with_end"))
+    {
+      ray->setStartingEndPoint(elem->point(0));
+      ray->setStationary();
+    }
   }
 }

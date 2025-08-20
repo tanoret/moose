@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,7 +22,7 @@ public:
   virtual void externalSolve() override;
   virtual void syncSolutions(ExternalProblem::Direction direction) override;
 
-  virtual bool converged() override { return true; }
+  virtual bool converged(unsigned int) override { return true; }
 
 protected:
   unsigned int _heat_source_var;

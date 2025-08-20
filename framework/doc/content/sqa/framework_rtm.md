@@ -19,7 +19,7 @@
 !template! item key=pre-test
 !! pre-test-begin
 Ideally all testing should be performed on a clean test machine following
-one of the supported configurations setup by the test system engineer. Testing
+one of the supported configurations set up by the test system engineer. Testing
 may be performed on local workstations and cluster systems containing supported
 operating systems.
 
@@ -36,6 +36,11 @@ All tests must pass in accordance with the type of test being performed. This li
 can be found in the [Software Test Plan](sqa/framework_stp.md).
 
 !! pre-test-finish
+!template-end!
+
+!template! item key=log-revisions
+The changelog for all code residing in the MOOSE repository is located in the
+[MOOSE RTM](moose_rtm.md#log-revisions optional=True).
 !template-end!
 
 !template item key=functional-requirements

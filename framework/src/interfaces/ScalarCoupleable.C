@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -67,8 +67,10 @@ ScalarCoupleable::ScalarCoupleable(const MooseObject * moose_object)
 }
 
 bool
-ScalarCoupleable::isCoupledScalar(const std::string & var_name, unsigned int i) const
+ScalarCoupleable::isCoupledScalar(const std::string & var_name_in, unsigned int i) const
 {
+  const auto var_name = _sc_parameters.checkForRename(var_name_in);
+
   auto it = _coupled_scalar_vars.find(var_name);
   if (it != _coupled_scalar_vars.end())
     return (i < it->second.size());
@@ -79,7 +81,7 @@ ScalarCoupleable::isCoupledScalar(const std::string & var_name, unsigned int i) 
       mooseError(_sc_name,
                  ": The coupled scalar variable \"",
                  var_name,
-                 "\" was never added to this objects's "
+                 "\" was never added to this object's "
                  "InputParameters, please double-check "
                  "your spelling");
 
@@ -88,14 +90,14 @@ ScalarCoupleable::isCoupledScalar(const std::string & var_name, unsigned int i) 
 }
 
 unsigned int
-ScalarCoupleable::coupledScalar(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalar(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   return getScalarVar(var_name, comp)->number();
 }
 
 Order
-ScalarCoupleable::coupledScalarOrder(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarOrder(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   if (!isCoupledScalar(var_name, comp))
@@ -119,7 +121,7 @@ ScalarCoupleable::getDefaultValue(const std::string & var_name) const
 }
 
 const VariableValue &
-ScalarCoupleable::coupledScalarValue(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarValue(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   if (!isCoupledScalar(var_name, comp))
@@ -130,7 +132,7 @@ ScalarCoupleable::coupledScalarValue(const std::string & var_name, unsigned int 
 }
 
 const ADVariableValue &
-ScalarCoupleable::adCoupledScalarValue(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::adCoupledScalarValue(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   if (!isCoupledScalar(var_name, comp))
@@ -148,7 +150,7 @@ ScalarCoupleable::adCoupledScalarValue(const std::string & var_name, unsigned in
 template <>
 const GenericVariableValue<false> &
 ScalarCoupleable::coupledGenericScalarValue<false>(const std::string & var_name,
-                                                   unsigned int comp) const
+                                                   const unsigned int comp) const
 {
   return coupledScalarValue(var_name, comp);
 }
@@ -156,7 +158,7 @@ ScalarCoupleable::coupledGenericScalarValue<false>(const std::string & var_name,
 template <>
 const GenericVariableValue<true> &
 ScalarCoupleable::coupledGenericScalarValue<true>(const std::string & var_name,
-                                                  unsigned int comp) const
+                                                  const unsigned int comp) const
 {
   return adCoupledScalarValue(var_name, comp);
 }
@@ -178,7 +180,7 @@ ScalarCoupleable::getADDefaultValue(const std::string & var_name) const
 const VariableValue &
 ScalarCoupleable::coupledVectorTagScalarValue(const std::string & var_name,
                                               TagID tag,
-                                              unsigned int comp) const
+                                              const unsigned int comp) const
 {
   checkVar(var_name);
   if (!isCoupledScalar(var_name, comp))
@@ -199,7 +201,7 @@ ScalarCoupleable::coupledVectorTagScalarValue(const std::string & var_name,
 const VariableValue &
 ScalarCoupleable::coupledMatrixTagScalarValue(const std::string & var_name,
                                               TagID tag,
-                                              unsigned int comp) const
+                                              const unsigned int comp) const
 {
   checkVar(var_name);
   if (!isCoupledScalar(var_name, comp))
@@ -211,7 +213,7 @@ ScalarCoupleable::coupledMatrixTagScalarValue(const std::string & var_name,
 }
 
 const VariableValue &
-ScalarCoupleable::coupledScalarValueOld(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarValueOld(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   if (!isCoupledScalar(var_name, comp))
@@ -223,7 +225,8 @@ ScalarCoupleable::coupledScalarValueOld(const std::string & var_name, unsigned i
 }
 
 const VariableValue &
-ScalarCoupleable::coupledScalarValueOlder(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarValueOlder(const std::string & var_name,
+                                          const unsigned int comp) const
 {
   checkVar(var_name);
   if (!isCoupledScalar(var_name, comp))
@@ -238,15 +241,23 @@ ScalarCoupleable::coupledScalarValueOlder(const std::string & var_name, unsigned
 }
 
 const VariableValue &
-ScalarCoupleable::coupledScalarDot(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarDot(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   validateExecutionerType(var_name, "coupledScalarDot");
   return getScalarVar(var_name, comp)->uDot();
 }
 
+const ADVariableValue &
+ScalarCoupleable::adCoupledScalarDot(const std::string & var_name, const unsigned int comp) const
+{
+  checkVar(var_name);
+  validateExecutionerType(var_name, "adCoupledScalarDot");
+  return getScalarVar(var_name, comp)->adUDot();
+}
+
 const VariableValue &
-ScalarCoupleable::coupledScalarDotDot(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarDotDot(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   validateExecutionerType(var_name, "coupledScalarDotDot");
@@ -254,7 +265,7 @@ ScalarCoupleable::coupledScalarDotDot(const std::string & var_name, unsigned int
 }
 
 const VariableValue &
-ScalarCoupleable::coupledScalarDotOld(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarDotOld(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   validateExecutionerType(var_name, "coupledScalarDotOld");
@@ -262,14 +273,15 @@ ScalarCoupleable::coupledScalarDotOld(const std::string & var_name, unsigned int
 }
 
 const VariableValue &
-ScalarCoupleable::coupledScalarDotDotOld(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarDotDotOld(const std::string & var_name,
+                                         const unsigned int comp) const
 {
   checkVar(var_name);
   validateExecutionerType(var_name, "coupledScalarDotDotOld");
   return getScalarVar(var_name, comp)->uDotDotOld();
 }
 const VariableValue &
-ScalarCoupleable::coupledScalarDotDu(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarDotDu(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   validateExecutionerType(var_name, "coupledScalarDotDu");
@@ -277,7 +289,7 @@ ScalarCoupleable::coupledScalarDotDu(const std::string & var_name, unsigned int 
 }
 
 const VariableValue &
-ScalarCoupleable::coupledScalarDotDotDu(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::coupledScalarDotDotDu(const std::string & var_name, const unsigned int comp) const
 {
   checkVar(var_name);
   validateExecutionerType(var_name, "coupledScalarDotDotDu");
@@ -285,8 +297,10 @@ ScalarCoupleable::coupledScalarDotDotDu(const std::string & var_name, unsigned i
 }
 
 void
-ScalarCoupleable::checkVar(const std::string & var_name) const
+ScalarCoupleable::checkVar(const std::string & var_name_in) const
 {
+  const auto var_name = _sc_parameters.checkForRename(var_name_in);
+
   auto it = _sc_coupled_vars.find(var_name);
   if (it != _sc_coupled_vars.end())
   {
@@ -304,8 +318,10 @@ ScalarCoupleable::checkVar(const std::string & var_name) const
 }
 
 const MooseVariableScalar *
-ScalarCoupleable::getScalarVar(const std::string & var_name, unsigned int comp) const
+ScalarCoupleable::getScalarVar(const std::string & var_name_in, const unsigned int comp) const
 {
+  const auto var_name = _sc_parameters.checkForRename(var_name_in);
+
   const auto it = _coupled_scalar_vars.find(var_name);
   if (it != _coupled_scalar_vars.end())
   {
@@ -334,8 +350,10 @@ ScalarCoupleable::validateExecutionerType(const std::string & name,
 }
 
 unsigned int
-ScalarCoupleable::coupledScalarComponents(const std::string & var_name) const
+ScalarCoupleable::coupledScalarComponents(const std::string & var_name_in) const
 {
+  const auto var_name = _sc_parameters.checkForRename(var_name_in);
+
   const auto it = _coupled_scalar_vars.find(var_name);
   if (it != _coupled_scalar_vars.end())
     return it->second.size();

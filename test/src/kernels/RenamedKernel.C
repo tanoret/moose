@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,12 +10,16 @@
 #include "RenamedKernel.h"
 
 registerMooseObjectRenamed("MooseTestApp", OldNamedKernel, "01/01/2050 00:00", RenamedKernel);
+registerMooseObject("MooseTestApp", RenamedKernel);
 
 InputParameters
 RenamedKernel::validParams()
 {
   InputParameters params = Reaction::validParams();
   params.addParam<Real>("coefficient", 1.0, "Coefficient of the term");
+  params.renameParam("rate",
+                     "base_coeff",
+                     "The base coefficient multiplying the concentration in the Reaction kernel.");
   return params;
 }
 

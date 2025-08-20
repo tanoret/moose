@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,6 +27,9 @@ public:
 
   /// Computes d-residual / d-jvar... storing the result in Ke.
   virtual void computeOffDiagJacobian(unsigned int jvar) override;
+
+  /// Compute the residual and Jacobian together
+  virtual void computeResidualAndJacobian() override;
 
   /**
    * Computes jacobian block with respect to a scalar variable

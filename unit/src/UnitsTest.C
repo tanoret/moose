@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,6 +32,7 @@ TEST(Units, numbers)
   EXPECT_DOUBLE_EQ(Real(MooseUnits("m/0.1^3") / MooseUnits("km")), 1.0);
   EXPECT_DOUBLE_EQ(Real(MooseUnits("m/1e-3") / MooseUnits("km")), 1.0);
   EXPECT_DOUBLE_EQ(Real(MooseUnits("1234.567")), 1234.567);
+  EXPECT_DOUBLE_EQ(Real(MooseUnits("20*80")), 1600);
 }
 
 TEST(Units, si_prefixes)
@@ -55,6 +56,9 @@ TEST(Units, parse)
       {"m^3", "m^3"},
       {"N*m", "m^2*kg*s^-2"},
       {"mm", "0.001 m"},
+      {"5m * 1/6s", "0.833333 m*s^-1"},
+      {"5m/(6s)", "0.833333 m*s^-1"},
+      {"cal", "4.184 m^2*kg*s^-2"},
       {"kg/(m*s^2)", "m^-1*kg*s^-2"},
       {"kg/(m*s)^2", "m^-2*kg*s^-2"},
       {"eV/at", "1.60218e-19 m^2*kg*s^-2*at^-1"},
@@ -103,7 +107,9 @@ TEST(Units, convert)
       {{1.0, "K/m"}, {1.0, "degC/m"}},
       {{9.0, "degF/m"}, {5.0, "degC/m"}},
       // other conversions
-      {{96.48533212, "kJ/mol"}, {1.0, "eV/at"}}};
+      {{96.48533212, "kJ/mol"}, {1.0, "eV/at"}},
+      {{1, "day"}, {86400, "s"}},
+      {{1, "year"}, {365.25, "day"}}};
 
   for (const auto & p : pairs)
   {

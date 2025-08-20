@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,9 +24,9 @@ public:
 protected:
   virtual Real computeValue();
 
-  std::vector<BoundaryName> _wall_boundary_names;
+  const std::vector<BoundaryName> & _wall_boundary_names;
 
-  const Real & _von_karman_const;
-  const Real & _von_karman_const_0;
-  const Real & _delta;
+  const Moose::Functor<Real> & _von_karman_const;
+  const Moose::Functor<Real> & _von_karman_const_0;
+  const Moose::Functor<Real> & _delta;
 };

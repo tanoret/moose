@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,7 +19,7 @@ class MeshBase;
 }
 
 /**
- * Report the time and iteration information for the simulation.
+ * Report mesh information, such as the number of elements, nodes, and degrees of freedom.
  */
 class MeshInfo : public GeneralReporter
 {
@@ -94,8 +94,9 @@ template <typename T>
 T &
 MeshInfo::declareHelper(const std::string & item_name, const ReporterMode mode)
 {
-  return (!_items.isValid() || _items.contains(item_name)) ? declareValueByName<T>(item_name, mode)
-                                                           : declareUnusedValue<T>();
+  return (!_items.isValid() || _items.isValueSet(item_name))
+             ? declareValueByName<T>(item_name, mode)
+             : declareUnusedValue<T>();
 }
 
 void to_json(nlohmann::json & json, const std::map<BoundaryID, MeshInfo::SidesetInfo> & sidesets);

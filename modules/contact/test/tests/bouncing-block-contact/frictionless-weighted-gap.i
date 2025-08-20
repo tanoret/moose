@@ -43,6 +43,19 @@ offset = 1e-2
   []
 []
 
+[UserObjects]
+  [weighted_gap_uo]
+    type = LMWeightedGapUserObject
+    primary_boundary = 20
+    secondary_boundary = 10
+    primary_subdomain = 4
+    secondary_subdomain = 3
+    lm_variable = normal_lm
+    disp_x = disp_x
+    disp_y = disp_y
+  []
+[]
+
 [Constraints]
   [weighted_gap_lm]
     type = ComputeWeightedGapLMMechanicalContact
@@ -55,6 +68,7 @@ offset = 1e-2
     disp_y = disp_y
     use_displaced_mesh = true
     c = 1
+    weighted_gap_uo = weighted_gap_uo
   []
   [normal_x]
     type = NormalMortarMechanicalContact
@@ -67,6 +81,7 @@ offset = 1e-2
     component = x
     use_displaced_mesh = true
     compute_lm_residuals = false
+    weighted_gap_uo = weighted_gap_uo
   []
   [normal_y]
     type = NormalMortarMechanicalContact
@@ -79,6 +94,7 @@ offset = 1e-2
     component = y
     use_displaced_mesh = true
     compute_lm_residuals = false
+    weighted_gap_uo = weighted_gap_uo
   []
 []
 
@@ -100,12 +116,14 @@ offset = 1e-2
     variable = disp_y
     boundary = 30
     function = '${starting_point} * cos(2 * pi / 40 * t) + ${offset}'
+    preset = false
   []
   [leftx]
     type = FunctionDirichletBC
     variable = disp_x
     boundary = 50
     function = '1e-2 * t'
+    preset = false
   []
 []
 
@@ -115,14 +133,14 @@ offset = 1e-2
   dt = 5
   dtmin = .1
   solve_type = 'PJFNK'
-  petsc_options = '-snes_converged_reason -ksp_converged_reason -pc_svd_monitor '
-                  '-snes_linesearch_monitor'
+  petsc_options = '-snes_converged_reason -ksp_converged_reason -pc_svd_monitor -snes_linesearch_monitor'
   petsc_options_iname = '-pc_type -pc_factor_shift_type -pc_factor_shift_amount -mat_mffd_err'
   petsc_options_value = 'lu       NONZERO               1e-15                   1e-5'
   l_max_its = 30
   nl_max_its = 20
   line_search = 'none'
   snesmf_reuse_base = true
+  nl_rel_tol = 1e-12
 []
 
 [Debug]

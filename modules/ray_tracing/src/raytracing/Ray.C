@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,6 +16,8 @@
 
 // MOOSE includes
 #include "DataIO.h"
+
+using namespace libMesh;
 
 Ray::Ray(RayTracingStudy * study,
          const RayID id,
@@ -85,7 +87,7 @@ Ray::Ray(const Ray * const other, const ConstructRayKey & key)
     if (!other->invalidDirection())
       setStartingDirection(other->_direction);
     if (other->maxDistanceSet())
-      setStartingMaxDistance(other->_max_distance);
+      _max_distance = other->_max_distance;
   }
 
   std::copy(other->_data.begin(), other->_data.end(), _data.begin());
@@ -113,7 +115,7 @@ Ray::reset(const Ray * const other, const ConstructRayKey &)
     if (!other->invalidDirection())
       setStartingDirection(other->_direction);
     if (other->maxDistanceSet())
-      setStartingMaxDistance(other->_max_distance);
+      _max_distance = other->_max_distance;
   }
 
   _data = other->_data;
@@ -320,6 +322,20 @@ Ray::setStartingMaxDistance(const Real starting_max_distance)
 }
 
 void
+Ray::setStationary()
+{
+  errorIfTracing("Cannot use Ray::setStationary()");
+  if (invalidCurrentPoint())
+    errorWhenInitializing("Cannot use Ray::setStationary() before Ray::setStart()");
+  if (_end_set)
+    errorWhenInitializing("Cannot use Ray::setStationary() after Ray::setStartingEndPoint()");
+  if (!invalidDirection())
+    errorWhenInitializing("Cannot use Ray::setStationary() with Ray::setStartingDirection()");
+  _max_distance = 0;
+  mooseAssert(stationary(), "Stationary not set");
+}
+
+void
 Ray::invalidateStartingElem()
 {
   errorIfTracing("Cannot use Ray::invalidateStartingElem()");
@@ -387,7 +403,9 @@ std::vector<RayData> &
 Ray::data()
 {
   mooseAssert(_data.size() == 0 || _data.size() == _study.rayDataSize(),
-              "Ray data size is not zero or the size required by study");
+              "Ray data size of " + std::to_string(_data.size()) +
+                  " is not zero or the size required by the study of " +
+                  std::to_string(_study.rayDataSize()));
   _data.resize(_study.rayDataSize());
   return _data;
 }

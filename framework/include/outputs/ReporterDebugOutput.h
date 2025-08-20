@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,5 +22,5 @@ public:
   ReporterDebugOutput(const InputParameters & parameters);
 
 protected:
-  void output(const ExecFlagType & type) override;
+  void output() override;
 };

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,7 +24,7 @@ class ComputeNodalDampingThread
   : public ThreadedNodeLoop<ConstNodeRange, ConstNodeRange::const_iterator>
 {
 public:
-  ComputeNodalDampingThread(FEProblemBase & feproblem);
+  ComputeNodalDampingThread(FEProblemBase & feproblem, NonlinearSystemBase & nl);
 
   // Splitting Constructor
   ComputeNodalDampingThread(ComputeNodalDampingThread & x, Threads::split split);
@@ -38,6 +38,9 @@ public:
   Real damping();
 
 protected:
+  /// Print information about the loop, mostly order of execution of objects
+  void printGeneralExecutionInformation() const override;
+
   Real _damping;
   NonlinearSystemBase & _nl;
   const MooseObjectWarehouse<NodalDamper> & _nodal_dampers;

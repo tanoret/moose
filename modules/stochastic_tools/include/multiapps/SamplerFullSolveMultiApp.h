@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -40,10 +40,33 @@ public:
    * - Any parameter already with an equal sign is not modified:
    *      param1=3.14;param2[0,1,2] -> param1=3.14 param2='row[0] row[1] row[2]'
    */
-  static std::string sampledCommandLineArgs(const std::vector<Real> & row,
-                                            const std::vector<std::string> & full_args_name);
+  static std::vector<std::string>
+  sampledCommandLineArgs(const std::vector<Real> & row,
+                         const std::vector<std::string> & full_args_name);
+
+  /**
+   * Helper for executing transfers when doing batch stochastic simulations
+   *
+   * @param transfers A vector of transfers to execute
+   * @param global_row_index The global row index of the run
+   * @param row_data The current sampler row of data for the transfer to utilize
+   * @param type The current execution flag, used for info printing
+   * @param direction The direction of the transfer, used for info printing
+   * @param verbose Whether or not print information about the transfer
+   * @param console The console stream to output to
+   */
+  static void
+  execBatchTransfers(const std::vector<std::shared_ptr<StochasticToolsTransfer>> & transfers,
+                     dof_id_type global_row_index,
+                     const std::vector<Real> & row_data,
+                     Transfer::DIRECTION direction,
+                     bool verbose,
+                     const ConsoleStream & console);
 
 protected:
+  /// Override to avoid 'solve converged' message and print when processors are finished
+  virtual void showStatusMessage(unsigned int i) const override;
+
   /// Sampler to utilize for creating MultiApps
   Sampler & _sampler;
 
@@ -54,7 +77,7 @@ protected:
   dof_id_type _local_batch_app_index;
 
   /// Override to allow for batch mode to get correct cli_args
-  virtual std::string getCommandLineArgsParamHelper(unsigned int local_app) override;
+  virtual std::vector<std::string> getCommandLineArgs(const unsigned int local_app) override;
 
 private:
   /**

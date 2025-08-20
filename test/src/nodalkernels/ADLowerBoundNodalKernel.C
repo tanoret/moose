@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,7 @@ ADLowerBoundNodalKernel::validParams()
   params.addParam<Real>("lower_bound", "The lower bound on the coupled variable");
   params.addParam<std::vector<BoundaryName>>(
       "exclude_boundaries",
+      {},
       "Boundaries on which not to execute the NodalKernel. This can be useful for avoiding "
       "singularity in the matrix in case a constraint is active in the same place that a "
       "DirichletBC is set");

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -49,6 +49,8 @@ void
 OutputWarehouse::initialSetup()
 {
   TIME_SECTION("initialSetup", 5, "Setting Up Outputs");
+
+  resetFileBase();
 
   for (const auto & obj : _all_objects)
     obj->initialSetup();
@@ -112,23 +114,29 @@ OutputWarehouse::addOutput(std::shared_ptr<Output> const output)
   _object_map[output->name()] = output.get();
   _object_names.insert(output->name());
 
-  // If the output object is a FileOutput then store the output filename
-  FileOutput * ptr = dynamic_cast<FileOutput *>(output.get());
-  if (ptr != NULL)
-    addOutputFilename(ptr->filename());
-
   // Insert object sync times to the global set
-  if (output->parameters().isParamValid("sync_times"))
-  {
-    std::vector<Real> sync_times = output->parameters().get<std::vector<Real>>("sync_times");
-    _sync_times.insert(sync_times.begin(), sync_times.end());
-  }
+  const std::set<Real> & sync_times = output->getSyncTimes();
+  _sync_times.insert(sync_times.begin(), sync_times.end());
 }
 
 bool
 OutputWarehouse::hasOutput(const std::string & name) const
 {
   return _object_map.find(name) != _object_map.end();
+}
+
+bool
+OutputWarehouse::hasMaterialPropertyOutput(const std::string & name) const
+{
+  const auto found_object = hasOutput(name);
+  if (!found_object)
+    return false;
+  else
+  {
+    // Check if output object supports material property output
+    const auto * output_object = static_cast<const Output *>(_object_map.at(name));
+    return output_object->supportsMaterialPropertyOutput();
+  }
 }
 
 const std::set<OutputName> &
@@ -144,11 +152,12 @@ OutputWarehouse::getOutputNames()
 }
 
 void
-OutputWarehouse::addOutputFilename(const OutFileBase & filename)
+OutputWarehouse::addOutputFilename(const OutputName & obj_name, const OutFileBase & filename)
 {
-  if (_file_base_set.find(filename) != _file_base_set.end())
-    mooseError("An output file with the name, ", filename, ", already exists.");
-  _file_base_set.insert(filename);
+  _file_base_map[obj_name].insert(filename);
+  for (const auto & it : _file_base_map)
+    if (it.first != obj_name && it.second.find(filename) != it.second.end())
+      mooseError("An output file with the name, ", filename, ", already exists.");
 }
 
 void
@@ -319,11 +328,39 @@ OutputWarehouse::buildInterfaceHideVariables(const std::string & output_name,
 }
 
 void
-OutputWarehouse::checkOutputs(const std::set<OutputName> & names)
+OutputWarehouse::checkOutputs(const std::set<OutputName> & names,
+                              const bool supports_material_output)
 {
+  std::string reserved_name = "";
   for (const auto & name : names)
-    if (!isReservedName(name) && !hasOutput(name))
-      mooseError("The output object '", name, "' is not a defined output object");
+  {
+    const bool is_reserved_name = isReservedName(name);
+    if (is_reserved_name)
+      reserved_name = name;
+    if (!is_reserved_name)
+    {
+      if (!hasOutput(name))
+        mooseError("The output object '", name, "' is not a defined output object.");
+      if (supports_material_output && !hasMaterialPropertyOutput(name))
+        mooseError("The output object '", name, "' does not support material output.");
+    }
+  }
+  if (!reserved_name.empty() && names.size() > 1)
+    mooseError("When setting output name to reserved name '" + reserved_name +
+               "', only one entry is allowed in outputs parameter.");
+}
+
+std::set<OutputName>
+OutputWarehouse::getAllMaterialPropertyOutputNames() const
+{
+  std::set<OutputName> output_names;
+  for (const auto & pair : _object_map)
+  {
+    const auto * output = static_cast<const Output *>(pair.second);
+    if (output->supportsMaterialPropertyOutput())
+      output_names.insert(pair.first);
+  }
+  return output_names;
 }
 
 const std::set<std::string> &
@@ -368,5 +405,24 @@ OutputWarehouse::reset()
     auto * exodus = dynamic_cast<Exodus *>(pair.second);
     if (exodus != NULL)
       exodus->clear();
+  }
+}
+
+void
+OutputWarehouse::resetFileBase()
+{
+  // Set the file base from the application to FileOutputs and add associated filenames
+  for (const auto & obj : _all_objects)
+  {
+    FileOutput * file_output = dynamic_cast<FileOutput *>(obj);
+    if (file_output)
+    {
+      const std::string file_base = obj->parameters().get<bool>("_built_by_moose")
+                                        ? _app.getOutputFileBase()
+                                        : (_app.getOutputFileBase(true) + "_" + obj->name());
+      file_output->setFileBase(file_base);
+
+      addOutputFilename(obj->name(), file_output->filename());
+    }
   }
 }

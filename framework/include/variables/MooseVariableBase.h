@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,6 +18,7 @@
 #include "MooseError.h"
 
 #include "libmesh/fe_type.h"
+#include "libmesh/enum_fe_family.h"
 
 // libMesh forward declarations
 namespace libMesh
@@ -50,7 +51,7 @@ public:
   /**
    * Get the type of finite element object
    */
-  const FEType & feType() const { return _fe_type; }
+  const libMesh::FEType & feType() const { return _fe_type; }
 
   /**
    * Get the system this variable is part of.
@@ -86,7 +87,6 @@ public:
   /**
    * Set the scaling factor for this variable
    */
-  void scalingFactor(Real factor);
   void scalingFactor(const std::vector<Real> & factor);
 
   /**
@@ -99,7 +99,7 @@ public:
    * Get the order of this variable
    * Note: Order enum can be implicitly converted to unsigned int.
    */
-  Order order() const;
+  libMesh::Order order() const;
 
   /**
    * Get the number of components
@@ -111,18 +111,26 @@ public:
    * Is this variable nodal
    * @return true if it nodal, otherwise false
    */
-  virtual bool isNodal() const { return true; }
+  virtual bool isNodal() const { mooseError("Base class cannot determine this"); }
 
   /**
    * Does this variable have DoFs on nodes
    * @return true if it does, false if not.
    */
-  virtual bool hasDoFsOnNodes() const { return true; }
+  virtual bool hasDoFsOnNodes() const { mooseError("Base class cannot determine this"); };
+
+  /**
+   * Return the continuity of this variable
+   */
+  virtual libMesh::FEContinuity getContinuity() const
+  {
+    mooseError("Base class cannot determine this");
+  };
 
   /**
    * The DofMap associated with the system this variable is in.
    */
-  const DofMap & dofMap() const { return _dof_map; }
+  const libMesh::DofMap & dofMap() const { return _dof_map; }
 
   virtual void getDofIndices(const Elem * /*elem*/,
                              std::vector<dof_id_type> & /*dof_indices*/) const
@@ -172,12 +180,22 @@ public:
    */
   bool isArray() const { return _is_array; }
 
+  /**
+   * @return whether this variable lives on lower dimensional blocks
+   */
+  bool isLowerD() const { return _is_lower_d; }
+
 protected:
+  /**
+   * @returns whether we should insert derivatives
+   */
+  bool doDerivatives() const;
+
   /// System this variable is part of
   SystemBase & _sys;
 
   /// The FEType associated with this variable
-  FEType _fe_type;
+  libMesh::FEType _fe_type;
 
   /// variable number (from libMesh)
   unsigned int _var_num;
@@ -195,13 +213,13 @@ protected:
   SubProblem & _subproblem;
 
   /// libMesh variable object for this variable
-  const Variable & _variable;
+  const libMesh::Variable & _variable;
 
   /// Assembly data
   Assembly & _assembly;
 
   /// DOF map
-  const DofMap & _dof_map;
+  const libMesh::DofMap & _dof_map;
 
   /// DOF indices
   std::vector<dof_id_type> _dof_indices;
@@ -226,6 +244,9 @@ protected:
 
   /// Whether this is an array variable
   const bool _is_array;
+
+  /// Whether this variable lives on lower dimensional blocks
+  bool _is_lower_d;
 };
 
 inline void

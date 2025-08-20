@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,7 +11,7 @@
 
 #include "GeneralPostprocessor.h"
 
-class Transient;
+class TransientBase;
 
 /**
  * Gets the relative solution norm from the transient executioner
@@ -39,9 +39,9 @@ public:
    * Returns the relative solution norm taken from the transient executioner
    * @return A const reference to the value of the postprocessor
    */
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
 
 protected:
   /// Transient executioner
-  Transient * _trex;
+  TransientBase * _trex;
 };

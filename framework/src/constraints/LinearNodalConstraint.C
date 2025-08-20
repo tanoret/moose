@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,8 +20,8 @@ LinearNodalConstraint::validParams()
   params.addClassDescription(
       "Constrains secondary node to move as a linear combination of primary nodes.");
   params.addRequiredParam<std::vector<unsigned int>>("primary", "The primary node IDs.");
-  params.addParam<std::vector<unsigned int>>("secondary_node_ids",
-                                             "The list of secondary node ids");
+  params.addParam<std::vector<unsigned int>>(
+      "secondary_node_ids", {}, "The list of secondary node ids");
   params.addParam<BoundaryName>(
       "secondary_node_set", "NaN", "The boundary ID associated with the secondary side");
   params.addRequiredParam<Real>("penalty", "The penalty used for the boundary term");

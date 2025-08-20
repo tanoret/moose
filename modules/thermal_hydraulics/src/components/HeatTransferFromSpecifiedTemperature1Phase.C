@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -33,7 +33,9 @@ HeatTransferFromSpecifiedTemperature1Phase::addVariables()
 {
   HeatTransferFromTemperature1Phase::addVariables();
 
-  getTHMProblem().addFunctionIC(_T_wall_name, _T_wall_fn_name, _flow_channel_subdomains);
+  if (!_app.isRestarting())
+    getTHMProblem().addFunctionIC(_T_wall_name, _T_wall_fn_name, _flow_channel_subdomains);
+
   makeFunctionControllableIfConstant(_T_wall_fn_name, "T_wall");
 }
 

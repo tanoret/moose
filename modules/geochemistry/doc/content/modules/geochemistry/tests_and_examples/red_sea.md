@@ -48,7 +48,7 @@ The analogous [Geochemists Workbench](https://www.gwb.com/) input file for this 
 
 ## Results: no precipitation or dissolution
 
-The `geochemistry` results match those from Geochemsits Workbench exactly.
+The `geochemistry` results match those from Geochemists Workbench exactly.
 
 ### Error and charge-neutrality error
 
@@ -76,7 +76,7 @@ The `geochemistry` output matches [!cite](bethke_2007) (and the GWB software) wh
 | Cl$^{-}$ | 5.182 | 0.6125 | 0.5017 | 
 | Na$^{+}$ | 4.86 | 0.7036 | 0.5341 |
 | NaCl | 0.551 | 1.0 | -0.2587 |
-| CaCl$^{+}$ | 0.1277 | 0.7036 | -1.047|
+| CaCl$^{+}$ | 0.1277 | 0.7036 | -1.047 |
 | K$^{+}$ | $0.5944\times 10^{-1}$ | 0.6125 | -1.438 |
 | Ca$^{2+}$ | $0.4447\times 10^{-1}$ | 0.1941 | -2.064 |
 | MgCl$^{+}$ | $0.2495\times 10^{-1}$ | 0.7036 | -1.756 |
@@ -87,7 +87,7 @@ The `geochemistry` output matches [!cite](bethke_2007) (and the GWB software) wh
 
 ### Mineral saturation indices
 
-The saturation indices of the equilibrium solution in [table:molalities_etc] are greater than 0 for a number of minerals: bornite, chalcopyrite, chalcocite, pyrite, flourite, galena and covellite.  Both GWB and `geochemistry` produce identical results
+The saturation indices of the equilibrium solution in [table:molalities_etc] are greater than 0 for a number of minerals: bornite, chalcopyrite, chalcocite, pyrite, fluorite, galena and covellite.  Both GWB and `geochemistry` produce identical results
 
 ## Mineral precipitation and dissolution
 

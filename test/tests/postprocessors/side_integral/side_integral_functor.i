@@ -45,16 +45,16 @@
   [v1]
     type = MooseVariableFVReal
     block = 1
-    [InitialCondition]
-      type = FunctionIC
+    [FVInitialCondition]
+      type = FVFunctionIC
       function = 'x + y'
     []
   []
   [v2]
     type = MooseVariableFVReal
     block = 2
-    [InitialCondition]
-      type = FunctionIC
+    [FVInitialCondition]
+      type = FVFunctionIC
       function = '2*x*x - y'
     []
   []
@@ -62,7 +62,7 @@
 
 [Functions]
   [f1]
-    type = ADParsedFunction
+    type = ParsedFunction
     expression = 'exp(x - y)'
   []
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,7 +30,7 @@ AccumulateReporter::AccumulateReporter(const InputParameters & parameters)
 }
 
 void
-AccumulateReporter::initialSetup()
+AccumulateReporter::declareLateValues()
 {
   const ReporterData & rdata = _fe_problem.getReporterData();
   for (const auto & rname : getParam<std::vector<ReporterName>>("reporters"))

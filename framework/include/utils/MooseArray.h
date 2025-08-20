@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,7 +27,7 @@ public:
   /**
    * @param size The initial size of the array.
    */
-  explicit MooseArray(const unsigned int size) : _data(nullptr), _allocated_size(0)
+  explicit MooseArray(const unsigned int size) : _data(nullptr), _size(0), _allocated_size(0)
   {
     resize(size);
   }
@@ -37,14 +37,14 @@ public:
    * @param default_value The default value to set.
    */
   explicit MooseArray(const unsigned int size, const T & default_value)
-    : _data(nullptr), _allocated_size(0)
+    : _data(nullptr), _size(0), _allocated_size(0)
   {
     resize(size);
 
     setAllValues(default_value);
   }
 
-  explicit MooseArray(const MooseArray & rhs) : _data(nullptr), _allocated_size(0)
+  explicit MooseArray(const MooseArray & rhs) : _data(nullptr), _size(0), _allocated_size(0)
   {
     resize(rhs._size);
 
@@ -173,10 +173,13 @@ public:
    */
   std::vector<T> stdVector() const;
 
+  ///@{
   /**
    * Reference to first element of array
    */
   const T * data() const { return _data; }
+  T * data() { return _data; }
+  ///@}
 
 private:
   /// Smart pointer storage
@@ -212,20 +215,19 @@ template <bool value_initialize>
 inline void
 MooseArray<T>::resize(unsigned int size)
 {
-  if (size <= _allocated_size)
-    _size = size;
-  else
+  if (size > _allocated_size)
   {
-    if (value_initialize)
+    if constexpr (value_initialize)
       _data_ptr.reset(new T[size]());
     else
-      _data_ptr.reset(new T[size]);
+      _data_ptr = std::make_unique<T[]>(size);
     mooseAssert(_data_ptr, "Failed to allocate MooseArray memory!");
 
     _data = _data_ptr.get();
     _allocated_size = size;
-    _size = size;
   }
+
+  _size = size;
 }
 
 template <typename T>
@@ -234,14 +236,14 @@ MooseArray<T>::resize(unsigned int size, const T & default_value)
 {
   if (size > _allocated_size)
   {
-    T * new_pointer = new T[size];
+    auto new_pointer = std::make_unique<T[]>(size);
     mooseAssert(new_pointer, "Failed to allocate MooseArray memory!");
 
     if (_data)
       for (unsigned int i = 0; i < _size; i++)
         new_pointer[i] = _data[i];
 
-    _data_ptr.reset(new_pointer);
+    _data_ptr = std::move(new_pointer);
     _data = _data_ptr.get();
     _allocated_size = size;
   }

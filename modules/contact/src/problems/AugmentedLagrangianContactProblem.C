@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,147 +24,70 @@
 #include "Executioner.h"
 #include "AddVariableAction.h"
 #include "ConstraintWarehouse.h"
+#include "MortarUserObject.h"
+#include "AugmentedLagrangeInterface.h"
+#include "AugmentedLagrangianContactConvergence.h"
+#include "Convergence.h"
 
 registerMooseObject("ContactApp", AugmentedLagrangianContactProblem);
+registerMooseObject("ContactApp", AugmentedLagrangianContactFEProblem);
 
+template <class T>
 InputParameters
-AugmentedLagrangianContactProblem::validParams()
+AugmentedLagrangianContactProblemTempl<T>::validParams()
 {
-  InputParameters params = ReferenceResidualProblem::validParams();
-  params.addParam<int>("maximum_lagrangian_update_iterations",
-                       100,
-                       "Maximum number of update Lagrangian Multiplier iterations per step");
+  InputParameters params = T::validParams();
+  params += AugmentedLagrangianContactProblemInterface::validParams();
   params.addClassDescription("Manages nested solution for augmented Lagrange contact");
   return params;
 }
 
-AugmentedLagrangianContactProblem::AugmentedLagrangianContactProblem(const InputParameters & params)
-  : ReferenceResidualProblem(params),
-    _num_lagmul_iterations(0),
-    _max_lagmul_iters(getParam<int>("maximum_lagrangian_update_iterations"))
+template <class T>
+AugmentedLagrangianContactProblemTempl<T>::AugmentedLagrangianContactProblemTempl(
+    const InputParameters & params)
+  : T(params), AugmentedLagrangianContactProblemInterface(params)
 {
 }
 
+template <class T>
 void
-AugmentedLagrangianContactProblem::timestepSetup()
+AugmentedLagrangianContactProblemTempl<T>::timestepSetup()
 {
-  _num_lagmul_iterations = 0;
-  ReferenceResidualProblem::timestepSetup();
+  _lagrangian_iteration_number = 0;
+  T::timestepSetup();
 }
 
-MooseNonlinearConvergenceReason
-AugmentedLagrangianContactProblem::checkNonlinearConvergence(std::string & msg,
-                                                             const PetscInt it,
-                                                             const Real xnorm,
-                                                             const Real snorm,
-                                                             const Real fnorm,
-                                                             const Real rtol,
-                                                             const Real divtol,
-                                                             const Real stol,
-                                                             const Real abstol,
-                                                             const PetscInt nfuncs,
-                                                             const PetscInt /*max_funcs*/,
-                                                             const Real ref_resid,
-                                                             const Real /*div_threshold*/)
+template <>
+void
+AugmentedLagrangianContactProblemTempl<ReferenceResidualProblem>::addDefaultNonlinearConvergence(
+    const InputParameters & params_to_apply)
 {
-
-  Real my_max_funcs = std::numeric_limits<int>::max();
-  Real my_div_threshold = std::numeric_limits<Real>::max();
-
-  MooseNonlinearConvergenceReason reason =
-      ReferenceResidualProblem::checkNonlinearConvergence(msg,
-                                                          it,
-                                                          xnorm,
-                                                          snorm,
-                                                          fnorm,
-                                                          rtol,
-                                                          divtol,
-                                                          stol,
-                                                          abstol,
-                                                          nfuncs,
-                                                          my_max_funcs,
-                                                          ref_resid,
-                                                          my_div_threshold);
-
-  _console << "Augmented Lagrangian contact iteration " << _num_lagmul_iterations << std::endl;
-
-  bool _augLM_repeat_step;
-
-  if (reason == MooseNonlinearConvergenceReason::CONVERGED_FNORM_ABS ||
-      reason == MooseNonlinearConvergenceReason::CONVERGED_FNORM_RELATIVE ||
-      reason == MooseNonlinearConvergenceReason::CONVERGED_SNORM_RELATIVE)
-  {
-    if (_num_lagmul_iterations < _max_lagmul_iters)
-    {
-      NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();
-      nonlinear_sys.update();
-
-      const ConstraintWarehouse & constraints = nonlinear_sys.getConstraintWarehouse();
-
-      std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *> * penetration_locators =
-          NULL;
-
-      bool displaced = false;
-      _augLM_repeat_step = false;
-      if (getDisplacedProblem() == NULL)
-      {
-        GeometricSearchData & geom_search_data = geomSearchData();
-        penetration_locators = &geom_search_data._penetration_locators;
-      }
-      else
-      {
-        GeometricSearchData & displaced_geom_search_data = getDisplacedProblem()->geomSearchData();
-        penetration_locators = &displaced_geom_search_data._penetration_locators;
-        displaced = true;
-      }
-
-      for (const auto & it : *penetration_locators)
-      {
-        PenetrationLocator & pen_loc = *(it.second);
-
-        BoundaryID secondary_boundary = pen_loc._secondary_boundary;
-
-        if (constraints.hasActiveNodeFaceConstraints(secondary_boundary, displaced))
-        {
-          const auto & ncs =
-              constraints.getActiveNodeFaceConstraints(secondary_boundary, displaced);
-
-          for (const auto & nc : ncs)
-          {
-            if (std::dynamic_pointer_cast<MechanicalContactConstraint>(nc) == NULL)
-              mooseError("AugmentedLagrangianContactProblem: dynamic cast of "
-                         "MechanicalContactConstraint object failed.");
-
-            if (!(std::dynamic_pointer_cast<MechanicalContactConstraint>(nc))
-                     ->AugmentedLagrangianContactConverged())
-            {
-              (std::dynamic_pointer_cast<MechanicalContactConstraint>(nc))
-                  ->updateAugmentedLagrangianMultiplier(false);
-              _augLM_repeat_step = true;
-              break;
-            }
-          }
-        }
-      }
-
-      if (_augLM_repeat_step)
-      {
-        // force it to keep iterating
-        reason = MooseNonlinearConvergenceReason::ITERATING;
-        _console << "Augmented Lagrangian Multiplier needs updating." << std::endl;
-        _num_lagmul_iterations++;
-      }
-      else
-        _console << "Augmented Lagrangian contact constraint enforcement is satisfied."
-                 << std::endl;
-    }
-    else
-    {
-      // maxed out
-      _console << "Maximum Augmented Lagrangian contact iterations have been reached." << std::endl;
-      reason = MooseNonlinearConvergenceReason::DIVERGED_FUNCTION_COUNT;
-    }
-  }
-
-  return reason;
+  std::string class_name = "AugmentedLagrangianContactReferenceConvergence";
+  InputParameters params = this->_factory.getValidParams(class_name);
+  params.applyParameters(params_to_apply);
+  params.applyParameters(parameters());
+  params.set<bool>("added_as_default") = true;
+  // TODO: Add multi-nonlinear system support
+  if (this->numNonlinearSystems() > 1)
+    mooseError("Multi-system not currently implemented");
+  this->addConvergence(class_name, this->getNonlinearConvergenceNames()[0], params);
 }
+
+template <>
+void
+AugmentedLagrangianContactProblemTempl<FEProblem>::addDefaultNonlinearConvergence(
+    const InputParameters & params_to_apply)
+{
+  std::string class_name = "AugmentedLagrangianContactFEProblemConvergence";
+  InputParameters params = _factory.getValidParams(class_name);
+  params.applyParameters(params_to_apply);
+  params.applyParameters(parameters());
+  params.set<bool>("added_as_default") = true;
+  // TODO: Add multi-nonlinear system support
+  if (this->numNonlinearSystems() > 1)
+    mooseError("Multi-system not currently implemented");
+  this->addConvergence(class_name, this->getNonlinearConvergenceNames()[0], params);
+}
+
+template class AugmentedLagrangianContactProblemTempl<ReferenceResidualProblem>;
+template class AugmentedLagrangianContactProblemTempl<FEProblem>;

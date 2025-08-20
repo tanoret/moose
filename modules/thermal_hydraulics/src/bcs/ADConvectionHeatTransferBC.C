@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,8 +19,10 @@ ADConvectionHeatTransferBC::validParams()
   params.addRequiredParam<FunctionName>("T_ambient", "Ambient temperature function");
   params.addRequiredParam<FunctionName>("htc_ambient",
                                         "Ambient heat transfer coefficient function");
-  params.addParam<PostprocessorName>(
-      "scale_pp", 1.0, "Post-processor by which to scale boundary condition");
+  params.addParam<MooseFunctorName>(
+      "scale", 1.0, "Functor by which to scale the boundary condition");
+  params.addClassDescription("Adds a convective heat flux boundary condition with user-specified "
+                             "ambient temperature and heat transfer coefficient functions");
   return params;
 }
 
@@ -28,13 +30,14 @@ ADConvectionHeatTransferBC::ADConvectionHeatTransferBC(const InputParameters & p
   : ADIntegratedBC(parameters),
     _T_ambient_fn(getFunction("T_ambient")),
     _htc_ambient_fn(getFunction("htc_ambient")),
-    _scale_pp(getPostprocessorValue("scale_pp"))
+    _scale(getFunctor<ADReal>("scale"))
 {
 }
 
 ADReal
 ADConvectionHeatTransferBC::computeQpResidual()
 {
-  return _scale_pp * _htc_ambient_fn.value(_t, _q_point[_qp]) *
+  const Moose::ElemSideQpArg space_arg = {_current_elem, _current_side, _qp, _qrule, _q_point[_qp]};
+  return _scale(space_arg, Moose::currentState()) * _htc_ambient_fn.value(_t, _q_point[_qp]) *
          (_u[_qp] - _T_ambient_fn.value(_t, _q_point[_qp])) * _test[_i][_qp];
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -51,7 +51,7 @@ PoroFullSatMaterial::PoroFullSatMaterial(const InputParameters & parameters)
     _constant_porosity(getParam<bool>("constant_porosity")),
 
     _porepressure(coupledValue("porepressure")),
-    _porepressure_name(getVar("porepressure", 0)->name()),
+    _porepressure_name(coupledName("porepressure", 0)),
 
     _ndisp(coupledComponents("displacements")),
     _grad_disp(_ndisp),

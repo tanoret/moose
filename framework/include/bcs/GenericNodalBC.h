@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -41,7 +41,6 @@ protected:
   using GenericNodalBC<is_ad>::adCoupledValue;                                                     \
   using GenericNodalBC<is_ad>::_u;                                                                 \
   using GenericNodalBC<is_ad>::_var;                                                               \
-  using GenericNodalBC<is_ad>::_name;                                                              \
   using GenericNodalBC<is_ad>::getVar;                                                             \
   using Coupleable::coupled;                                                                       \
   using Coupleable::coupledComponents

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -37,9 +37,7 @@ class NumericVector;
 class ComputeUserObjectsThread : public ThreadedElementLoop<ConstElemRange>
 {
 public:
-  ComputeUserObjectsThread(FEProblemBase & problem,
-                           SystemBase & sys,
-                           const TheWarehouse::Query & query);
+  ComputeUserObjectsThread(FEProblemBase & problem, const TheWarehouse::Query & query);
   // Splitting Constructor
   ComputeUserObjectsThread(ComputeUserObjectsThread & x, Threads::split);
 
@@ -51,6 +49,7 @@ public:
                           BoundaryID bnd_id,
                           const Elem * lower_d_elem = nullptr) override;
   virtual void onInternalSide(const Elem * elem, unsigned int side) override;
+  virtual void onExternalSide(const Elem * elem, unsigned int side) override;
   virtual void onInterface(const Elem * elem, unsigned int side, BoundaryID bnd_id) override;
   virtual void post() override;
   virtual void subdomainChanged() override;
@@ -58,7 +57,15 @@ public:
   void join(const ComputeUserObjectsThread & /*y*/);
 
 protected:
-  const NumericVector<Number> & _soln;
+  /// Print general information about the loop, like the ordering of class of objects
+  void printGeneralExecutionInformation() const override;
+
+  /// Print information about the loop, mostly order of execution of particular objects
+  void printBlockExecutionInformation() const override;
+
+  /// Format output of vector of UOs
+  template <typename T>
+  void printVectorOrdering(std::vector<T *> uos, const std::string & name) const;
 
 private:
   template <typename T>
@@ -81,6 +88,8 @@ private:
   std::vector<ShapeElementUserObject *> _shape_element_objs;
   std::vector<DomainUserObject *> _domain_objs;
   std::vector<DomainUserObject *> _all_domain_objs;
+
+  AuxiliarySystem & _aux_sys;
 };
 
 // determine when we need to run user objects based on whether any initial conditions or aux

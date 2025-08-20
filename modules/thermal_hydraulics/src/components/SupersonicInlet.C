@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,7 @@ SupersonicInlet::validParams()
   params.addParam<Real>("p", "Prescribed pressure [Pa]");
   params.addParam<Real>("T", "Prescribed temperature [K]");
   params.addParam<Real>("vel", "Prescribed velocity [m/s]");
+  params.addClassDescription("Deprecated component to add a supersonic flow inlet");
   return params;
 }
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,10 +23,10 @@ public:
 
   TestFaceToCellReconstruction(const InputParameters & parameters);
 
-  void initialize() override;
-  void execute() override {}
+  virtual void initialize() override;
+  virtual void execute() override {}
 
-  PostprocessorValue getValue() override final;
+  virtual PostprocessorValue getValue() const override final;
 
 protected:
   PostprocessorValue _reconstruction_error;

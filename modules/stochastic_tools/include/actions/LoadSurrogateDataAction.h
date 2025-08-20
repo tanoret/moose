@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,15 +10,17 @@
 #pragma once
 
 #include "Action.h"
-class SurrogateModel;
+#include "LoadModelDataAction.h"
+#include "SurrogateModel.h"
 
-class LoadSurrogateDataAction : public Action
+/**
+ * Action which is responsible for loading essential data for surrogates from
+ * separate binary files.
+ */
+class LoadSurrogateDataAction : public LoadModelDataAction<SurrogateModel>
 {
 public:
   static InputParameters validParams();
-  LoadSurrogateDataAction(const InputParameters & params);
-  virtual void act() override;
 
-private:
-  void load(const SurrogateModel & model);
+  LoadSurrogateDataAction(const InputParameters & params);
 };

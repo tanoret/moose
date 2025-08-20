@@ -1,11 +1,13 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
 //*
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
+
+#pragma once
 
 #include "RankThreeTensor.h"
 #include "RankTwoTensor.h"
@@ -97,10 +99,10 @@ RankThreeTensorTempl<T>::operator=(const RankThreeTensorTempl<T> & a)
 }
 
 template <typename T>
-VectorValue<T>
+libMesh::VectorValue<T>
 RankThreeTensorTempl<T>::operator*(const RankTwoTensorTempl<T> & a) const
 {
-  VectorValue<T> result;
+  libMesh::VectorValue<T> result;
 
   for (auto i : make_range(N))
   {
@@ -255,7 +257,7 @@ RankThreeTensorTempl<T>::fillFromInputVector(const std::vector<T> & input, FillM
       mooseError("To use fillFromPlaneNormal, your input must have size 3, the supplied size was ",
                  input.size(),
                  ".");
-    fillFromPlaneNormal(VectorValue<T>(input[0], input[1], input[2]));
+    fillFromPlaneNormal(libMesh::VectorValue<T>(input[0], input[1], input[2]));
   }
 
   else
@@ -265,7 +267,7 @@ RankThreeTensorTempl<T>::fillFromInputVector(const std::vector<T> & input, FillM
 
 template <typename T>
 void
-RankThreeTensorTempl<T>::fillFromPlaneNormal(const VectorValue<T> & input)
+RankThreeTensorTempl<T>::fillFromPlaneNormal(const libMesh::VectorValue<T> & input)
 {
   unsigned int index = 0;
   for (auto i : make_range(N))
@@ -312,7 +314,7 @@ RankThreeTensorTempl<T>::mixedProductRankFour(const RankTwoTensorTempl<T> & a) c
 
 template <typename T>
 void
-RankThreeTensorTempl<T>::rotate(const TensorValue<T> & R)
+RankThreeTensorTempl<T>::rotate(const libMesh::TensorValue<T> & R)
 {
   RankThreeTensorTempl<T> old = *this;
 
@@ -352,10 +354,10 @@ RankThreeTensorTempl<T>::fillGeneralFromInputVector(const std::vector<T> & input
 }
 
 template <typename T>
-VectorValue<T>
+libMesh::VectorValue<T>
 RankThreeTensorTempl<T>::doubleContraction(const RankTwoTensorTempl<T> & b) const
 {
-  VectorValue<T> result;
+  libMesh::VectorValue<T> result;
 
   for (auto i : make_range(N))
     for (auto j : make_range(N2))

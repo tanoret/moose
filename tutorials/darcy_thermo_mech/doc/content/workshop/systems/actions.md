@@ -1,4 +1,4 @@
-# Action System
+# [Action System](source/actions/Action.md)
 
 A system for the programmatic creation of simulation objects and input file syntax.
 
@@ -15,9 +15,9 @@ parameters to be manipulated and re-used during object creation.
 
 ## Action Object
 
-An action design to build specific objects, such as the case in [#step09] for tensor mechanics.
+An action designed to build specific objects, such as the case in [#step09] for solid mechanics.
 
-!listing problems/step9.i block=Modules/TensorMechanics/Master
+!listing problems/step9.i block=Physics/SolidMechanics/QuasiStatic
 
 !---
 
@@ -26,7 +26,7 @@ An action design to build specific objects, such as the case in [#step09] for te
 
 The MOOSE action system operates on tasks, each task is connected to one or many actions.
 
-For each task the `act()` method is called for each task, thus the act method can be used to
+For each task the `act()` method is called. Thus the act method can be used to
 create any number of objects.
 
 !---

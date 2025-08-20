@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,13 +27,43 @@ INSFVFluxKernel::INSFVFluxKernel(const InputParameters & params)
 }
 
 void
-INSFVFluxKernel::processResidualAndJacobian(const ADReal & residual)
+INSFVFluxKernel::computeResidual(const FaceInfo & fi)
 {
-#ifdef MOOSE_GLOBAL_AD_INDEXING
+  if (_rc_uo.segregated())
+    FVFluxKernel::computeResidual(fi);
+}
+
+void
+INSFVFluxKernel::computeJacobian(const FaceInfo & fi)
+{
+  if (_rc_uo.segregated())
+    FVFluxKernel::computeJacobian(fi);
+}
+
+void
+INSFVFluxKernel::computeResidualAndJacobian(const FaceInfo & fi)
+{
+  if (_rc_uo.segregated())
+    FVFluxKernel::computeResidualAndJacobian(fi);
+}
+
+ADReal
+INSFVFluxKernel::computeQpResidual()
+{
+  mooseAssert(_rc_uo.segregated(), "We should not get here if we are not segregated!");
+  return computeSegregatedContribution();
+}
+
+void
+INSFVFluxKernel::addResidualAndJacobian(const ADReal & residual)
+{
   auto process_residual = [this](const ADReal & residual, const Elem & elem)
   {
     const auto dof_index = elem.dof_number(_sys.number(), _var.number(), 0);
-    _assembly.processResidualAndJacobian(residual, dof_index, _vector_tags, _matrix_tags);
+    addResidualsAndJacobian(_assembly,
+                            std::array<ADReal, 1>{{residual}},
+                            std::array<dof_id_type, 1>{{dof_index}},
+                            _var.scalingFactor());
   };
 
   if (_face_type == FaceInfo::VarFaceNeighbors::ELEM ||
@@ -42,7 +72,4 @@ INSFVFluxKernel::processResidualAndJacobian(const ADReal & residual)
   if (_face_type == FaceInfo::VarFaceNeighbors::NEIGHBOR ||
       _face_type == FaceInfo::VarFaceNeighbors::BOTH)
     process_residual(-residual, _face_info->neighbor());
-#else
-  libmesh_ignore(residual);
-#endif
 }

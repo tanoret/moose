@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,14 +9,14 @@
 
 #pragma once
 
-#include "ADDirichletBCBase.h"
+#include "ADDirichletBCBaseTempl.h"
 
 /**
  * Boundary condition of a Dirichlet type
  *
  * Sets the values of a nodal variable at nodes
  */
-class ADDirichletBC : public ADDirichletBCBase
+class ADDirichletBC : public ADDirichletBCBaseTempl<Real>
 {
 public:
   static InputParameters validParams();

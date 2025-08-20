@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,8 +27,4 @@ public:
 
 private:
   const MeshGeneratorName & _generator_prefix;
-
-  const unsigned int & _num_elements_x_prop;
-  const Real & _xmin_prop;
-  const Real & _xmax_prop;
 };

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,8 @@ InputParameters
 ADTemperatureWall3EqnMaterial::validParams()
 {
   InputParameters params = Material::validParams();
+  params.addClassDescription("Computes the wall temperature from the fluid temperature, "
+                             "the heat flux and the heat transfer coefficient");
   params.addRequiredParam<MaterialPropertyName>("T", "Fluid temperature");
   params.addRequiredParam<MaterialPropertyName>("Hw", "Heat transfer coefficient");
   params.addRequiredParam<MaterialPropertyName>("q_wall", "Wall heat flux");

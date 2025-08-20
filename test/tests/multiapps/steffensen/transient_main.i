@@ -87,19 +87,22 @@
     input_files = 'transient_sub.i'
     clone_parent_mesh = true
     execute_on = 'timestep_begin'
+    # The input was originally created with effectively no restore
+    # see the changes made for #5554 then reverted in #28115
+    no_restore = true
   []
 []
 
 [Transfers]
   [v_from_sub]
-    type = MultiAppNearestNodeTransfer
+    type = MultiAppGeneralFieldNearestLocationTransfer
     from_multi_app = sub
     source_variable = v
     variable = v
     execute_on = 'timestep_begin'
   []
   [u_to_sub]
-    type = MultiAppNearestNodeTransfer
+    type = MultiAppGeneralFieldNearestLocationTransfer
     to_multi_app = sub
     source_variable = u
     variable = u

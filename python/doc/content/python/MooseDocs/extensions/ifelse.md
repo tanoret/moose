@@ -13,9 +13,9 @@ following sections demonstrate the use of the commands.
 
 The "modules" configuration item provides a list of python modules to search when calling
 conditional functions. The default behavior of the module is equivalent to adding the following
-the "modules" item.
+to the "modules" item.
 
-!listing
+!listing language=yaml
 MooseDocs.extensions.ifelse:
     modules:
         - MooseDocs.extensions.ifelse
@@ -30,7 +30,7 @@ function must exist within the modules loaded by the extension using the "module
 (see [ifelse-config]).
 
 This extension was originally created to allow content to depend on the application name, as
-such such a scenario will be used to demonstrate use of the syntax. The most basic use is a single
+such a scenario will be used to demonstrate use of the syntax. The most basic use is a single
 "if" statement. When the supplied function returns `True` the content is
 displayed (see [if-true], when `False` the content is ignored (see [if-false]).
 
@@ -72,8 +72,8 @@ The complete list of settings available for the "if" command are provided in [if
 
 Creating `if`-`elif`-`else` statements is accomplished by using an `if` command followed by any
 number of `elif` commands and then a final (optional) `else` command. It is important to understand
-that the implementation actually uses separate [commands](command.md). As such, each command the
-`if`, `elif`, and/or the `else` can use the inline or block version of the command definition. The
+that the implementation actually uses separate [commands](command.md). As such, each command (the
+`if`, `elif`, and/or the `else`) can use the inline or block version of the command definition. The
 extension will enforce that commands occur in the expected order.
 
 !devel! example id=if-elif-else caption=A `if elif else` statement that mixes the command

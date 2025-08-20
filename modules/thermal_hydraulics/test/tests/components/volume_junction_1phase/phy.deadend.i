@@ -17,6 +17,7 @@
 
 [AuxVariables]
   [p0]
+    block = 'inlet_pipe outlet_pipe deadend_pipe'
     family = MONOMIAL
     order = CONSTANT
   []
@@ -88,6 +89,7 @@
     connections = 'inlet_pipe:out deadend_pipe:in outlet_pipe:in'
     position = '1 0 0'
     volume = 1e-8
+    use_scalar_variables = false
   []
 
   [outlet_pipe]
@@ -157,6 +159,9 @@
 
   l_tol = 1e-6
   l_max_its = 10
+
+  petsc_options_iname = '-pc_type'
+  petsc_options_value = 'lu'
 
   start_time = 0
   end_time = 5

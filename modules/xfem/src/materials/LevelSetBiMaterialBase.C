@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -50,7 +50,7 @@ LevelSetBiMaterialBaseTempl<is_ad>::LevelSetBiMaterialBaseTempl(const InputParam
 {
   FEProblemBase * fe_problem = dynamic_cast<FEProblemBase *>(&_subproblem);
 
-  if (fe_problem == NULL)
+  if (fe_problem == nullptr)
     mooseError("Problem casting _subproblem to FEProblemBase in XFEMMaterialStateMarkerBase");
 
   _xfem = MooseSharedNamespace::dynamic_pointer_cast<XFEM>(fe_problem->getXFEM());

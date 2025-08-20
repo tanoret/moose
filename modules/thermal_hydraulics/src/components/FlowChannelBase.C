@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,10 +17,14 @@
 #include "libmesh/edge_edge3.h"
 
 const std::map<std::string, FlowChannelBase::EConvHeatTransGeom>
-    FlowChannelBase::_heat_transfer_geom_to_enum{{"PIPE", PIPE}, {"ROD_BUNDLE", ROD_BUNDLE}};
+    FlowChannelBase::_heat_transfer_geom_to_enum{
+        {"PIPE", PIPE}, {"ROD_BUNDLE", ROD_BUNDLE}, {"HEX_ROD_BUNDLE", HEX_ROD_BUNDLE}};
 
 const std::map<std::string, FlowChannelBase::EPipeType> FlowChannelBase::_pipe_type_to_enum{
     {"STRAIGHT", STRAIGHT}, {"CURVED", CURVED}, {"DOWNCOMER", DOWNCOMER}};
+
+const std::map<std::string, FlowChannelBase::EPipeLocation> FlowChannelBase::_pipe_location_to_enum{
+    {"INTERIOR", INTERIOR}, {"EDGE", EDGE}, {"CORNER", CORNER}};
 
 MooseEnum
 FlowChannelBase::getConvHeatTransGeometry(const std::string & name)
@@ -32,6 +36,12 @@ MooseEnum
 FlowChannelBase::getPipeType(const std::string & name)
 {
   return THM::getMooseEnum<EPipeType>(name, _pipe_type_to_enum);
+}
+
+MooseEnum
+FlowChannelBase::getPipeLocation(const std::string & name)
+{
+  return THM::getMooseEnum<EPipeLocation>(name, _pipe_location_to_enum);
 }
 
 template <>
@@ -49,6 +59,13 @@ THM::stringToEnum(const std::string & s)
   return stringToEnum<FlowChannelBase::EPipeType>(s, FlowChannelBase::_pipe_type_to_enum);
 }
 
+template <>
+FlowChannelBase::EPipeLocation
+THM::stringToEnum(const std::string & s)
+{
+  return stringToEnum<FlowChannelBase::EPipeLocation>(s, FlowChannelBase::_pipe_location_to_enum);
+}
+
 InputParameters
 FlowChannelBase::validParams()
 {
@@ -63,13 +80,25 @@ FlowChannelBase::validParams()
   params.addParam<MooseEnum>("heat_transfer_geom",
                              FlowChannelBase::getConvHeatTransGeometry("PIPE"),
                              "Convective heat transfer geometry");
+  params.addParam<MooseEnum>("pipe_location",
+                             FlowChannelBase::getPipeLocation("INTERIOR"),
+                             "Pipe location within the bundle");
   params.addParam<Real>("PoD", 1, "Pitch-to-diameter ratio for parallel bundle heat transfer [-]");
   params.addParam<bool>(
       "pipe_pars_transferred",
       false,
       "Set to true if Dh, P_hf and A are going to be transferred in from an external source");
   params.addParam<bool>("lump_mass_matrix", false, "Lump the mass matrix");
-  params.addRequiredParam<std::string>("closures", "Closures type");
+  params.addParam<std::vector<std::string>>(
+      "closures",
+      {},
+      "Closures object(s). This is optional since closure relations can be supplied directly by "
+      "Materials as well.");
+  params.addParam<bool>("name_multiple_ht_by_index",
+                        true,
+                        "If true, when there are multiple heat transfer components connected to "
+                        "this flow channel, use their index for naming related quantities; "
+                        "otherwise, use the name of the heat transfer component.");
 
   params.setDocString(
       "orientation",
@@ -77,8 +106,8 @@ FlowChannelBase::validParams()
       "curved flow channels, it is the (tangent) direction at the start position.");
 
   params.addPrivateParam<std::string>("component_type", "pipe");
-
   params.declareControllable("A f");
+  params.addParamNamesToGroup("lump_mass_matrix", "Numerical scheme");
 
   return params;
 }
@@ -93,10 +122,10 @@ FlowChannelBase::FlowChannelBase(const InputParameters & params)
                        ? 0.0
                        : std::acos(_dir * _gravity_vector / (_dir.norm() * _gravity_magnitude)) *
                              180 / M_PI),
-    _closures_name(getParam<std::string>("closures")),
     _pipe_pars_transferred(getParam<bool>("pipe_pars_transferred")),
     _roughness(getParam<Real>("roughness")),
     _HT_geometry(getEnumParam<EConvHeatTransGeom>("heat_transfer_geom")),
+    _pipe_location(getEnumParam<EPipeLocation>("pipe_location")),
     _PoD(getParam<Real>("PoD")),
     _has_PoD(isParamValid("PoD")),
     _temperature_mode(false),
@@ -139,23 +168,10 @@ FlowChannelBase::init()
   {
     _flow_model->init();
 
-    if (getTHMProblem().hasClosures(_closures_name))
-      _closures = getTHMProblem().getClosures(_closures_name);
-    else
-      _closures = buildClosures();
+    const auto & closures_names = getParam<std::vector<std::string>>("closures");
+    for (const auto & closures_name : closures_names)
+      _closures_objects.push_back(getTHMProblem().getClosures(closures_name));
   }
-}
-
-std::shared_ptr<ClosuresBase>
-FlowChannelBase::buildClosures()
-{
-  const std::string class_name =
-      ThermalHydraulicsApp::getClosuresClassName(_closures_name, getFlowModelID());
-  InputParameters params = _factory.getValidParams(class_name);
-  params.set<THMProblem *>("_thm_problem") = &getTHMProblem();
-  params.set<Logger *>("_logger") = &getTHMProblem().log();
-  return _factory.create<ClosuresBase>(
-      class_name, genName(name(), "closure", _closures_name), params);
 }
 
 void
@@ -182,8 +198,8 @@ FlowChannelBase::check() const
 {
   Component1D::check();
 
-  if (_closures)
-    _closures->checkFlowChannel(*this);
+  for (const auto & closures : _closures_objects)
+    closures->checkFlowChannel(*this);
 
   // check types of heat transfer for all sources; must be all of same type
   if (_temperature_mode)
@@ -207,7 +223,7 @@ FlowChannelBase::addVariables()
   _flow_model->addVariables();
 
   // total heat flux perimeter
-  if (_n_heat_transfer_connections > 1)
+  if (_n_heat_transfer_connections > 1 && !_app.isRestarting())
   {
     const std::string class_name = "SumIC";
     InputParameters params = _factory.getValidParams(class_name);
@@ -248,11 +264,11 @@ FlowChannelBase::addCommonObjects()
       makeFunctionControllableIfConstant(_area_function, "Area");
     }
     {
-      const std::string class_name = "CopyValueAux";
+      const std::string class_name = "ProjectionAux";
       InputParameters params = _factory.getValidParams(class_name);
       params.set<AuxVariableName>("variable") = FlowModel::AREA;
       params.set<std::vector<SubdomainName>>("block") = getSubdomainNames();
-      params.set<std::vector<VariableName>>("source") = {FlowModel::AREA_LINEAR};
+      params.set<std::vector<VariableName>>("v") = {FlowModel::AREA_LINEAR};
       params.set<ExecFlagEnum>("execute_on") = ts_execute_on;
       const std::string aux_kernel_name = genName(name(), "area_aux");
       getTHMProblem().addAuxKernel(class_name, aux_kernel_name, params);
@@ -308,7 +324,9 @@ FlowChannelBase::addMooseObjects()
   }
 
   _flow_model->addMooseObjects();
-  _closures->addMooseObjectsFlowChannel(*this);
+
+  for (const auto & closures : _closures_objects)
+    closures->addMooseObjectsFlowChannel(*this);
 }
 
 void
@@ -346,7 +364,13 @@ FlowChannelBase::getHeatTransferNamesSuffix(const std::string & ht_name) const
     if (it != _heat_transfer_names.end())
     {
       const unsigned int index = std::distance(_heat_transfer_names.begin(), it);
-      const std::string suffix = ":" + std::to_string(index + 1);
+
+      std::string suffix = ":";
+      if (getParam<bool>("name_multiple_ht_by_index"))
+        suffix += std::to_string(index + 1);
+      else
+        suffix += _heat_transfer_names[index];
+
       return suffix;
     }
     else

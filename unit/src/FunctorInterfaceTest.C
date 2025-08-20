@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -61,6 +61,11 @@ TEST(FunctorInterfaceTest, deduceFunctorName)
   {
     auto params = base_params;
     params.set<PostprocessorName>("test") = "pp";
+    EXPECT_EQ(FunctorInterface::deduceFunctorName("test", params), "pp");
+  }
+  {
+    auto params = base_params;
+    params.set<std::string>("test") = "str";
     try
     {
       FunctorInterface::deduceFunctorName("test", params);

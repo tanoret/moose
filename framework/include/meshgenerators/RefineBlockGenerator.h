@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,6 +36,9 @@ private:
 
   /// Toggles whether neighboring level one elements should be refined or not. Defaults to true.
   const bool _enable_neighbor_refinement;
+
+  /// maximum element size over which elements are refined
+  const Real _max_element_volume;
 
   /**
    * The actual function refining the blocks. This is done recursively in order

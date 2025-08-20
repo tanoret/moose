@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,6 +17,7 @@ ADOneDEnergyWallHeatFlux::validParams()
   InputParameters params = ADKernel::validParams();
   params.addRequiredParam<MaterialPropertyName>("q_wall", "Wall heat flux material property");
   params.addRequiredCoupledVar("P_hf", "heat flux perimeter");
+  params.addClassDescription("Computes a heat flux term for the energy equation");
   return params;
 }
 

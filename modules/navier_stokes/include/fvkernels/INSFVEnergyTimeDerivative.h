@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include "FVTimeKernel.h"
+#include "FVFunctorTimeKernel.h"
 
-class INSFVEnergyTimeDerivative : public FVTimeKernel
+class INSFVEnergyTimeDerivative : public FVFunctorTimeKernel
 {
 public:
   static InputParameters validParams();
@@ -22,6 +22,6 @@ protected:
 
   /// the density
   const Moose::Functor<ADReal> & _rho;
-  /// the heat conductivity
-  const Moose::Functor<ADReal> & _cp;
+  /// The time derivative of the specific enthalpy
+  const Moose::Functor<ADReal> & _h_dot;
 };

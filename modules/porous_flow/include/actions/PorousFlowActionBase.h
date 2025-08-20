@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -50,6 +50,12 @@ protected:
   /// The name of the PorousFlowDictator object to be added
   const std::string _dictator_name;
 
+  /// if this vector is not empty the variables, kernels and materials are restricted to these subdomains
+  std::vector<SubdomainName> _subdomain_names;
+
+  /// indicates, if the vector of subdomain names is set (dont set block restrictions, if not)
+  const bool _subdomain_names_set;
+
   /// Number of aqueous-equilibrium secondary species
   const unsigned int _num_aqueous_equilibrium;
 
@@ -60,13 +66,13 @@ protected:
   const RealVectorValue _gravity;
 
   /// Name of the mass-fraction variables (if any)
-  const std::vector<VariableName> & _mass_fraction_vars;
+  const std::vector<VariableName> _mass_fraction_vars;
 
   /// Number of mass-fraction variables
   const unsigned _num_mass_fraction_vars;
 
   /// Name of the temperature variable (if any)
-  const std::vector<VariableName> & _temperature_var;
+  const std::vector<VariableName> _temperature_var;
 
   /// Displacement NonlinearVariable names (if any)
   const std::vector<VariableName> & _displacements;

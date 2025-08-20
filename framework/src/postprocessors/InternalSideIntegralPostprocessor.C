@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -37,17 +37,15 @@ InternalSideIntegralPostprocessor::execute()
 }
 
 Real
-InternalSideIntegralPostprocessor::getValue()
+InternalSideIntegralPostprocessor::getValue() const
 {
-
   return _integral_value;
 }
 
 void
 InternalSideIntegralPostprocessor::threadJoin(const UserObject & y)
 {
-  const InternalSideIntegralPostprocessor & pps =
-      static_cast<const InternalSideIntegralPostprocessor &>(y);
+  const auto & pps = static_cast<const InternalSideIntegralPostprocessor &>(y);
   _integral_value += pps._integral_value;
 }
 

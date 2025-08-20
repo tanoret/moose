@@ -51,7 +51,8 @@
   exodus = true
   [out]
     type = Checkpoint
-    interval = 3
+    time_step_interval = 3
     num_files = 2
+    wall_time_interval = 3600 # seconds
   []
 []

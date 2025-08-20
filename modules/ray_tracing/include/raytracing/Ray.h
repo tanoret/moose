@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -321,7 +321,7 @@ public:
    *
    * This MUST be called before setStartingDirection(), setStartingEndPoint(),
    * or setStartingMaxDistance(). It cannot be called after a Ray has
-   * began tracing.
+   * begun tracing.
    *
    * @param starting_point The starting point
    * @param starting_elem The starting element (if known)
@@ -336,14 +336,14 @@ public:
    *
    * This MUST be called after setStart(). It cannot be used with
    * setStartingEndPoint(), which sets the direction internally.
-   * It cannot be called after a Ray has began tracing.
+   * It cannot be called after a Ray has begun tracing.
    */
   void setStartingDirection(const Point & starting_direction);
   /**
    * Sets the starting end point to \p starting_point for a Ray.
    *
    * This MUST be called after setStart(). It cannot be used with
-   * setStartingDirection(). It cannot be called after a Ray has began tracing.
+   * setStartingDirection(). It cannot be called after a Ray has begun tracing.
    *
    * Internally, this sets the direction to be
    * currentPoint() -> \p starting_direction, and sets the maximum
@@ -354,7 +354,7 @@ public:
    * Sets the maximum distance this Ray should travel to \p starting_max_distance.
    *
    * This MUST be called after setStart(). It cannot be used with
-   * setStartingEndPoint(). It cannot be called after a Ray has began tracing.
+   * setStartingEndPoint(). It cannot be called after a Ray has begun tracing.
    *
    * If setting a Ray's trajectory with setStartingEndPoint(), the max distance
    * is set internally to be || end - start ||.
@@ -362,6 +362,15 @@ public:
    * Can only be called before a Ray has started to be traced!
    */
   void setStartingMaxDistance(const Real starting_max_distance);
+  /**
+   * Sets the Ray to be stationary (max distance = 0).
+   *
+   * This MUST be called after setStart(). It cannot be used with
+   * setStartingEndPoint(). It cannot be called after a Ray has begun tracing.
+   *
+   * Can only be called before a Ray has started to be traced!
+   */
+  void setStationary();
 
   /**
    * Invalidates a Ray's starting element.
@@ -369,7 +378,7 @@ public:
    * This is useful after the mesh has changed due to adaptivity,
    * in which the starting element may no longer be valid.
    *
-   * This can only be called before a Ray has began tracing.
+   * This can only be called before a Ray has begun tracing.
    */
   void invalidateStartingElem();
   /**
@@ -378,7 +387,7 @@ public:
    * This is useful after the mesh has changed due to adaptivity,
    * in which the incoming side may no longer be valid.
    *
-   * This can only be called before a Ray has began tracing.
+   * This can only be called before a Ray has begun tracing.
    */
   void invalidateStartingIncomingSide();
   /**
@@ -389,7 +398,7 @@ public:
    * - Starting direction
    * - Starting maximum distance
    *
-   * This can only be called before a Ray has began tracing.
+   * This can only be called before a Ray has begun tracing.
    */
   void clearStartingInfo();
 
@@ -488,6 +497,11 @@ public:
    * Whether or not the distance has been set via setStartingMaxDistance()
    */
   bool maxDistanceSet() const { return _max_distance != std::numeric_limits<Real>::max(); }
+
+  /**
+   * @return Whether or not the Ray is set to be stationary
+   */
+  inline bool stationary() const;
 
   /**
    * Whether or not this Ray should continue
@@ -719,6 +733,15 @@ private:
   friend void dataStore(std::ostream & stream, std::shared_ptr<Ray> & ray, void * context);
   friend void dataLoad(std::istream & stream, std::shared_ptr<Ray> & ray, void * context);
 };
+
+bool
+Ray::stationary() const
+{
+  const bool stationary = _max_distance == 0;
+  if (stationary)
+    mooseAssert(_intersections == 0, "Should be zero");
+  return stationary;
+}
 
 /**
  * The following methods are specializations for using the Parallel::packed_range_* routines

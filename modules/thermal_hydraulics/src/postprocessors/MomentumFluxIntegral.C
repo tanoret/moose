@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,7 @@ InputParameters
 MomentumFluxIntegral::validParams()
 {
   InputParameters params = SideIntegralPostprocessor::validParams();
+  params.addClassDescription("Computes the integral of the momentum flux over a boundary");
   params.addRequiredCoupledVar("arhouA", "Momentum equation variable");
   params.addRequiredCoupledVar("vel", "Velocity");
   params.addRequiredCoupledVar("p", "Pressure");
@@ -36,7 +37,7 @@ MomentumFluxIntegral::MomentumFluxIntegral(const InputParameters & parameters)
 void
 MomentumFluxIntegral::threadJoin(const UserObject & y)
 {
-  const MomentumFluxIntegral & pps = static_cast<const MomentumFluxIntegral &>(y);
+  const auto & pps = static_cast<const MomentumFluxIntegral &>(y);
   _integral_value += pps._integral_value;
 }
 

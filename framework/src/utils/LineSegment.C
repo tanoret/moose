@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "LineSegment.h"
+
+#include "JsonIO.h"
 
 #include "libmesh/plane.h"
 #include "libmesh/vector_value.h"
@@ -61,7 +63,7 @@ LineSegment::contains_point(const Point & p) const
 }
 
 bool
-LineSegment::intersect(const Plane & pl, Point & intersect_p) const
+LineSegment::intersect(const libMesh::Plane & pl, Point & intersect_p) const
 {
   /**
    * There are three cases in 3D for intersection of a line and a plane
@@ -221,4 +223,35 @@ LineSegment::intersect(const LineSegment & l, Point & intersect_p) const
   intersect_p = _p0 + a*v0;
   return true;
      */
+}
+
+void
+LineSegment::set(const Point & p0, const Point & p1)
+{
+  setStart(p0);
+  setEnd(p1);
+}
+
+void
+dataStore(std::ostream & stream, LineSegment & l, void * context)
+{
+  dataStore(stream, l.start(), context);
+  dataStore(stream, l.end(), context);
+}
+
+void
+dataLoad(std::istream & stream, LineSegment & l, void * context)
+{
+  Point p0;
+  dataLoad(stream, p0, context);
+  Point p1;
+  dataLoad(stream, p1, context);
+  l.set(p0, p1);
+}
+
+void
+to_json(nlohmann::json & json, const LineSegment & l)
+{
+  to_json(json["start"], l.start());
+  to_json(json["end"], l.end());
 }

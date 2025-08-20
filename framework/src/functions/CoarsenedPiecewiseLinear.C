@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,6 +36,27 @@ CoarsenedPiecewiseLinear::validParams()
 
 CoarsenedPiecewiseLinear::CoarsenedPiecewiseLinear(const InputParameters & parameters)
   : PiecewiseLinearBase(parameters)
+{
+  if (isRawDataLoaded())
+  {
+    buildCoarsenedGrid();
+    _interpolation_created = true;
+  }
+}
+
+void
+CoarsenedPiecewiseLinear::initialSetup()
+{
+  PiecewiseTabularBase::initialSetup();
+  if (isRawDataLoaded() && !_interpolation_created)
+    buildCoarsenedGrid();
+  else if (!isRawDataLoaded())
+    mooseError("Data has still not been loaded at setup time. Something has gone wrong during "
+               "Function initialization, contact a developer");
+}
+
+void
+CoarsenedPiecewiseLinear::buildCoarsenedGrid()
 {
   const Real x_scale = getParam<Real>("x_scale");
   const Real y_scale = getParam<Real>("y_scale");

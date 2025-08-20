@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -48,7 +48,7 @@ protected:
   void makePNG();
 
   /// Called to run the functions in this class.
-  virtual void output(const ExecFlagType & type);
+  virtual void output();
 
   /// Variable to determine the size, or resolution, of the image.
   const unsigned int _resolution;
@@ -63,7 +63,7 @@ protected:
   const Real _transparency;
 
   /// Pointer to the libMesh::MeshFunction object in which the read data is stored.
-  std::unique_ptr<MeshFunction> _mesh_function;
+  std::unique_ptr<libMesh::MeshFunction> _mesh_function;
 
   /// The boundaries of the image.
   BoundingBox _box;

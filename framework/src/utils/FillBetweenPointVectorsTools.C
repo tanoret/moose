@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,20 +14,24 @@
 #include "MooseError.h"
 
 // libMesh includes
+#include "libmesh/int_range.h"
+#include "libmesh/mesh_base.h"
 #include "libmesh/mesh_generation.h"
-#include "libmesh/unstructured_mesh.h"
+#include "libmesh/mesh_serializer.h"
 #include "libmesh/point.h"
 #include "libmesh/elem.h"
 #include "libmesh/node.h"
 #include "libmesh/face_tri3.h"
 #include "libmesh/face_quad4.h"
 
+using namespace libMesh;
+
 namespace FillBetweenPointVectorsTools
 {
 void
-fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh, // an empty mesh is expected
-                                 const std::vector<Point> boundary_points_vec_1,
-                                 std::vector<Point> boundary_points_vec_2,
+fillBetweenPointVectorsGenerator(MeshBase & mesh, // an empty mesh is expected
+                                 const std::vector<Point> & boundary_points_vec_1,
+                                 const std::vector<Point> & boundary_points_vec_2,
                                  const unsigned int num_layers,
                                  const subdomain_id_type transition_layer_id,
                                  const boundary_id_type input_boundary_1_id,
@@ -70,14 +74,29 @@ fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh, // an empty mesh is expe
                " ",
                name,
                ", QUAD4 elements option can only be selected when the two input vectors of Points "
-               "have the same length.");
+               "have the same length. In the current instance, the first vector has ",
+               boundary_points_vec_1.size(),
+               " points and the second ",
+               boundary_points_vec_2.size(),
+               " points");
+
+  std::vector<Point> possibly_reoriented_boundary_points_vec_2;
+  const std::vector<Point> * oriented_boundary_points_vec_2 = &boundary_points_vec_2;
 
   if (needFlip(boundary_points_vec_1, boundary_points_vec_2))
   {
-    std::reverse(boundary_points_vec_2.begin(), boundary_points_vec_2.end());
-    mooseWarning(
-        "In FillBetweenPointVectorsTools, one of the vector of Points must be flipped to ensure "
-        "correct transition layer shape.");
+    possibly_reoriented_boundary_points_vec_2.assign(boundary_points_vec_2.rbegin(),
+                                                     boundary_points_vec_2.rend());
+    oriented_boundary_points_vec_2 = &possibly_reoriented_boundary_points_vec_2;
+
+    // This isn't worth warning about.  The way
+    // MooseMeshUtils::makeOrderedNodeList works, we can end up
+    // finding a flip necessary on one element numbering and
+    // unnecessary on another.
+    //
+    // mooseWarning(
+    //     "In FillBetweenPointVectorsTools, one of the vector of Points must be flipped to ensure "
+    //     "correct transition layer shape.");
   }
 
   std::vector<Real> vec_1_index; // Unweighted index
@@ -106,7 +125,7 @@ fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh, // an empty mesh is expe
                        linear_vec_1_y,
                        spline_vec_1_l);
   weightedInterpolator(vec_2_node_num,
-                       boundary_points_vec_2,
+                       *oriented_boundary_points_vec_2,
                        vec_2_index,
                        wt_2,
                        index_2,
@@ -125,7 +144,7 @@ fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh, // an empty mesh is expe
   // Node counter
   unsigned int node_counter = 0;
 
-  for (unsigned int i = 0; i < num_layers + 1; i++)
+  for (const auto i : make_range(num_layers + 1))
   {
     // calculate number of nodes in each sublayer
     node_number_vec.push_back(
@@ -157,7 +176,7 @@ fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh, // an empty mesh is expe
                        vec_2_node_num,
                        i);
 
-    for (unsigned int j = 0; j < node_number_vec[i]; j++)
+    for (const auto j : make_range(node_number_vec[i]))
     {
       // Create surrogate Points on side #1 for Point #j on the sublayer
       Point surrogate_pos_1 = Point(linear_vec_1_x->sample(weighted_surrogate_index_1[j]),
@@ -205,9 +224,9 @@ fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh, // an empty mesh is expe
 }
 
 void
-fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh,
-                                 const std::vector<Point> boundary_points_vec_1,
-                                 const std::vector<Point> boundary_points_vec_2,
+fillBetweenPointVectorsGenerator(MeshBase & mesh,
+                                 const std::vector<Point> & boundary_points_vec_1,
+                                 const std::vector<Point> & boundary_points_vec_2,
                                  const unsigned int num_layers,
                                  const subdomain_id_type transition_layer_id,
                                  const boundary_id_type external_boundary_id,
@@ -230,10 +249,10 @@ fillBetweenPointVectorsGenerator(ReplicatedMesh & mesh,
 }
 
 void
-elementsCreationFromNodesVectorsQuad(ReplicatedMesh & mesh,
-                                     const std::vector<std::vector<Node *>> nodes,
+elementsCreationFromNodesVectorsQuad(MeshBase & mesh,
+                                     const std::vector<std::vector<Node *>> & nodes,
                                      const unsigned int num_layers,
-                                     const std::vector<unsigned int> node_number_vec,
+                                     const std::vector<unsigned int> & node_number_vec,
                                      const subdomain_id_type transition_layer_id,
                                      const boundary_id_type input_boundary_1_id,
                                      const boundary_id_type input_boundary_2_id,
@@ -243,7 +262,7 @@ elementsCreationFromNodesVectorsQuad(ReplicatedMesh & mesh,
   const unsigned int node_number = node_number_vec.front();
   BoundaryInfo & boundary_info = mesh.get_boundary_info();
 
-  for (unsigned int i = 0; i < num_layers; i++)
+  for (const auto i : make_range(num_layers))
     for (unsigned int j = 1; j < node_number; j++)
     {
       Elem * elem = mesh.add_elem(new Quad4);
@@ -265,10 +284,10 @@ elementsCreationFromNodesVectorsQuad(ReplicatedMesh & mesh,
 }
 
 void
-elementsCreationFromNodesVectors(ReplicatedMesh & mesh,
-                                 const std::vector<std::vector<Node *>> nodes,
+elementsCreationFromNodesVectors(MeshBase & mesh,
+                                 const std::vector<std::vector<Node *>> & nodes,
                                  const unsigned int num_layers,
-                                 const std::vector<unsigned int> node_number_vec,
+                                 const std::vector<unsigned int> & node_number_vec,
                                  const subdomain_id_type transition_layer_id,
                                  const boundary_id_type input_boundary_1_id,
                                  const boundary_id_type input_boundary_2_id,
@@ -277,7 +296,7 @@ elementsCreationFromNodesVectors(ReplicatedMesh & mesh,
 {
   BoundaryInfo & boundary_info = mesh.get_boundary_info();
 
-  for (unsigned int i = 0; i < num_layers; i++)
+  for (const auto i : make_range(num_layers))
   {
     unsigned int nodes_up_it = 0;
     unsigned int nodes_down_it = 0;
@@ -353,7 +372,7 @@ elementsCreationFromNodesVectors(ReplicatedMesh & mesh,
 
 void
 weightedInterpolator(const unsigned int vec_node_num,
-                     const std::vector<Point> boundary_points_vec,
+                     const std::vector<Point> & boundary_points_vec,
                      std::vector<Real> & vec_index,
                      std::vector<Real> & wt,
                      std::vector<Real> & index,
@@ -367,7 +386,7 @@ weightedInterpolator(const unsigned int vec_node_num,
   std::vector<Real> dist_vec;
   std::vector<Real> pos_l;
 
-  for (unsigned int i = 0; i < vec_node_num; i++)
+  for (const auto i : make_range(vec_node_num))
   {
     // Unweighted, the index interval is just uniform
     // Normalized range 0~1
@@ -394,12 +413,12 @@ weightedInterpolator(const unsigned int vec_node_num,
                  index.begin(),
                  [dist_vec_total](Real & c) { return c / dist_vec_total; });
   // Use Gaussian blurring to smoothen local density
-  for (unsigned int i = 0; i < vec_node_num; i++)
+  for (const auto i : make_range(vec_node_num))
   {
     Real gaussian_factor(0.0);
     Real sum_tmp(0.0);
     // Use interval as parameter now, consider distance in the future
-    for (unsigned int j = 0; j < vec_node_num - 1; j++)
+    for (const auto j : make_range(vec_node_num - 1))
     {
       // dis_vec and index are off by 0.5
       const Real tmp_factor =
@@ -418,9 +437,9 @@ weightedInterpolator(const unsigned int vec_node_num,
 void
 surrogateGenerator(std::vector<Real> & weighted_surrogate_index,
                    std::vector<Real> & unweighted_surrogate_index,
-                   const std::vector<unsigned int> node_number_vec,
-                   const std::vector<Real> wt,
-                   const std::vector<Real> index,
+                   const std::vector<unsigned int> & node_number_vec,
+                   const std::vector<Real> & wt,
+                   const std::vector<Real> & index,
                    const unsigned int boundary_node_num,
                    const unsigned int i)
 {
@@ -457,7 +476,7 @@ surrogateGenerator(std::vector<Real> & weighted_surrogate_index,
 }
 
 bool
-needFlip(const std::vector<Point> vec_pts_1, const std::vector<Point> vec_pts_2)
+needFlip(const std::vector<Point> & vec_pts_1, const std::vector<Point> & vec_pts_2)
 {
   const Real th1 =
       acos((vec_pts_1.back() - vec_pts_1.front()) * (vec_pts_2.front() - vec_pts_1.front()) /
@@ -479,41 +498,52 @@ needFlip(const std::vector<Point> vec_pts_1, const std::vector<Point> vec_pts_2)
 }
 
 bool
-isBoundarySimpleClosedLoop(ReplicatedMesh & mesh,
+isBoundarySimpleClosedLoop(MeshBase & mesh,
                            Real & max_node_radius,
                            std::vector<dof_id_type> & boundary_ordered_node_list,
                            const Point origin_pt,
                            const boundary_id_type bid)
 {
+  // This has no communication and expects elem_ptr to find any
+  // element, so it only works on serialized meshes
+  libMesh::MeshSerializer serial(mesh);
+
   max_node_radius = 0.0;
   BoundaryInfo & boundary_info = mesh.get_boundary_info();
   auto side_list_tmp = boundary_info.build_side_list();
-  unsigned int elem_counter = 0;
   std::vector<std::pair<dof_id_type, dof_id_type>> boundary_node_assm;
-  for (unsigned int i = 0; i < side_list_tmp.size(); i++)
+  std::vector<dof_id_type> boundary_midpoint_node_list;
+  for (const auto i : index_range(side_list_tmp))
   {
     if (std::get<2>(side_list_tmp[i]) == bid)
     {
-      elem_counter++;
       // store two nodes of each side
-      boundary_node_assm.push_back(std::make_pair(mesh.elem_ptr(std::get<0>(side_list_tmp[i]))
-                                                      ->side_ptr(std::get<1>(side_list_tmp[i]))
-                                                      ->node_id(0),
-                                                  mesh.elem_ptr(std::get<0>(side_list_tmp[i]))
-                                                      ->side_ptr(std::get<1>(side_list_tmp[i]))
-                                                      ->node_id(1)));
+      const auto elem = mesh.elem_ptr(std::get<0>(side_list_tmp[i]));
+      const auto side = elem->side_ptr(std::get<1>(side_list_tmp[i]));
+      boundary_node_assm.push_back(std::make_pair(side->node_id(0), side->node_id(1)));
+      // see if there is a midpoint
+      const auto & side_type = elem->side_type(std::get<1>(side_list_tmp[i]));
+      if (side_type == EDGE3)
+        boundary_midpoint_node_list.push_back(
+            elem->node_id(elem->n_vertices() + std::get<1>(side_list_tmp[i])));
+      else
+        boundary_midpoint_node_list.push_back(DofObject::invalid_id);
     }
   }
-  return isClosedLoop(mesh,
-                      max_node_radius,
-                      boundary_ordered_node_list,
-                      boundary_node_assm,
-                      origin_pt,
-                      "external boundary");
+  bool is_closed_loop;
+  isClosedLoop(mesh,
+               max_node_radius,
+               boundary_ordered_node_list,
+               boundary_node_assm,
+               boundary_midpoint_node_list,
+               origin_pt,
+               "external boundary",
+               is_closed_loop);
+  return is_closed_loop;
 }
 
 bool
-isBoundarySimpleClosedLoop(ReplicatedMesh & mesh,
+isBoundarySimpleClosedLoop(MeshBase & mesh,
                            Real & max_node_radius,
                            const Point origin_pt,
                            const boundary_id_type bid)
@@ -524,14 +554,14 @@ isBoundarySimpleClosedLoop(ReplicatedMesh & mesh,
 }
 
 bool
-isBoundarySimpleClosedLoop(ReplicatedMesh & mesh, const Point origin_pt, const boundary_id_type bid)
+isBoundarySimpleClosedLoop(MeshBase & mesh, const Point origin_pt, const boundary_id_type bid)
 {
   Real dummy_max_node_radius;
   return isBoundarySimpleClosedLoop(mesh, dummy_max_node_radius, origin_pt, bid);
 }
 
 bool
-isBoundaryOpenSingleSegment(ReplicatedMesh & mesh,
+isBoundaryOpenSingleSegment(MeshBase & mesh,
                             Real & max_node_radius,
                             std::vector<dof_id_type> & boundary_ordered_node_list,
                             const Point origin_pt,
@@ -555,13 +585,17 @@ isBoundaryOpenSingleSegment(ReplicatedMesh & mesh,
 }
 
 bool
-isExternalBoundary(ReplicatedMesh & mesh, const boundary_id_type bid)
+isExternalBoundary(MeshBase & mesh, const boundary_id_type bid)
 {
+  // This has no communication and expects elem_ptr to find any
+  // element, so it only works on serialized meshes
+  libMesh::MeshSerializer serial(mesh);
+
   if (!mesh.is_prepared())
     mesh.find_neighbors();
   BoundaryInfo & boundary_info = mesh.get_boundary_info();
   auto side_list = boundary_info.build_side_list();
-  for (unsigned int i = 0; i < side_list.size(); i++)
+  for (const auto i : index_range(side_list))
   {
     if (std::get<2>(side_list[i]) == bid)
       if (mesh.elem_ptr(std::get<0>(side_list[i]))->neighbor_ptr(std::get<1>(side_list[i])) !=
@@ -572,34 +606,41 @@ isExternalBoundary(ReplicatedMesh & mesh, const boundary_id_type bid)
 }
 
 bool
-isCurveSimpleClosedLoop(ReplicatedMesh & mesh,
+isCurveSimpleClosedLoop(MeshBase & mesh,
                         Real & max_node_radius,
                         std::vector<dof_id_type> & ordered_node_list,
                         const Point origin_pt)
 {
+  // This has no communication and expects to loop over all elements
+  // on every processor, so it only works on serialized meshes
+  libMesh::MeshSerializer serial(mesh);
+
   max_node_radius = 0.0;
   std::vector<std::pair<dof_id_type, dof_id_type>> node_assm;
   for (auto it = mesh.active_elements_begin(); it != mesh.active_elements_end(); it++)
     node_assm.push_back(std::make_pair((*it)->node_id(0), (*it)->node_id(1)));
-  return isClosedLoop(mesh, max_node_radius, ordered_node_list, node_assm, origin_pt, "curve");
+  bool is_closed_loop;
+  isClosedLoop(
+      mesh, max_node_radius, ordered_node_list, node_assm, origin_pt, "curve", is_closed_loop);
+  return is_closed_loop;
 }
 
 bool
-isCurveSimpleClosedLoop(ReplicatedMesh & mesh, Real & max_node_radius, const Point origin_pt)
+isCurveSimpleClosedLoop(MeshBase & mesh, Real & max_node_radius, const Point origin_pt)
 {
   std::vector<dof_id_type> dummy_ordered_node_list;
   return isCurveSimpleClosedLoop(mesh, max_node_radius, dummy_ordered_node_list, origin_pt);
 }
 
 bool
-isCurveSimpleClosedLoop(ReplicatedMesh & mesh, const Point origin_pt)
+isCurveSimpleClosedLoop(MeshBase & mesh, const Point origin_pt)
 {
   Real dummy_max_node_radius;
   return isCurveSimpleClosedLoop(mesh, dummy_max_node_radius, origin_pt);
 }
 
 bool
-isCurveOpenSingleSegment(ReplicatedMesh & mesh,
+isCurveOpenSingleSegment(MeshBase & mesh,
                          Real & max_node_radius,
                          std::vector<dof_id_type> & ordered_node_list,
                          const Point origin_pt)
@@ -621,76 +662,36 @@ isCurveOpenSingleSegment(ReplicatedMesh & mesh,
   return false;
 }
 
-bool
-isClosedLoop(ReplicatedMesh & mesh,
+void
+isClosedLoop(MeshBase & mesh,
              Real & max_node_radius,
              std::vector<dof_id_type> & ordered_node_list,
              std::vector<std::pair<dof_id_type, dof_id_type>> & node_assm,
+             std::vector<dof_id_type> & midpoint_node_list,
              const Point origin_pt,
-             const std::string input_type)
+             const std::string input_type,
+             bool & is_closed_loop,
+             const bool suppress_exception)
 {
-  bool isFlipped = false;
-  // Start from the first element, try to find a chain of nodes
-  ordered_node_list.push_back(node_assm.front().first);
-  ordered_node_list.push_back(node_assm.front().second);
-  // Remove the element that has been added to ordered_node_list
-  node_assm.erase(node_assm.begin());
-  const unsigned int node_assm_size_0 = node_assm.size();
-  for (unsigned int i = 0; i < node_assm_size_0; i++)
-  {
-    // Find nodes to expand the chain
-    dof_id_type end_node_id = ordered_node_list.back();
-    auto isMatch1 = [end_node_id](std::pair<dof_id_type, dof_id_type> old_id_pair)
-    { return old_id_pair.first == end_node_id; };
-    auto isMatch2 = [end_node_id](std::pair<dof_id_type, dof_id_type> old_id_pair)
-    { return old_id_pair.second == end_node_id; };
-    auto result = std::find_if(node_assm.begin(), node_assm.end(), isMatch1);
-    bool match_first;
-    if (result == node_assm.end())
-    {
-      match_first = false;
-      result = std::find_if(node_assm.begin(), node_assm.end(), isMatch2);
-    }
-    else
-    {
-      match_first = true;
-    }
-    // If found, add the node to boundary_ordered_node_list
-    if (result != node_assm.end())
-    {
-      ordered_node_list.push_back(match_first ? (*result).second : (*result).first);
-      node_assm.erase(result);
-    }
-    // If there are still elements in node_assm and result ==
-    // node_assm.end(), this means the curve is not a loop, the
-    // ordered_node_list is flipped and try the other direction that has not
-    // been examined yet.
-    else
-    {
-      if (isFlipped)
-        // Flipped twice; this means the curve has at least two segments.
-        // This is invalid type #1
-        throw MooseException("This mesh generator does not work for the provided ",
-                             input_type,
-                             " as it has more than one segments.");
+  // This has no communication and expects node_ptr to find any
+  // node, so it only works on serialized meshes
+  libMesh::MeshSerializer serial(mesh);
 
-      // mark the first flip event.
-      isFlipped = true;
-      std::reverse(ordered_node_list.begin(), ordered_node_list.end());
-      // As this iteration is wasted, set the iterator backward
-      i--;
-    }
-  }
+  std::vector<dof_id_type> dummy_elem_list = std::vector<dof_id_type>(node_assm.size(), 0);
+  std::vector<dof_id_type> ordered_dummy_elem_list;
+  is_closed_loop = false;
+  MooseMeshUtils::makeOrderedNodeList(
+      node_assm, dummy_elem_list, midpoint_node_list, ordered_node_list, ordered_dummy_elem_list);
   // If the code ever gets here, node_assm is empty.
   // If the ordered_node_list front and back are not the same, the boundary is not a loop.
   // This is not done inside the loop just for some potential applications in the future.
   if (ordered_node_list.front() != ordered_node_list.back())
   {
     // This is invalid type #2
-    throw MooseException("This mesh generator does not work for the provided ",
-                         input_type,
-                         " as it is not a closed loop.");
-    return false;
+    if (!suppress_exception)
+      throw MooseException("This mesh generator does not work for the provided ",
+                           input_type,
+                           " as it is not a closed loop.");
   }
   // It the curve is a loop, check if azimuthal angles change monotonically
   else
@@ -699,7 +700,7 @@ isClosedLoop(ReplicatedMesh & mesh,
     // If azimuthal angles change monotonically,
     // the z components of the cross products are always negative or positive.
     std::vector<Real> ordered_node_azi_list;
-    for (unsigned int i = 0; i < ordered_node_list.size() - 1; i++)
+    for (const auto i : make_range(ordered_node_list.size() - 1))
     {
       ordered_node_azi_list.push_back(
           (*mesh.node_ptr(ordered_node_list[i]) - origin_pt)
@@ -710,14 +711,39 @@ isClosedLoop(ReplicatedMesh & mesh,
     }
     std::sort(ordered_node_azi_list.begin(), ordered_node_azi_list.end());
     if (ordered_node_azi_list.front() * ordered_node_azi_list.back() < 0.0)
+    {
       // This is invalid type #3
-      throw MooseException(
-          "This mesh generator does not work for the provided ",
-          input_type,
-          " as azimuthal angles of consecutive nodes do not change monotonically.");
+      if (!suppress_exception)
+        throw MooseException(
+            "This mesh generator does not work for the provided ",
+            input_type,
+            " as azimuthal angles of consecutive nodes do not change monotonically.");
+    }
     else
-      return true;
+      is_closed_loop = true;
   }
+}
+
+void
+isClosedLoop(MeshBase & mesh,
+             Real & max_node_radius,
+             std::vector<dof_id_type> & ordered_node_list,
+             std::vector<std::pair<dof_id_type, dof_id_type>> & node_assm,
+             const Point origin_pt,
+             const std::string input_type,
+             bool & is_closed_loop,
+             const bool suppress_exception)
+{
+  std::vector<dof_id_type> dummy_midpoint_node_list(node_assm.size(), DofObject::invalid_id);
+  isClosedLoop(mesh,
+               max_node_radius,
+               ordered_node_list,
+               node_assm,
+               dummy_midpoint_node_list,
+               origin_pt,
+               input_type,
+               is_closed_loop,
+               suppress_exception);
 }
 
 bool

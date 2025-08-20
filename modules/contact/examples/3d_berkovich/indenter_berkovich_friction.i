@@ -38,7 +38,7 @@
 []
 
 
-[Modules/TensorMechanics/Master]
+[Physics/SolidMechanics/QuasiStatic]
   [./all]
     add_variables = true
     strain = FINITE
@@ -211,7 +211,7 @@
 [Outputs]
   [./my_checkpoint]
     type = Checkpoint
-    interval = 50
+    time_step_interval = 50
   [../]
   exodus = true
   csv = true

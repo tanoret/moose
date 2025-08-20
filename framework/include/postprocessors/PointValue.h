@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,14 +27,14 @@ public:
   virtual void initialize() override {}
   virtual void execute() override;
   virtual void finalize() override {}
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
 
 protected:
   /// The variable number of the variable we are operating on
   const unsigned int _var_number;
 
   /// A reference to the system containing the variable
-  const System & _system;
+  const libMesh::System & _system;
 
   /// The point to locate
   const Point & _point;

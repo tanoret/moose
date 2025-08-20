@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,6 +10,9 @@
 #include "ImageMesh.h"
 #include "pcrecpp.h"
 #include "MooseApp.h"
+#include "MooseTypes.h"
+#include "libmesh/cell_hex8.h"
+#include "libmesh/face_quad4.h"
 
 #include <cstdlib> // std::system, mkstemp
 #include <fstream>
@@ -58,7 +61,7 @@ ImageMesh::ImageMesh(const ImageMesh & other_mesh)
 std::unique_ptr<MooseMesh>
 ImageMesh::safeClone() const
 {
-  return std::make_unique<ImageMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 void

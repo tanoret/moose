@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,21 +32,6 @@ BoundaryFluxBase::initialize()
   _cached_flux_side_id = libMesh::invalid_uint;
   _cached_jacobian_elem_id = libMesh::invalid_uint;
   _cached_jacobian_side_id = libMesh::invalid_uint;
-}
-
-void
-BoundaryFluxBase::execute()
-{
-}
-
-void
-BoundaryFluxBase::finalize()
-{
-}
-
-void
-BoundaryFluxBase::threadJoin(const UserObject &)
-{
 }
 
 const std::vector<Real> &

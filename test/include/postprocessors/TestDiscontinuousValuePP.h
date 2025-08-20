@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,7 +12,7 @@
 #include "GeneralPostprocessor.h"
 
 // Forward Declarations
-class SolutionUserObject;
+class SolutionUserObjectBase;
 
 /**
  * Compute the value of a variable or the gradient at a specified location.
@@ -27,16 +27,16 @@ public:
 
   virtual ~TestDiscontinuousValuePP(){};
 
-  virtual void initialize(){};
+  virtual void initialize() override{};
 
-  virtual void execute(){};
+  virtual void execute() override{};
 
-  virtual void finalize(){};
+  virtual void finalize() override{};
 
   /// initialSetup gets the pointer to the solution UO
-  virtual void initialSetup();
+  virtual void initialSetup() override;
 
-  virtual Real getValue();
+  virtual Real getValue() const override;
 
 protected:
   /// The variable name from which a values is to be extracted
@@ -52,5 +52,5 @@ protected:
   unsigned int _gradient_component;
 
   /// Pointer to SolutionUserObject containing the solution of interest
-  const SolutionUserObject * _solution_object_ptr;
+  const SolutionUserObjectBase * _solution_object_ptr;
 };

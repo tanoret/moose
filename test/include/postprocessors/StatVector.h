@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,7 +21,7 @@ public:
   static InputParameters validParams();
   StatVector(const InputParameters & parameters);
   virtual void execute() override;
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
   virtual void initialize() final{};
   virtual void finalize() final{};
 

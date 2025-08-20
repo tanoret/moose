@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "GeneratedMesh.h"
+
+#include "MooseApp.h"
 
 #include "libmesh/mesh_generation.h"
 #include "libmesh/string_to_enum.h"
@@ -27,13 +29,10 @@ GeneratedMesh::validParams()
 {
   InputParameters params = MooseMesh::validParams();
 
-  MooseEnum elem_types(
-      "EDGE EDGE2 EDGE3 EDGE4 QUAD QUAD4 QUAD8 QUAD9 TRI3 TRI6 HEX HEX8 HEX20 HEX27 TET4 TET10 "
-      "PRISM6 PRISM15 PRISM18 PYRAMID5 PYRAMID13 PYRAMID14"); // no default
+  MooseEnum elem_types(LIST_GEOM_ELEM); // no default
 
   MooseEnum dims("1=1 2 3");
-  params.addRequiredParam<MooseEnum>(
-      "dim", dims, "The dimension of the mesh to be generated"); // Make this parameter required
+  params.addRequiredParam<MooseEnum>("dim", dims, "The dimension of the mesh to be generated");
 
   params.addParam<unsigned int>("nx", 1, "Number of elements in the X direction");
   params.addParam<unsigned int>("ny", 1, "Number of elements in the Y direction");
@@ -69,7 +68,7 @@ GeneratedMesh::validParams()
       "bias_z>=0.5 & bias_z<=2",
       "The amount by which to grow (or shrink) the cells in the z-direction.");
 
-  params.addParamNamesToGroup("dim", "Main");
+  params.addParamNamesToGroup("dim", "Required");
 
   params.addClassDescription(
       "Create a line, square, or cube mesh with uniformly spaced or biased elements.");
@@ -152,7 +151,7 @@ GeneratedMesh::getMaxInDimension(unsigned int component) const
 std::unique_ptr<MooseMesh>
 GeneratedMesh::safeClone() const
 {
-  return std::make_unique<GeneratedMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 void

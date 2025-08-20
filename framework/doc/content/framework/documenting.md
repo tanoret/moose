@@ -17,9 +17,9 @@ documenting new and changing code within MOOSE:
 ## MooseObject C++ Documentation
 
 The first step is to add documentation for your application in the `validParams` function. This is
-done by adding parameter documentation strings and calling the class description method.
+done by adding parameter documentation strings and calling the class description method as follows.
 
-A description of each parameter should also be provided when they are added with the various add
+Firstly, a description of each parameter should be provided when they are added with the various add
 methods of the `InputParameters` object. For example, in the
 [/BoxMarker.md] the following parameter documentation is
 added, which is then present in the parameter summary table of the generated site.
@@ -53,7 +53,7 @@ framework or modules will create a corresponding markdown file to document the n
 
 The documentation for the classes within MOOSE and the modules are located within the "doc"
 directory where the class is registered: "framework/doc" contains all core MOOSE level objects,
-"modules/tensor_mechanics/doc" contains objects for the tensor mechanics modules, etc.
+"modules/solid_mechanics/doc" contains objects for the solid mechanics modules, etc.
 
 When adding documentation, the MOOSE modules executable must exist; this is accomplished by using the
 following commands:
@@ -65,17 +65,17 @@ make -j16 # 16 should be replaced by the number of cores on your system
 
 If you are writing a documentation page for a new class with MOOSE or the modules, you can use the
 MooseDocs executable to build a documentation stub for your new class. However, the executable
-for the module must be used. For example, if you add a new class to the tensor mechanics
+for the module must be used. For example, if you add a new class to the solid mechanics
 module:
 
 ```bash
-cd ~/projects/moose/modules/tensor_mechanics
+cd ~/projects/moose/modules/solid_mechanics
 make -j16
 cd doc
-./moosedocs.py generate TensorMechanicsApp
+./moosedocs.py generate SolidMechanicsApp
 ```
 
-To generate pages for the framework, the moose test application can be used as follows.
+To generate pages for the framework, the MOOSE test application can be used as follows.
 
 ```bash
 cd ~/projects/moose/test
@@ -159,7 +159,7 @@ values are overridden.
     type = CSVDiff
     input = one.i
     csvdiff = one_out.csv
-    requirement = "The system shall must compute a value."
+    requirement = "The system shall compute a value."
   []
   [two]
     type = RunException
@@ -182,27 +182,27 @@ and each of the details are a complete sentence when combined, as shown in the f
   [group] # this is an arbitrary name that is not used
     issues = "#1235"
     design = "MyObject.md"
-    requirement = "The system shall solve the Laplace equation in:"
+    requirement = "The system shall solve the Laplace equation in: "
     [1D]
       type = Exodiff
       input = input_1D.i
       exodiff = input_1D_out.e
 
-      detail = "in 1D,"
+      detail = "1D, "
     []
     [2D]
       type = Exodiff
       input = input_2D.i
       exodiff = input_2D_out.e
 
-      detail = "in 2D, and"
+      detail = "2D, and "
     []
     [3D]
       type = Exodiff
       input = input_3D.i
       exodiff = input_3D_out.e
 
-      detail = "in 3D."
+      detail = "3D."
     []
   []
 []

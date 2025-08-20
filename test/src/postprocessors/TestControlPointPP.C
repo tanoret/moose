@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,7 +46,7 @@ TestControlPointPP::execute()
 }
 
 PostprocessorValue
-TestControlPointPP::getValue()
+TestControlPointPP::getValue() const
 {
   return _scale_factor * _function.value(_t, _point);
 }

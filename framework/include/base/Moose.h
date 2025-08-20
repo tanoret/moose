@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "libMeshReducedNamespace.h"
 #include "libmesh/perf_log.h"
 #include "libmesh/libmesh_common.h"
 #include "XTermConstants.h"
@@ -32,18 +33,16 @@ using UniquePtr = std::unique_ptr<T>;
 #endif
 }
 
-using namespace libMesh;
-
 class ActionFactory;
 class Factory;
 class MooseEnumItem;
 class ExecFlagEnum;
 class MooseVariableFieldBase;
 
-void MooseVecView(NumericVector<Number> & vector);
-void MooseVecView(const NumericVector<Number> & vector);
-void MooseMatView(SparseMatrix<Number> & mat);
-void MooseMatView(const SparseMatrix<Number> & mat);
+void MooseVecView(libMesh::NumericVector<libMesh::Number> & vector);
+void MooseVecView(const libMesh::NumericVector<libMesh::Number> & vector);
+void MooseMatView(libMesh::SparseMatrix<libMesh::Number> & mat);
+void MooseMatView(const libMesh::SparseMatrix<libMesh::Number> & mat);
 
 /**
  * MOOSE now contains C++17 code, so give a reasonable error message
@@ -56,7 +55,7 @@ static_assert(__cplusplus >= 201703L,
               "MOOSE requires a C++17 compatible compiler (GCC >= 7.5.0, Clang >= 5.0.2). Please "
               "update your compiler or, if compatible, add '-std=c++17' to your compiler flags "
               "and try again. If using the MOOSE conda package, please attempt a MOOSE environment "
-              "update (using `mamba update --all`). If this update is not successful, please "
+              "update (using `mamba update moose-dev`). If this update is not successful, please "
               "create a new MOOSE environment (see "
               "https://mooseframework.inl.gov/getting_started/installation/"
               "conda.html#uninstall-conda-moose-environment).");
@@ -115,9 +114,13 @@ using ExecFlagType = MooseEnumItem;
 extern const ExecFlagType EXEC_NONE;
 extern const ExecFlagType EXEC_INITIAL;
 extern const ExecFlagType EXEC_LINEAR;
+extern const ExecFlagType EXEC_NONLINEAR_CONVERGENCE;
 extern const ExecFlagType EXEC_NONLINEAR;
+extern const ExecFlagType EXEC_POSTCHECK;
 extern const ExecFlagType EXEC_TIMESTEP_END;
 extern const ExecFlagType EXEC_TIMESTEP_BEGIN;
+extern const ExecFlagType EXEC_MULTIAPP_FIXED_POINT_BEGIN;
+extern const ExecFlagType EXEC_MULTIAPP_FIXED_POINT_END;
 extern const ExecFlagType EXEC_FINAL;
 extern const ExecFlagType EXEC_FORCED;
 extern const ExecFlagType EXEC_FAILED;
@@ -145,6 +148,12 @@ static_assert(LIBMESH_DIM == 3,
 static constexpr std::size_t dim = LIBMESH_DIM;
 
 /**
+ * Used by the signal handler to determine if we should write a checkpoint file out at any point
+ * during operation.
+ */
+extern int interrupt_signal_number;
+
+/**
  * Set to true (the default) to print the stack trace with error and warning
  * messages - false to omit it.
  */
@@ -159,8 +168,10 @@ extern bool show_multiple;
 /**
  * Perflog to be used by applications.
  * If the application prints this in the end they will get performance info.
+ *
+ * This is no longer instantiated in the framework and will be removed in the future.
  */
-extern PerfLog perf_log;
+extern libMesh::PerfLog perf_log;
 
 /**
  * Variable indicating whether we will enable FPE trapping for this run.

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,7 +36,7 @@ ElementIntegralPostprocessor::execute()
 }
 
 Real
-ElementIntegralPostprocessor::getValue()
+ElementIntegralPostprocessor::getValue() const
 {
   return _integral_value;
 }
@@ -44,7 +44,7 @@ ElementIntegralPostprocessor::getValue()
 void
 ElementIntegralPostprocessor::threadJoin(const UserObject & y)
 {
-  const ElementIntegralPostprocessor & pps = static_cast<const ElementIntegralPostprocessor &>(y);
+  const auto & pps = static_cast<const ElementIntegralPostprocessor &>(y);
   _integral_value += pps._integral_value;
 }
 

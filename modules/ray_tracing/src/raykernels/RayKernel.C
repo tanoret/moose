@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -35,7 +35,7 @@ RayKernelTempl<T>::RayKernelTempl(const InputParameters & params)
     MooseVariableInterface<T>(this,
                               false,
                               "variable",
-                              Moose::VarKindType::VAR_NONLINEAR,
+                              Moose::VarKindType::VAR_SOLVER,
                               std::is_same<T, Real>::value ? Moose::VarFieldType::VAR_FIELD_STANDARD
                                                            : Moose::VarFieldType::VAR_FIELD_VECTOR),
     TaggingInterface(this),
@@ -98,7 +98,7 @@ RayKernelTempl<T>::computeJacobian()
 
   precalculateJacobian();
 
-  const auto & ce = _fe_problem.couplingEntries(_tid);
+  const auto & ce = _fe_problem.couplingEntries(_tid, _nl->number());
   for (const auto & it : ce)
   {
     MooseVariableFEBase & ivariable = *(it.first);

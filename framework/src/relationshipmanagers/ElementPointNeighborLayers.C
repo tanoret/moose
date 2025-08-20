@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,8 @@
 #include "MooseApp.h"
 
 #include "libmesh/point_neighbor_coupling.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", ElementPointNeighborLayers);
 
@@ -44,7 +46,7 @@ ElementPointNeighborLayers::ElementPointNeighborLayers(const ElementPointNeighbo
 std::unique_ptr<GhostingFunctor>
 ElementPointNeighborLayers::clone() const
 {
-  return std::make_unique<ElementPointNeighborLayers>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 std::string

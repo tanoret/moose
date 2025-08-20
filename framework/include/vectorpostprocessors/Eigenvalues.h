@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,5 +34,5 @@ protected:
   VectorPostprocessorValue & _eigen_values_imag;
 
   /// Nonlinear eigen-system to get the eigenvalues from
-  NonlinearEigenSystem * _nl_eigen;
+  const NonlinearEigenSystem * const _nl_eigen;
 };

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -37,15 +37,14 @@ TimeNodalKernel::computeResidual()
   {
     const dof_id_type & dof_idx = _var.nodalDofIndex();
     _qp = 0;
-    Real res = computeQpResidual();
-    res *= _var.scalingFactor();
-    _assembly.cacheResidual(dof_idx, res, _vector_tags);
+    const Real res = computeQpResidual();
+    addResiduals(_assembly,
+                 std::array<Real, 1>{{res}},
+                 std::array<dof_id_type, 1>{{dof_idx}},
+                 _var.scalingFactor());
 
     if (_has_save_in)
-    {
-      Threads::spin_mutex::scoped_lock lock(Threads::spin_mtx);
       for (const auto & var : _save_in)
         var->sys().solution().add(var->nodalDofIndex(), res);
-    }
   }
 }

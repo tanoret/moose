@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,6 +12,8 @@
 // MOOSE includes
 #include "Action.h"
 
+#include <optional>
+
 /**
  * Meta-action for creating common output object parameters
  * This action serves two purpose, first it adds common output object
@@ -22,9 +24,6 @@
 class CommonOutputAction : public Action
 {
 public:
-  /**
-   * Class constructor
-   */
   static InputParameters validParams();
 
   CommonOutputAction(const InputParameters & params);
@@ -35,8 +34,11 @@ private:
   /**
    * Helper method for creating the short-cut actions
    * @param object_type String of the object type, i.e., the value of 'type=' in the input file
+   * @param param_name The name of the input parameter that is responsible for creating, if any
    */
-  void create(std::string object_type);
+  void create(std::string object_type,
+              const std::optional<std::string> & param_name,
+              const InputParameters * const from_params = nullptr);
 
   /**
    * Check if a Console object that outputs to the screen has been defined

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,9 +14,11 @@
 #include "libmesh/quadrature.h"
 
 registerMooseObject("PorousFlowApp", PorousFlowFluidMass);
+registerMooseObject("PorousFlowApp", ADPorousFlowFluidMass);
 
+template <bool is_ad>
 InputParameters
-PorousFlowFluidMass::validParams()
+PorousFlowFluidMassTempl<is_ad>::validParams()
 {
   InputParameters params = ElementIntegralPostprocessor::validParams();
   params.addParam<unsigned int>(
@@ -26,6 +28,7 @@ PorousFlowFluidMass::validParams()
   params.addRequiredParam<UserObjectName>(
       "PorousFlowDictator", "The UserObject that holds the list of PorousFlow variable names.");
   params.addParam<std::vector<unsigned int>>("phase",
+                                             {},
                                              "The index of the fluid phase that this "
                                              "Postprocessor is restricted to.  Multiple "
                                              "indices can be entered");
@@ -54,7 +57,8 @@ PorousFlowFluidMass::validParams()
   return params;
 }
 
-PorousFlowFluidMass::PorousFlowFluidMass(const InputParameters & parameters)
+template <bool is_ad>
+PorousFlowFluidMassTempl<is_ad>::PorousFlowFluidMassTempl(const InputParameters & parameters)
   : ElementIntegralPostprocessor(parameters),
 
     _dictator(getUserObject<PorousFlowDictator>("PorousFlowDictator")),
@@ -65,11 +69,13 @@ PorousFlowFluidMass::PorousFlowFluidMass(const InputParameters & parameters)
     _total_strain(_has_total_strain
                       ? &getMaterialProperty<RankTwoTensor>(_base_name + "total_strain")
                       : nullptr),
-    _porosity(getMaterialProperty<Real>("PorousFlow_porosity_nodal")),
-    _fluid_density(getMaterialProperty<std::vector<Real>>("PorousFlow_fluid_phase_density_nodal")),
-    _fluid_saturation(getMaterialProperty<std::vector<Real>>("PorousFlow_saturation_nodal")),
-    _mass_fraction(
-        getMaterialProperty<std::vector<std::vector<Real>>>("PorousFlow_mass_frac_nodal")),
+    _porosity(getGenericMaterialProperty<Real, is_ad>("PorousFlow_porosity_nodal")),
+    _fluid_density(getGenericMaterialProperty<std::vector<Real>, is_ad>(
+        "PorousFlow_fluid_phase_density_nodal")),
+    _fluid_saturation(
+        getGenericMaterialProperty<std::vector<Real>, is_ad>("PorousFlow_saturation_nodal")),
+    _mass_fraction(getGenericMaterialProperty<std::vector<std::vector<Real>>, is_ad>(
+        "PorousFlow_mass_frac_nodal")),
     _saturation_threshold(getParam<Real>("saturation_threshold")),
     _var(getParam<unsigned>("kernel_variable_number") < _dictator.numVariables()
              ? &_fe_problem.getStandardVariable(
@@ -137,10 +143,15 @@ PorousFlowFluidMass::PorousFlowFluidMass(const InputParameters & parameters)
   if (_phase_index.empty())
     for (unsigned int i = 0; i < num_phases; ++i)
       _phase_index.push_back(i);
+
+  // Error if a strain base_name is provided but doesn't exist
+  if (parameters.isParamSetByUser("base_name") && !_has_total_strain)
+    paramError("base_name", "A strain base_name ", _base_name, " does not exist");
 }
 
+template <bool is_ad>
 Real
-PorousFlowFluidMass::computeIntegral()
+PorousFlowFluidMassTempl<is_ad>::computeIntegral()
 {
   Real sum = 0;
 
@@ -167,18 +178,22 @@ PorousFlowFluidMass::computeIntegral()
     Real mass = 0.0;
     for (auto ph : _phase_index)
     {
-      if (_fluid_saturation[node][ph] <= _saturation_threshold)
-        mass += _fluid_density[node][ph] * _fluid_saturation[node][ph] *
-                _mass_fraction[node][ph][_fluid_component];
+      if (MetaPhysicL::raw_value(_fluid_saturation[node][ph]) <= _saturation_threshold)
+        mass += MetaPhysicL::raw_value(_fluid_density[node][ph] * _fluid_saturation[node][ph] *
+                                       _mass_fraction[node][ph][_fluid_component]);
     }
-    sum += nodal_volume * _porosity[node] * mass;
+    sum += nodal_volume * MetaPhysicL::raw_value(_porosity[node]) * mass;
   }
 
   return sum;
 }
 
+template <bool is_ad>
 Real
-PorousFlowFluidMass::computeQpIntegral()
+PorousFlowFluidMassTempl<is_ad>::computeQpIntegral()
 {
   return 0.0;
 }
+
+template class PorousFlowFluidMassTempl<false>;
+template class PorousFlowFluidMassTempl<true>;

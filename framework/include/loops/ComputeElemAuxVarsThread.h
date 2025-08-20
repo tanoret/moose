@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,7 +25,6 @@ class ComputeElemAuxVarsThread : public ThreadedElementLoop<ConstElemRange>
 public:
   ComputeElemAuxVarsThread(FEProblemBase & problem,
                            const MooseObjectWarehouse<AuxKernelType> & storage,
-                           const std::vector<std::vector<MooseVariableFEBase *>> & vars,
                            bool need_materials);
   // Splitting Constructor
   ComputeElemAuxVarsThread(ComputeElemAuxVarsThread & x, Threads::split split);
@@ -39,12 +38,16 @@ public:
   void join(const ComputeElemAuxVarsThread & /*y*/);
 
 protected:
+  /// Print list of object types executed and in which order
+  void printGeneralExecutionInformation() const override;
+
+  /// Print list of specific objects executed and in which order
+  void printBlockExecutionInformation() const override;
+
   AuxiliarySystem & _aux_sys;
 
   /// Storage object containing active AuxKernel objects
   const MooseObjectWarehouse<AuxKernelType> & _aux_kernels;
-
-  const std::vector<std::vector<MooseVariableFEBase *>> & _aux_vars;
 
   bool _need_materials;
 };

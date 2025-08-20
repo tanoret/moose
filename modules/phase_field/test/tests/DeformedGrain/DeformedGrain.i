@@ -12,7 +12,6 @@
 []
 
 [GlobalParams]
-  block = 0
   op_num = 8
   deformed_grain_num = 16
   var_name_base = gr
@@ -115,7 +114,7 @@
 
 [Outputs]
   exodus = true
-  interval = 1
+  time_step_interval = 1
   show = bnds
   perf_graph = true
 []

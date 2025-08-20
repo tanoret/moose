@@ -51,7 +51,7 @@ l = 4
     drho_dt = drho_dt
   []
   [mass]
-    type = INSFVMassAdvection
+    type = WCNSFVMassAdvection
     variable = pressure
     advected_interp_method = ${advected_interp_method}
     velocity_interp_method = ${velocity_interp_method}
@@ -126,9 +126,10 @@ l = 4
   [temp_time]
     type = WCNSFVEnergyTimeDerivative
     variable = T
-    cp = cp
     rho = rho
     drho_dt = drho_dt
+    h = h
+    dh_dt = dh_dt
   []
   [temp_conduction]
     type = FVDiffusion
@@ -182,7 +183,7 @@ l = 4
   []
 []
 
-[Materials]
+[FunctorMaterials]
   [rho]
     type = RhoFromPTFunctorMaterial
     fp = fp
@@ -195,7 +196,7 @@ l = 4
     prop_values = '${cp} ${k}'
   []
   [ins_fv]
-    type = INSFVEnthalpyMaterial
+    type = INSFVEnthalpyFunctorMaterial
     temperature = 'T'
     rho = ${rho}
   []
@@ -249,13 +250,13 @@ l = 4
     value_type = 'max'
   []
   [T_min]
-    type = ElementExtremeValue
-    variable = 'T'
+    type = ADElementExtremeFunctorValue
+    functor = 'T'
     value_type = 'min'
   []
   [T_max]
-    type = ElementExtremeValue
-    variable = 'T'
+    type = ADElementExtremeFunctorValue
+    functor = 'T'
     value_type = 'max'
   []
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,9 +19,9 @@ ClosureTestAction::validParams()
 
   params.addParam<FunctionName>("T_wall", "Wall temperature function");
   params.addParam<Real>("q_wall", 0., "Convective wall heat flux");
-  params.addParam<std::vector<std::string>>("output", "List of material properties to output");
-  params.addParam<std::vector<std::string>>("ad_output",
-                                            "List of AD material properties to output");
+  params.addParam<std::vector<std::string>>("output", {}, "List of material properties to output");
+  params.addParam<std::vector<std::string>>(
+      "ad_output", {}, "List of AD material properties to output");
 
   params.set<std::string>("fe_family") = "LAGRANGE";
   params.set<std::string>("fe_order") = "FIRST";

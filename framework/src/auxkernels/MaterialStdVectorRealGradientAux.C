@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,5 +36,5 @@ MaterialStdVectorRealGradientAux::MaterialStdVectorRealGradientAux(
 Real
 MaterialStdVectorRealGradientAux::getRealValue()
 {
-  return _prop[_qp][_index](_component);
+  return this->_full_value[_index](_component);
 }

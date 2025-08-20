@@ -13,6 +13,8 @@
 
   rdg_slope_reconstruction = minmod
   gravity_vector = '0 0 0'
+
+  scaling_factor_1phase = '1 1 1e-5'
 []
 
 [FluidProperties]
@@ -55,6 +57,7 @@
     K = 0
     on = true
     power = 1000
+    use_scalar_variables = false
   []
 
   [pipe2]
@@ -112,7 +115,7 @@
   [dP]
     type = ParsedPostprocessor
     pp_names = 'p_in W_dot'
-    function = 'p_in * (1 - (1-W_dot/(10*2910.06*517))^(1.4/0.4))'
+    expression = 'p_in * (1 - (1-W_dot/(10*2910.06*517))^(1.4/0.4))'
   []
   [momentum_diff]
     type = LinearCombinationPostprocessor
@@ -131,8 +134,9 @@
     boundary = outlet
   []
   [W_dot]
-    type = ScalarVariable
-    variable = turbine:W_dot
+    type = ElementAverageValue
+    variable = W_dot
+    block = 'turbine'
   []
   [energy_diff]
     type = LinearCombinationPostprocessor
@@ -159,15 +163,18 @@
   abort_on_solve_fail = true
 
   solve_type = 'newton'
-  line_search = 'basic'
   petsc_options_iname = '-pc_type'
   petsc_options_value = ' lu'
 
-  nl_rel_tol = 1e-7
+  nl_rel_tol = 0
   nl_abs_tol = 2e-6
 
   nl_max_its = 10
   l_tol = 1e-3
+
+  # automatic_scaling = true
+  # compute_scaling_once = false
+  # off_diagonals_in_auto_scaling = true
 []
 
 [Outputs]

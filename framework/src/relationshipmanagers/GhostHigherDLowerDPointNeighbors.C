@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -93,4 +93,10 @@ GhostHigherDLowerDPointNeighbors::operator>=(const RelationshipManager & other) 
 {
   return dynamic_cast<const GhostHigherDLowerDPointNeighbors *>(&other) ||
          dynamic_cast<const GhostLowerDElems *>(&other);
+}
+
+std::unique_ptr<GhostingFunctor>
+GhostHigherDLowerDPointNeighbors::clone() const
+{
+  return _app.getFactory().copyConstruct(*this);
 }

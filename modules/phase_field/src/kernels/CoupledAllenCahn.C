@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,7 +25,7 @@ CoupledAllenCahn::validParams()
 
 CoupledAllenCahn::CoupledAllenCahn(const InputParameters & parameters)
   : ACBulk<Real>(parameters),
-    _v_name(getVar("v", 0)->name()),
+    _v_name(coupledName("v", 0)),
     _dFdV(getMaterialPropertyDerivative<Real>("f_name", _v_name)),
     _d2FdVdEta(getMaterialPropertyDerivative<Real>("f_name", _v_name, _var.name())),
     _d2FdVdarg(_n_args)

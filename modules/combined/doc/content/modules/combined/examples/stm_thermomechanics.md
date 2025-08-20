@@ -1,6 +1,6 @@
 # Using Stochastic Tools with Multiphysics Models
 
-The purpose of this document is to present a multiphysics example using the [Stochastic Tools Module](modules/stochastic_tools/index.md). The intention is to showcase the capabilities of the module to produce statistically relevant results including uncertainty propagation and sensitivity, as well as the module's surrogate modeling infrastructure. The problem of interest is a thermomechanics model using a combination of the [Heat Conduction](modules/heat_conduction/index.md) and [Tensor Mechanics](modules/tensor_mechanics/index.md) modules. The problem involves multiple uncertain material properties and multiple quantities of interest (QoI). Using both Monte Carlo sampling and polynomial chaos surrogate modeling, the effect of these properties' uncertainties are quantified with uncertainty propagation and global sensitivity analysis.
+The purpose of this document is to present a multiphysics example using the [Stochastic Tools Module](modules/stochastic_tools/index.md). The intention is to showcase the capabilities of the module to produce statistically relevant results including uncertainty propagation and sensitivity, as well as the module's surrogate modeling infrastructure. The problem of interest is a thermomechanics model using a combination of the [Heat Transfer](modules/heat_transfer/index.md) and [Solid Mechanics](modules/solid_mechanics/index.md) modules. The problem involves multiple uncertain material properties and multiple quantities of interest (QoI). Using both Monte Carlo sampling and polynomial chaos surrogate modeling, the effect of these properties' uncertainties are quantified with uncertainty propagation and global sensitivity analysis.
 
 ## Problem Description
 
@@ -11,7 +11,7 @@ The problem of interest involves a steady-state thermomechanics model. The geome
 !table caption=Material Properties for Thermomechanics Cylinder id=tab:mat_prop
 | Property | Symbol | Value | Units  |
 | :- | :- | -: | -: |
-| Half Cyliner Height | $L$ | 3 | m |
+| Half Cylinder Height | $L$ | 3 | m |
 | Inner Radius | $R$ | 1.0 | m |
 | Inner Ring Width | $r_1$ | 0.1 | m |
 | Outer Ring Width | $r_2$ | 0.1 | m |
@@ -44,7 +44,7 @@ The problem of interest involves a steady-state thermomechanics model. The geome
 
 !row-end!
 
-!listing examples/stochastic/graphite_ring_thermomechanics.i caption=Thermomechanics model input file id=list:thermo
+!listing examples/stochastic/thermomech/graphite_ring_thermomechanics.i caption=Thermomechanics model input file id=list:thermo
 
 ### Uncertain Parameters
 
@@ -85,7 +85,7 @@ There are a total of ten QoIs for the model, which involve temperature and displ
 
 ## Results
 
-In this exercise, we will use the [statistics](Statistics.md) and [Sobol sensitivity](PolynomialChaosReporter.md) capabilities available in the stochastic tools module. The goal of this exercise is to understand how the uncertainty in the parameters affects the the resulting QoIs. This is done through sampling the model at different perturbations of the parameters and performing statistical calculations on resulting QoI values. Two methods are used to perform this analysis. First is using the sampler system to perturb the uncertain properties and retrieve the QoIs which will undergo the analysis. The second is training a [polynomial chaos surrogate](PolynomialChaos.md) and using that reduced order model to sample and perform the analysis. The idea is that many evaluations of the model are necessary to compute accurate statistical quantities and surrogate modeling speeds up this computation by requiring much fewer full model evaluations for training and is significantly faster to evaluate once trained.
+In this exercise, we will use the [statistics](Statistics.md) and [Sobol sensitivity](PolynomialChaosReporter.md) capabilities available in the stochastic tools module. The goal of this exercise is to understand how the uncertainty in the parameters affects the resulting QoIs. This is done through sampling the model at different perturbations of the parameters and performing statistical calculations on resulting QoI values. Two methods are used to perform this analysis. First is using the sampler system to perturb the uncertain properties and retrieve the QoIs which will undergo the analysis. The second is training a [polynomial chaos surrogate](PolynomialChaos.md) and using that reduced order model to sample and perform the analysis. The idea is that many evaluations of the model are necessary to compute accurate statistical quantities and surrogate modeling speeds up this computation by requiring much fewer full model evaluations for training and is significantly faster to evaluate once trained.
 
 Using [latin hypercube sampling](LatinHypercubeSampler.md), the thermomechanics model was run with a total of 100,000 samples, the input file is shown by [list:lhs]. A order four polynomial chaos surrogate was training using a Smolyak sparse quadrature for a total of 7,344 runs of the full model. The training input is shown by [list:train] and the evaluation input is shown by [list:eval]. [tab:rt] shows the run-time for sampling the full order model and training and evaluating the surrogate. We see here that cumulative time for training and evaluating the surrogate is much smaller than just sampling the full order model, this is because building the surrogate required far fewer evaluations of the full model and evaluating the surrogate is much faster than evaluating the full model.
 
@@ -96,15 +96,15 @@ Using [latin hypercube sampling](LatinHypercubeSampler.md), the thermomechanics 
 | Polynomial Chaos --- Training | 7,344 | 13.7 hr  |
 | Polynomial Chaos --- Evaluation | 100,000 | 6.8 s  |
 
-!listing combined/examples/stochastic/lhs_uniform.i id=list:lhs caption=Latin hypercube sampling and statistics input file
+!listing combined/examples/stochastic/thermomech/lhs_uniform.i id=list:lhs caption=Latin hypercube sampling and statistics input file
 
-!listing combined/examples/stochastic/poly_chaos_train_uniform.i id=list:train caption=Polynomial chaos training input file
+!listing combined/examples/stochastic/thermomech/poly_chaos_train_uniform.i id=list:train caption=Polynomial chaos training input file
 
-!listing combined/examples/stochastic/poly_chaos_uniform.i id=list:eval caption=Polynomial chaos evaluation input file
+!listing combined/examples/stochastic/thermomech/poly_chaos_uniform.i id=list:eval caption=Polynomial chaos evaluation input file
 
 ### Statistics
 
-[tab:stat] shows the statistical results of sampling the thermomechanis model and the polynomial chaos surrogate. $\mu$ and $\sigma$ represent the mean and standard deviation of the QoI, and CI is the confidence interval. Note that the confidence interval for the polynomial chaos statistics is not relevant since these values were found analytically using integration techniques. [fig:hist_temp] to [fig:hist_dispz] compares several of the probability distributions of the QoIs between sampling the full-order model and the polynomial chaos surrogate.
+[tab:stat] shows the statistical results of sampling the thermomechanics model and the polynomial chaos surrogate. $\mu$ and $\sigma$ represent the mean and standard deviation of the QoI, and CI is the confidence interval. Note that the confidence interval for the polynomial chaos statistics is not relevant since these values were found analytically using integration techniques. [fig:hist_temp] to [fig:hist_dispz] compares several of the probability distributions of the QoIs between sampling the full-order model and the polynomial chaos surrogate.
 
 !table caption=Statistics Results id=tab:stat
 | QoI | $\mu$ | 95% CI | $\sigma$ | 95% CI | PC -- $\mu$ | PC -- $\sigma$ |
@@ -132,7 +132,7 @@ Using [latin hypercube sampling](LatinHypercubeSampler.md), the thermomechanics 
 
 ### Sobol Sensitivities
 
-Sobol sensitivities, or Sobol indicies, are a metric to compare the global sensitivity a parameter has on a QoI. This examples demonstrates several different types of the sensitivities. The first is total sensitivity, which measure the total sensitivity from a parameter, [fig:sobol_total] shows these values for each QoI and parameter. The second is a correlative sensitivity, which measures the sensitivity due to a combination of parameters, [fig:heat_temp] to [fig:heat_dispz] show heat maps of these values for several QoIs.
+Sobol sensitivities, or Sobol indices, are a metric to compare the global sensitivity a parameter has on a QoI. This examples demonstrates several different types of the sensitivities. The first is total sensitivity, which measure the total sensitivity from a parameter, [fig:sobol_total] shows these values for each QoI and parameter. The second is a correlative sensitivity, which measures the sensitivity due to a combination of parameters, [fig:heat_temp] to [fig:heat_dispz] show heat maps of these values for several QoIs.
 
 !media combined/sobol_total.png caption=Total Sobol sensitivities id=fig:sobol_total style=width:100%
 
@@ -148,7 +148,7 @@ Sobol sensitivities, or Sobol indicies, are a metric to compare the global sensi
 
 ## Supplementary Figures
 
-### Probablity Distributions for All QoIs
+### Probability Distributions for All QoIs
 
 !gallery! large=6
 !card combined/temp_center_inner_hist.png title=$T_{1,c}$

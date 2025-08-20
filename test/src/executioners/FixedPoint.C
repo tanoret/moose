@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,7 +31,7 @@ FixedPoint::validParams()
 }
 
 FixedPoint::FixedPoint(Executioner & ex)
-  : SolveObject(ex),
+  : NonlinearSolveObject(ex),
     _fp_problem(dynamic_cast<FixedPointProblem &>(_problem)),
     _fp_max_its(getParam<unsigned int>("fp_max_its")),
     _fp_abs_tol(getParam<Real>("fp_abs_tol")),

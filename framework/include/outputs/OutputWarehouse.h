@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -65,6 +65,12 @@ public:
   bool hasOutput(const std::string & name) const;
 
   /**
+   * Returns true if the output object exists, and it supports material property output
+   * @param name The name of the output object for which to test for existence within the warehouse
+   */
+  bool hasMaterialPropertyOutput(const std::string & name) const;
+
+  /**
    * Calls the meshChanged method for every output object
    */
   void meshChanged();
@@ -117,10 +123,20 @@ public:
   /**
    * Test that the output names exist
    * @param names A vector of names to check
-   * This method will produce an error if any of the supplied
-   * names do not exist in the warehouse. Reserved names are not considered.
+   * @param supports_material_output Optional parameter to check if all output objects associated
+   *       with 'names' must support material property output
+   *
+   * This method will produce an error if any of the supplied names do not exist in
+   * the warehouse. Reserved names are not considered.
    */
-  void checkOutputs(const std::set<OutputName> & names);
+  void checkOutputs(const std::set<OutputName> & names,
+                    const bool supports_material_output = false);
+
+  /**
+   * Returns all output names that support material output
+   * @return A set of all output names that support material output
+   */
+  std::set<OutputName> getAllMaterialPropertyOutputNames() const;
 
   /**
    * Return an Output object by name
@@ -245,12 +261,14 @@ private:
   std::vector<std::shared_ptr<Output>> _all_ptrs;
 
   /**
-   * Adds the file name to the list of filenames being output
+   * Adds the file name to the map of filenames being output with an associated object
    * The main function of this object is to test that the same output file
-   * does not already exist to protect against output files overwriting each other
+   * does not already exist in another object to protect against output files overwriting each other
+   *
+   * @param obj_name Name of an FileOutput object
    * @param filename Name of an output file (extracted from filename() method of the objects)
    */
-  void addOutputFilename(const OutFileBase & filename);
+  void addOutputFilename(const OutputName & obj_name, const OutFileBase & filename);
 
   /**
    * Calls the initialSetup function for each of the output objects
@@ -313,6 +331,11 @@ private:
    */
   void flushConsoleBuffer();
 
+  /**
+   * Resets the file base for all FileOutput objects
+   */
+  void resetFileBase();
+
   /// MooseApp
   MooseApp & _app;
 
@@ -329,7 +352,7 @@ private:
   std::set<OutputName> _object_names;
 
   /// List of object names
-  std::set<OutFileBase> _file_base_set;
+  std::map<OutputName, std::set<OutFileBase>> _file_base_map;
 
   /// Pointer to the common InputParameters (@see CommonOutputAction)
   const InputParameters * _common_params_ptr;
@@ -381,7 +404,10 @@ private:
   friend class OutputInterface;
 
   // Console for calling flushConsoleBuffer()
-  friend class PetscOutput;
+  friend class PetscOutputInterface;
+
+  // MooseApp for resetFileBase()
+  friend class MooseApp;
 };
 
 template <typename T>

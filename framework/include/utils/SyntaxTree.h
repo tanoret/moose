@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,9 +11,10 @@
 
 #include "SyntaxFormatterInterface.h"
 
-#include <string>
 #include <map>
+#include <memory>
 #include <set>
+#include <string>
 
 // Forward declarations
 class InputParameters;
@@ -62,9 +63,9 @@ protected:
                       bool is_action_params,
                       InputParameters * params = NULL);
 
-    std::map<std::string, TreeNode *> _children;
-    std::multimap<std::string, InputParameters *> _action_params;
-    std::multimap<std::string, InputParameters *> _moose_object_params;
+    std::map<std::string, std::unique_ptr<TreeNode>> _children;
+    std::multimap<std::string, std::unique_ptr<InputParameters>> _action_params;
+    std::multimap<std::string, std::unique_ptr<InputParameters>> _moose_object_params;
     std::string _name;
     TreeNode * _parent;
     SyntaxTree & _syntax_tree;
@@ -72,7 +73,7 @@ protected:
 
   bool isLongNames() const;
 
-  TreeNode * _root;
+  std::unique_ptr<TreeNode> _root;
   bool _use_long_names;
 
 private:

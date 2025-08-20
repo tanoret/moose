@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,9 +17,10 @@ InputParameters
 ReynoldsNumberAux::validParams()
 {
   InputParameters params = AuxKernel::validParams();
+  params.addClassDescription("Computes the Reynolds number.");
   params.addCoupledVar("alpha", 1, "Volume fraction of the phase");
   params.addRequiredCoupledVar("rho", "Density of the phase");
-  params.addRequiredCoupledVar("vel", "x-component of phase velocity");
+  params.addRequiredCoupledVar("vel", "Component of phase velocity aligned with the flow");
   params.addRequiredCoupledVar("D_h", "Hydraulic diameter");
   params.addRequiredCoupledVar("v", "Specific volume");
   params.addRequiredCoupledVar("e", "Specific internal energy");

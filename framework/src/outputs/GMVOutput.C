@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,6 +12,8 @@
 
 #include "libmesh/equation_systems.h"
 #include "libmesh/gmv_io.h"
+
+using namespace libMesh;
 
 registerMooseObjectAliased("MooseApp", GMVOutput, "GMV");
 
@@ -29,7 +31,7 @@ GMVOutput::validParams()
   params.addClassDescription("Object for outputting data in the GMV format");
 
   // Need a layer of geometric ghosting for mesh serialization
-  params.addRelationshipManager("MooseGhostPointNeighbors",
+  params.addRelationshipManager("ElementPointNeighborLayers",
                                 Moose::RelationshipManagerType::GEOMETRIC);
 
   // Return the InputParameters
@@ -42,7 +44,7 @@ GMVOutput::GMVOutput(const InputParameters & parameters)
 }
 
 void
-GMVOutput::output(const ExecFlagType & /*type*/)
+GMVOutput::output()
 {
   GMVIO out(_es_ptr->get_mesh());
   out.write_equation_systems(filename(), *_es_ptr);

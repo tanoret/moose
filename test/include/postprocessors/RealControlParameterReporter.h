@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,20 +22,20 @@ public:
   /**
    * Extract the parameter via the ControlInterface::getControlParam
    **/
-  virtual void initialSetup();
+  virtual void initialSetup() override;
 
   ///@{
   /**
    * These methods left intentionally empty
    */
-  virtual void initialize() {}
-  virtual void execute() {}
+  virtual void initialize() override {}
+  virtual void execute() override {}
   ///@}
 
   /**
    * Return the parameter value
    */
-  virtual Real getValue();
+  virtual Real getValue() const override;
 
 private:
   // Pointer to the parameter to report, a pointer is used because the access

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,8 @@
 #include "libmesh/threads.h"
 
 #include <algorithm>
+
+using namespace libMesh;
 
 // Mutex to use when accessing _penetration_info;
 Threads::spin_mutex pinfo_mutex;
@@ -129,18 +131,8 @@ PenetrationThread::operator()(const NodeIdRange & range)
         std::vector<Point> points(1);
         points[0] = contact_ref;
         const std::vector<Point> & secondary_pos = fe_side->get_xyz();
+        bool search_succeeded = false;
 
-        // Prerequest other data we'll need in findContactPoint
-        fe_side->get_phi();
-        fe_side->get_dphi();
-        fe_side->get_dxyzdxi();
-        fe_side->get_d2xyzdxi2();
-        fe_side->get_d2xyzdxideta();
-        fe_side->get_dxyzdeta();
-        fe_side->get_d2xyzdeta2();
-        fe_side->get_d2xyzdxideta();
-
-        fe_side->reinit(info->_side, &points);
         Moose::findContactPoint(*info,
                                 fe_elem,
                                 fe_side,
@@ -148,7 +140,8 @@ PenetrationThread::operator()(const NodeIdRange & range)
                                 secondary_pos[0],
                                 false,
                                 _tangential_tolerance,
-                                contact_point_on_side);
+                                contact_point_on_side,
+                                search_succeeded);
 
         // Restore the original reference coordinates
         info->_closest_point_ref = contact_ref;
@@ -161,6 +154,7 @@ PenetrationThread::operator()(const NodeIdRange & range)
       {
         Real old_tangential_distance(info->_tangential_distance);
         bool contact_point_on_side(false);
+        bool search_succeeded = false;
 
         Moose::findContactPoint(*info,
                                 fe_elem,
@@ -169,7 +163,8 @@ PenetrationThread::operator()(const NodeIdRange & range)
                                 node,
                                 false,
                                 _tangential_tolerance,
-                                contact_point_on_side);
+                                contact_point_on_side,
+                                search_succeeded);
 
         if (contact_point_on_side)
         {
@@ -222,7 +217,7 @@ PenetrationThread::operator()(const NodeIdRange & range)
       else if (p_info.size() > 1)
       {
 
-        // Loop through all pairs of faces, and check for contact on ridge betweeen each face pair
+        // Loop through all pairs of faces, and check for contact on ridge between each face pair
         std::vector<RidgeData> ridgeDataVec;
         for (unsigned int i = 0; i + 1 < p_info.size(); ++i)
           for (unsigned int j = i + 1; j < p_info.size(); ++j)
@@ -432,8 +427,12 @@ PenetrationThread::operator()(const NodeIdRange & range)
           } while (i < p_info.size() && best < p_info.size());
           if (best < p_info.size())
           {
-            switchInfo(info, p_info[best]);
-            info_set = true;
+            // Ensure final info is within the tangential tolerance
+            if (p_info[best]->_tangential_distance <= _tangential_tolerance)
+            {
+              switchInfo(info, p_info[best]);
+              info_set = true;
+            }
           }
         }
       }
@@ -453,7 +452,7 @@ PenetrationThread::operator()(const NodeIdRange & range)
     }
     else
     {
-      smoothNormal(info, p_info);
+      smoothNormal(info, p_info, node);
       FEBase * fe = _fes[_tid][info->_side->dim()];
       computeSlip(*fe, *info);
     }
@@ -776,6 +775,7 @@ PenetrationThread::getSideCornerNodes(const Elem * side, std::vector<const Node 
 
     case TRI3:
     case TRI6:
+    case TRI7:
     {
       corner_nodes.push_back(side->node_ptr(2));
       break;
@@ -856,6 +856,7 @@ PenetrationThread::restrictPointToSpecifiedEdgeOfFace(Point & p,
 
     case TRI3:
     case TRI6:
+    case TRI7:
     {
       if ((local_node_indices[0] == 0) && (local_node_indices[1] == 1))
       {
@@ -1004,6 +1005,7 @@ PenetrationThread::restrictPointToFace(Point & p, const Node *& closest_node, co
 
     case TRI3:
     case TRI6:
+    case TRI7:
     {
       if (eta < 0.0)
       {
@@ -1237,7 +1239,9 @@ PenetrationThread::computeSlip(FEBase & fe, PenetrationInfo & info)
 }
 
 void
-PenetrationThread::smoothNormal(PenetrationInfo * info, std::vector<PenetrationInfo *> & p_info)
+PenetrationThread::smoothNormal(PenetrationInfo * info,
+                                std::vector<PenetrationInfo *> & p_info,
+                                const Node & node)
 {
   if (_do_normal_smoothing)
   {
@@ -1248,7 +1252,7 @@ PenetrationThread::smoothNormal(PenetrationInfo * info, std::vector<PenetrationI
       std::vector<Real> edge_face_weights;
       std::vector<PenetrationInfo *> edge_face_info;
 
-      getSmoothingFacesAndWeights(info, edge_face_info, edge_face_weights, p_info);
+      getSmoothingFacesAndWeights(info, edge_face_info, edge_face_weights, p_info, node);
 
       mooseAssert(edge_face_info.size() == edge_face_weights.size(),
                   "edge_face_info.size() != edge_face_weights.size()");
@@ -1296,13 +1300,13 @@ void
 PenetrationThread::getSmoothingFacesAndWeights(PenetrationInfo * info,
                                                std::vector<PenetrationInfo *> & edge_face_info,
                                                std::vector<Real> & edge_face_weights,
-                                               std::vector<PenetrationInfo *> & p_info)
+                                               std::vector<PenetrationInfo *> & p_info,
+                                               const Node & secondary_node)
 {
   const Elem * side = info->_side;
   const Point & p = info->_closest_point_ref;
   std::set<dof_id_type> elems_to_exclude;
   elems_to_exclude.insert(info->_elem->id());
-  const Node * secondary_node = info->_node;
 
   std::vector<std::vector<const Node *>> edge_nodes;
 
@@ -1320,7 +1324,7 @@ PenetrationThread::getSmoothingFacesAndWeights(PenetrationInfo * info,
 
     std::vector<PenetrationInfo *> face_info_comm_edge;
     getInfoForFacesWithCommonNodes(
-        secondary_node, elems_to_exclude, edge_nodes[i], face_info_comm_edge, p_info);
+        &secondary_node, elems_to_exclude, edge_nodes[i], face_info_comm_edge, p_info);
 
     if (face_info_comm_edge.size() == 0)
       edges_without_neighbors.push_back(i);
@@ -1362,7 +1366,7 @@ PenetrationThread::getSmoothingFacesAndWeights(PenetrationInfo * info,
 
     std::vector<PenetrationInfo *> face_info_comm_edge;
     getInfoForFacesWithCommonNodes(
-        secondary_node, elems_to_exclude, common_nodes, face_info_comm_edge, p_info);
+        &secondary_node, elems_to_exclude, common_nodes, face_info_comm_edge, p_info);
 
     unsigned int num_corner_neighbors = face_info_comm_edge.size();
 
@@ -1431,6 +1435,7 @@ PenetrationThread::getSmoothingEdgeNodesAndWeights(
 
     case TRI3:
     case TRI6:
+    case TRI7:
     {
       if (eta < -smooth_limit)
       {
@@ -1689,17 +1694,6 @@ PenetrationThread::createInfoForElem(std::vector<PenetrationInfo *> & thisElemIn
     FEBase * fe_elem = _fes[_tid][elem->dim()];
     FEBase * fe_side = _fes[_tid][side->dim()];
 
-    // Prerequest the data we'll need in findContactPoint
-    fe_side->get_phi();
-    fe_side->get_dphi();
-    fe_side->get_xyz();
-    fe_side->get_dxyzdxi();
-    fe_side->get_d2xyzdxi2();
-    fe_side->get_d2xyzdxideta();
-    fe_side->get_dxyzdeta();
-    fe_side->get_d2xyzdeta2();
-    fe_side->get_d2xyzdxideta();
-
     // Optionally check to see whether face is reasonable candidate based on an
     // estimate of how closely it is likely to project to the face
     if (check_whether_reasonable)
@@ -1723,23 +1717,24 @@ PenetrationThread::createInfoForElem(std::vector<PenetrationInfo *> & thisElemIn
     std::vector<RealGradient> dxyzdeta;
     std::vector<RealGradient> d2xyzdxideta;
 
-    PenetrationInfo * pen_info = new PenetrationInfo(secondary_node,
-                                                     elem,
-                                                     side,
-                                                     sides[i],
-                                                     normal,
-                                                     distance,
-                                                     tangential_distance,
-                                                     contact_phys,
-                                                     contact_ref,
-                                                     contact_on_face_ref,
-                                                     off_edge_nodes,
-                                                     side_phi,
-                                                     side_grad_phi,
-                                                     dxyzdxi,
-                                                     dxyzdeta,
-                                                     d2xyzdxideta);
+    std::unique_ptr<PenetrationInfo> pen_info =
+        std::make_unique<PenetrationInfo>(elem,
+                                          side,
+                                          sides[i],
+                                          normal,
+                                          distance,
+                                          tangential_distance,
+                                          contact_phys,
+                                          contact_ref,
+                                          contact_on_face_ref,
+                                          off_edge_nodes,
+                                          side_phi,
+                                          side_grad_phi,
+                                          dxyzdxi,
+                                          dxyzdeta,
+                                          d2xyzdxideta);
 
+    bool search_succeeded = false;
     Moose::findContactPoint(*pen_info,
                             fe_elem,
                             fe_side,
@@ -1747,11 +1742,15 @@ PenetrationThread::createInfoForElem(std::vector<PenetrationInfo *> & thisElemIn
                             *secondary_node,
                             true,
                             _tangential_tolerance,
-                            contact_point_on_side);
+                            contact_point_on_side,
+                            search_succeeded);
 
-    thisElemInfo.push_back(pen_info);
-
-    p_info.push_back(pen_info);
+    // Do not add contact info from failed searches
+    if (search_succeeded)
+    {
+      thisElemInfo.push_back(pen_info.get());
+      p_info.push_back(pen_info.release());
+    }
   }
 }
 

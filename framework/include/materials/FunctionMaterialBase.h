@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,14 +13,7 @@
 #include "DerivativeMaterialInterface.h"
 
 #define usingFunctionMaterialBaseMembers(T)                                                        \
-  using FunctionMaterialBase<T>::name;                                                             \
-  using FunctionMaterialBase<T>::_qp;                                                              \
-  using FunctionMaterialBase<T>::_qrule;                                                           \
-  using FunctionMaterialBase<T>::_name;                                                            \
-  using FunctionMaterialBase<T>::_tid;                                                             \
-  using FunctionMaterialBase<T>::_pars;                                                            \
-  using FunctionMaterialBase<T>::_material_data_type;                                              \
-  using FunctionMaterialBase<T>::_fe_problem;                                                      \
+  usingMaterialMembers;                                                                            \
   using FunctionMaterialBase<T>::_args;                                                            \
   using FunctionMaterialBase<T>::_F_name;                                                          \
   using FunctionMaterialBase<T>::_nargs;                                                           \
@@ -29,7 +22,8 @@
   using FunctionMaterialBase<T>::_arg_param_names;                                                 \
   using FunctionMaterialBase<T>::_arg_param_numbers;                                               \
   using FunctionMaterialBase<T>::_arg_constant_defaults;                                           \
-  using FunctionMaterialBase<T>::_prop_F
+  using FunctionMaterialBase<T>::_prop_F;                                                          \
+  using FunctionMaterialBase<T>::_communicator
 
 /**
  * Material base class, central to all Materials that provide a Function as a

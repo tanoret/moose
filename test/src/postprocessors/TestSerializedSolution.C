@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,7 +30,7 @@ TestSerializedSolution::validParams()
 TestSerializedSolution::TestSerializedSolution(const InputParameters & parameters)
   : GeneralPostprocessor(parameters),
     _test_sys(getParam<MooseEnum>("system") == 0
-                  ? (SystemBase &)_fe_problem.getNonlinearSystemBase()
+                  ? (SystemBase &)_fe_problem.getNonlinearSystemBase(_sys.number())
                   : (SystemBase &)_fe_problem.getAuxiliarySystem()),
     _serialized_solution(_test_sys.serializedSolution()),
     _sum(0)
@@ -60,7 +60,7 @@ TestSerializedSolution::execute()
 }
 
 Real
-TestSerializedSolution::getValue()
+TestSerializedSolution::getValue() const
 {
   return _sum;
 }

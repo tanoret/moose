@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,7 +19,9 @@ MatReaction::validParams()
                        "Set this to make v a coupled variable, otherwise it will use the "
                        "kernel's nonlinear variable for v");
   params.addClassDescription("Kernel to add -L*v, where L=reaction rate, v=variable");
-  params.addParam<MaterialPropertyName>("mob_name", "L", "The reaction rate used with the kernel");
+  params.addRequiredParam<MaterialPropertyName>("mob_name",
+                                                "The reaction rate used with the kernel");
+  params.deprecateParam("mob_name", "reaction_rate", "01/01/2025");
   params.addCoupledVar("args", "Vector of nonlinear variable arguments this object depends on");
   return params;
 }
@@ -27,24 +29,24 @@ MatReaction::validParams()
 MatReaction::MatReaction(const InputParameters & parameters)
   : DerivativeMaterialInterface<JvarMapKernelInterface<Kernel>>(parameters),
     _is_coupled(isCoupled("v")),
-    _v_name(_is_coupled ? getVar("v", 0)->name() : _var.name()),
+    _v_name(_is_coupled ? coupledName("v") : _var.name()),
     _v(_is_coupled ? coupledValue("v") : _u),
     _v_var(_is_coupled ? coupled("v") : _var.number()),
-    _L(getMaterialProperty<Real>("mob_name")),
+    _L(getMaterialProperty<Real>("reaction_rate")),
     _eta_name(_var.name()),
-    _dLdop(getMaterialPropertyDerivative<Real>("mob_name", _eta_name)),
-    _dLdv(getMaterialPropertyDerivative<Real>("mob_name", _v_name)),
+    _dLdop(getMaterialPropertyDerivative<Real>("reaction_rate", _eta_name)),
+    _dLdv(getMaterialPropertyDerivative<Real>("reaction_rate", _v_name)),
     _dLdarg(_n_args)
 {
   // Get reaction rate derivatives
   for (unsigned int i = 0; i < _n_args; ++i)
-    _dLdarg[i] = &getMaterialPropertyDerivative<Real>("mob_name", i);
+    _dLdarg[i] = &getMaterialPropertyDerivative<Real>("reaction_rate", i);
 }
 
 void
 MatReaction::initialSetup()
 {
-  validateNonlinearCoupling<Real>("mob_name");
+  validateNonlinearCoupling<Real>("reaction_rate");
 }
 
 Real

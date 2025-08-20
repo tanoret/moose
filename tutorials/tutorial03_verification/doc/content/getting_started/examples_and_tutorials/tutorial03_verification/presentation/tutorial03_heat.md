@@ -34,15 +34,15 @@ where $\phi_i$ are the finite element test functions, $T_h$ is the finite elemen
 $\hat{n}$ is the boundary outward facing normal vector. The boundary term is a result of using
 integration by parts and the divergence theorem.
 
-This derivation also includes provisions for the application of a Dirichlet boundary conditions,
-the details of which are not not necessary for this tutorial.
+This derivation also includes provisions for the application of Dirichlet boundary conditions,
+the details of which are not necessary for this tutorial.
 
 !---
 
 ## Practice: Kernel Objects
 
 In MOOSE, volume terms are represent by `Kernel` objects and added within the `[Kernels]` input
-block. For this problem the necessary objects exist within the heat conduction module.
+block. For this problem the necessary objects exist within the heat transfer module.
 
 $\lparen \phi_i, \rho(\vec{x}) c(\vec{x})\frac{\partial T_h}{\partial t} \rparen\implies$ `HeatConductionTimeDerivative`
 

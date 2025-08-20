@@ -3,38 +3,22 @@ Fundamentals
 
 !---
 
-## C Preprocessor Commands
+## Data Types
 
-`#` Should be the first character on the line
-
-- `#include <iostream>`
-- `#include "myheader.h"`
-- `#define SOMEWORD value`
-- `#ifdef, #ifndef, #endif`
-
-!---
-
-```cpp
-#pragma once
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic pop
-```
-
-!---
-
-## Intrinsic Data Types
-
-| Basic Type | Variant(s) |
+| Intrinsic Type | Variant(s) |
 | :- | :- |
-|bool | |
-|char | unsigned |
+| bool | |
+| char | unsigned |
 | int | unsigned, long, short |
 | float | |
 | double | long |
 | void | |
 
 Note, `void` is the "anti-datatype", used in functions returning nothing
+
+Objects of these types can be combined into more complicated
+"structure" or "class" objects, or aggregated into arrays or various
+"container" classes.
 
 !---
 
@@ -55,10 +39,20 @@ Note, `void` is the "anti-datatype", used in functions returning nothing
 
 ## Curly Braces `{ }`
 
+Used to group statements together and to define the scope of a function
 
-Used to group statements together
+Creates new layer of scope
 
-Creates new layer of scope (we will get to this)
+```cpp
+int x = 2;
+
+{
+  int x = 5; // "Shadows" the other x - bad practice
+  assert(x == 5);
+}
+
+assert(x == 2);
+```
 
 !---
 
@@ -81,11 +75,16 @@ evaluated.
 
 !---
 
-Scope resolution operator:
+Scope resolution:
 
 ```cpp
-t = std::pow(r, 2);
-b = std::sqrt(d);
+a = std::pow(r, 2);     // Calls the standard pow() function
+b = YourLib::pow(r, 2); // Calls pow() from YourLib namespace or class
+
+using std::pow;      // Now "pow" can mean "std::pow" automatically
+using YourLib::pow;  // Or it can mean "YourLib::pow"...
+
+c = pow(r, 2); // Ambiguous, or deduced from the type of r
 ```
 
 Dot and Pointer Operator:
@@ -121,7 +120,14 @@ Be careful with your assumptions
 
 ```cpp
 unsigned int huge_value = 4294967295; // ok
-int i = static_cast<int>(huge_value); // won't work!
+int i = huge_value;                   // value silently changed!
+int j = static_cast<int>(huge_value); // won't help!
+```
+
+And consider safer MOOSE tools
+
+```
+int i = cast_int<int>(huge_value);    // assertion failure in non-optimized runs
 ```
 
 !---
@@ -131,9 +137,10 @@ int i = static_cast<int>(huge_value); // won't work!
 For, While, and Do-While Loops:
 
 ```cpp
-for (int i=0; i<10; ++i) { }
-while (boolean-expression)  { }
-do { } while (boolean-expression);
+for (int i=0; i<10; ++i) { foo(i); }
+for (auto val : my_container) { foo(val); }
+while (boolean-expression)  { bar(); }
+do { baz(); } while (boolean-expression);
 ```
 
 If-Then-Else Tests:
@@ -152,27 +159,6 @@ false, such as:
 
 !---
 
-### Switch Statement
-
-```cpp
-switch (expression)
-{
-case constant1:
-  // commands to execute if
-  // expression==constant1 ...
-  break;
-case constant2:
-case constant3:
-  // commands to execute if
-  // expression==constant2 OR expression==constant3...
-  break;
-default:
-  // commands to execute if no previous case matched
-}
-```
-
-!---
-
 ## Declarations and Definitions
 
 In C++ we split our code into multiple files
@@ -184,6 +170,7 @@ Headers generally contain +declarations+
 
 - Statement of the types we will use
 - Gives names to types
+- The argument and return type signatures of functions
 
 Bodies generally contain +definitions+
 
@@ -210,6 +197,14 @@ class ClassName
 };
 ```
 
+(Pointers to) functions *themselves* are also objects, with ugly syntax
+
+```cpp
+  returnType (*f_ptr)(type1, type2) = &functionName;
+  returnType r = (*f_ptr)(a1, a2);
+  do_something_else_with(f_ptr);
+```
+
 !---
 
 ### Definition Examples
@@ -219,7 +214,7 @@ Function definition:
 ```cpp
 returnType functionName(type1 name1, type2 name2)
 {
-  // statesments
+  // statements
 }
 ```
 
@@ -234,154 +229,13 @@ returnType ClassName::methodName(type1 name1, type2 name2)
 
 !---
 
-### Function Example: Addition
-
-```cpp
-#include <iostream>
-int addition (int a, int b)
-{
-  return a + b;
-}
-
-int main ()
-{
-  int z = addition(5,3);
-  std::cout << "The result is " << z << "\n";
-  return 0;
-}
-```
-
-!---
-
-### Forward Declaration
-
-```cpp
-#include <iostream>
-int addition (int a, int b);
-
-int main ()
-{
-  int z = addition (5,3);
-  std::cout << "The result is " << z << "\n";
-  return 0;
-}
-
-int addition (int a, int b)
-{
-  return a + b;
-}
-```
-
-!---
-
 ## Make
 
-A Makefile is a list of dependencies with rules to satisfy those dependencies
-All MOOSE-based applications are supplied with a complete Makefile
-To build a MOOSE-based application just type:
+A Makefile is a list of dependencies with rules to satisfy those dependencies. All MOOSE-based
+applications are supplied with a complete Makefile.
+
+To build a MOOSE-based application, just type:
 
 ```text
 make
 ```
-
-!---
-
-## Compiling, Linking, Executing
-
-Compile and Link
-
-```
-g++ -O3 -o myExample myExample.C
-```
-
-Compile only
-
-```
-g++ -O3 -o myExample.o -c myExample.C
-```
-
-Link only
-
-```
-g++ -O3 -o myExample myExample.o
-```
-
-!---
-
-## Compiler/Linker Flags
-
-Libraries (`-L`) and Include (`-I`) path
-Library Names (`-l`)
-
-- Remove the leading "lib" and trailing file extension when linking
-- libutils.so would link as -lutils
-
-```
-g++ -I/home/permcj/include -L/home/permcj/lib -lutils -Wall -o myExec myExec.o
-```
-
-!---
-
-## Execution
-
-Basic execution
-
-```
-./myExec
-```
-
-Finding shared libraries at runtime
-
-- Linux: `ldd` and `$LD_LIBRARY_PATH`
-- MacOS: `otool`
-
-!---
-
-## Addition Example (continued)
-
-### Header File (add.h)
-
-```cpp
-#pragma once
-int addition (int a, int b); // Function declaration
-```
-
-Headers typically contain declarations only
-
-!---
-
-### Source File (add.C)
-
-```cpp
-#include "add.h"
-int addition (int a, int b)
-{
-  return a + b;
-}
-```
-
-!---
-
-### Driver Program (main.C)
-
-```cpp
-#include "add.h"
-#include <iostream>
-int main ()
-{
-  int z = addition(5,3);
-  std::cout << "The result is " << z;
-  return 0;
-}
-```
-
-!---
-
-## Compiling the Addition Example
-
-1. `g++ -g -c -o add.o add.C`
-1. `g++ -g -c -o main.o main.C`
-1. `g++ -g -o main main.o add.o`
-
-   - The -c flag means compile only, do not link
-   - These commands can be stored in a Makefile and executed automatically with the make command

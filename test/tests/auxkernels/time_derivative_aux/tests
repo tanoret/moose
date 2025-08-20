@@ -7,7 +7,6 @@
     exodiff = 'test_out.e'
     cli_args = "AuxVariables/inactive='variable_derivative_fv function_derivative_qp function_derivative_elem' AuxKernels/inactive='var_derivative_to_fv function_derivative_quadrature_point function_derivative_element'"
     requirement = "The system shall be able to compute the time derivative of a non linear variable."
-    ad_indexing_type = 'global'
   []
   [functors]
     type = 'Exodiff'
@@ -21,11 +20,10 @@
     input = 'test_fv.i'
     exodiff = 'test_fv_out.e'
     requirement = "The system shall be able to compute the time derivative of finite volume variables."
-    ad_indexing_type = 'global'
   []
 
   [errors]
-    requirement = 'The system shall error if'
+    requirement = 'The system shall report an error if'
     [not_implemented_functor_matprop]
       type = RunException
       input = 'test.i'

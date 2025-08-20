@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -65,7 +65,7 @@ JSONOutput::filename()
 void
 JSONOutput::outputSystemInformation()
 {
-  storeHelper(_json, _app);
+  nlohmann::to_json(_json, _app);
 }
 
 void
@@ -98,9 +98,9 @@ JSONOutput::outputReporters()
     // Add time/iteration information
     current_node["time"] = _problem_ptr->time();
     current_node["time_step"] = _problem_ptr->timeStep();
-    if (_execute_enum.contains(EXEC_LINEAR) && !_on_nonlinear_residual)
+    if (_execute_enum.isValueSet(EXEC_LINEAR) && !_on_nonlinear_residual)
       current_node["linear_iteration"] = _linear_iter;
-    if (_execute_enum.contains(EXEC_NONLINEAR))
+    if (_execute_enum.isValueSet(EXEC_NONLINEAR))
       current_node["nonlinear_iteration"] = _nonlinear_iter;
 
     // Inject processor info
@@ -142,9 +142,9 @@ JSONOutput::outputReporters()
                         .attributes();
         auto qid = _problem_ptr->theWarehouse().queryID(attr);
         _problem_ptr->theWarehouse().queryInto(qid, objs, true);
-        mooseAssert(objs.size() <= 1,
-                    "Multiple Reporter objects with the same name located, how did you do that?");
 
+        // There can now be multiple reporter objects with the same name, but
+        // there will only be one reporter that stores all the data.
         if (!objs.empty())
         {
           auto & reporter = *objs.front();
@@ -177,10 +177,10 @@ JSONOutput::outputReporters()
 }
 
 void
-JSONOutput::output(const ExecFlagType & type)
+JSONOutput::output()
 {
   _has_distributed = false;
-  AdvancedOutput::output(type);
+  AdvancedOutput::output();
   if (processor_id() == 0 || _has_distributed)
   {
     std::ofstream out(filename().c_str());

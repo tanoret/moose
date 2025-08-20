@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,10 +25,7 @@ public:
                   processor_id_type p,
                   map_type & coupled_elements) override;
 
-  std::unique_ptr<GhostingFunctor> clone() const override
-  {
-    return std::make_unique<GhostLowerDElems>(*this);
-  }
+  std::unique_ptr<GhostingFunctor> clone() const override;
 
   std::string getInfo() const override;
 

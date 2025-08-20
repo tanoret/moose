@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,6 +12,8 @@
 #include "FEProblem.h"
 #include "PetscSupport.h"
 
+using namespace libMesh;
+
 InputParameters
 ExplicitRK2::validParams()
 {
@@ -23,7 +25,7 @@ ExplicitRK2::validParams()
 ExplicitRK2::ExplicitRK2(const InputParameters & parameters)
   : TimeIntegrator(parameters),
     _stage(1),
-    _residual_old(_nl.addVector("residual_old", false, GHOSTED)),
+    _residual_old(addVector("residual_old", false, GHOSTED)),
     _solution_older(_sys.solutionState(2))
 {
   mooseInfo("ExplicitRK2-derived TimeIntegrators (ExplicitMidpoint, Heun, Ralston) and other "
@@ -53,15 +55,13 @@ ExplicitRK2::computeTimeDerivatives()
   NumericVector<Number> & u_dot = *_sys.solutionUDot();
   u_dot = *_solution;
   computeTimeDerivativeHelper(u_dot, _solution_old, _solution_older);
-
-  _du_dot_du = 1. / _dt;
-  u_dot.close();
+  computeDuDotDu();
 }
 
 void
-ExplicitRK2::computeADTimeDerivatives(DualReal & ad_u_dot,
+ExplicitRK2::computeADTimeDerivatives(ADReal & ad_u_dot,
                                       const dof_id_type & dof,
-                                      DualReal & /*ad_u_dotdot*/) const
+                                      ADReal & /*ad_u_dotdot*/) const
 {
   computeTimeDerivativeHelper(ad_u_dot, _solution_old(dof), _solution_older(dof));
 }
@@ -81,17 +81,17 @@ ExplicitRK2::solve()
   // first solve therefore happens in the second stage.  Note that the
   // non-time Kernels (which should be marked implicit=false) are
   // evaluated at the old solution during this stage.
-  _fe_problem.initPetscOutput();
+  _fe_problem.initPetscOutputAndSomeSolverSettings();
   _console << "1st solve" << std::endl;
   _stage = 2;
   _fe_problem.timeOld() = time_old;
   _fe_problem.time() = time_stage2;
-  _fe_problem.getNonlinearSystemBase().system().solve();
+  _nl->system().solve();
   _n_nonlinear_iterations += getNumNonlinearIterationsLastSolve();
   _n_linear_iterations += getNumLinearIterationsLastSolve();
 
   // Abort time step immediately on stage failure - see TimeIntegrator doc page
-  if (!_fe_problem.converged())
+  if (!_fe_problem.converged(_nl->number()))
     return;
 
   // Advance solutions old->older, current->old.  Also moves Material
@@ -100,12 +100,12 @@ ExplicitRK2::solve()
 
   // The "update" stage (which we call stage 3) requires an additional
   // solve with the mass matrix.
-  _fe_problem.initPetscOutput();
+  _fe_problem.initPetscOutputAndSomeSolverSettings();
   _console << "2nd solve" << std::endl;
   _stage = 3;
   _fe_problem.timeOld() = time_stage2;
   _fe_problem.time() = time_new;
-  _fe_problem.getNonlinearSystemBase().system().solve();
+  _nl->system().solve();
   _n_nonlinear_iterations += getNumNonlinearIterationsLastSolve();
   _n_linear_iterations += getNumLinearIterationsLastSolve();
 
@@ -136,11 +136,11 @@ ExplicitRK2::postResidual(NumericVector<Number> & residual)
     // .) The minus signs are "baked in" to the non-time residuals, so
     //    they do not appear here.
     // .) The current non-time residual is saved for the next stage.
-    _residual_old = _Re_non_time;
-    _residual_old.close();
+    *_residual_old = *_Re_non_time;
+    _residual_old->close();
 
-    residual.add(1., _Re_time);
-    residual.add(a(), _residual_old);
+    residual.add(1., *_Re_time);
+    residual.add(a(), *_residual_old);
     residual.close();
   }
   else if (_stage == 3)
@@ -156,9 +156,9 @@ ExplicitRK2::postResidual(NumericVector<Number> & residual)
     //    residuals, so it does not appear here.
     // .) Although this is an update step, we have to do a "solve"
     //    using the mass matrix.
-    residual.add(1., _Re_time);
-    residual.add(b1(), _residual_old);
-    residual.add(b2(), _Re_non_time);
+    residual.add(1., *_Re_time);
+    residual.add(b1(), *_residual_old);
+    residual.add(b2(), *_Re_non_time);
     residual.close();
   }
   else

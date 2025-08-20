@@ -43,14 +43,14 @@ where $\vec{n}$ is the outward normal and on the right:
 \end{equation}
 
 For seeing how the flux boundary condition is applied, the diffusion equation is integrated
-over the extent of an element adjacent to the left boundary and Gauss' theorem is appied to the divergence:
+over the extent of an element adjacent to the left boundary and Gauss' theorem is applied to the divergence:
 
 \begin{equation}
   -\int_{\Omega} \nabla \cdot D \nabla v dV =
-  -\int_{\partial \Omega_l} \nabla \cdot D \nabla v dV
-  -\int_{\partial \Omega \setminus \partial \Omega_l} \nabla \cdot D \nabla v dV
+  -\int_{\partial \Omega_l} D \nabla v \cdot \vec{n} dA
+  -\int_{\partial \Omega \setminus \partial \Omega_l} D \nabla v \cdot \vec{n} dA
   = 5 A_{\partial \Omega_l}
-  -\int_{\partial \Omega \setminus \partial \Omega_l} \nabla \cdot D \nabla v dV=0,
+  -\int_{\partial \Omega \setminus \partial \Omega_l} D \nabla v \cdot \vec{n} dA=0,
 \end{equation}
 
 where $\Omega$ is the element volume, $\partial \Omega_l$ are all faces that belong to the left sideset, $\partial \Omega$ are all faces, and $A_{\partial \Omega_l}$ is the area of face.
@@ -59,8 +59,8 @@ Flux boundary conditions are applied by replacing appropriate terms in the FVM b
 Dirichlet boundary conditions are applied differently. Let us first write a balance equation for an element that is adjacent to the right boundary:
 
 \begin{equation}
-  -\int_{\partial \Omega_r} \nabla \cdot D \nabla v dV
-  -\int_{\partial \Omega \setminus \partial \Omega_r} \nabla \cdot D \nabla v dV  =0,
+  -\int_{\partial \Omega_r} D \nabla v \cdot \vec{n} dA
+  -\int_{\partial \Omega \setminus \partial \Omega_r} D \nabla v \cdot \vec{n} dA  =0,
 \end{equation}
 
 MOOSE uses the ghost element method to apply Dirichlet boundary conditions for FVM.
@@ -75,7 +75,7 @@ The process of using a ghost elements is the following:
 4. Evaluate the numerical fluxes as if you were on an interior face.
 
 For implementing the ghost element method an extrapolation must be selected. Currently,
-MOOSE FVM only supports linear extrapolation. If the value of the Dirichlet boundary condition is denoted by $v_D$ and the value in the element is denosted by $v_E$, then the ghost element value $v_G$ is:
+MOOSE FVM only supports linear extrapolation. If the value of the Dirichlet boundary condition is denoted by $v_D$ and the value in the element is denoted by $v_E$, then the ghost element value $v_G$ is:
 
 \begin{equation}
   v_G = 2 v_D - v_E.
@@ -86,7 +86,7 @@ The parameters available in boundary conditions are equivalent to [FEM boundary 
 ## FVBCs source code: FVDirichletBC
 
 `FVDirichletBC` objects assigns a constant value on a boundary.
-Implementation of a FVM Dirichlet bondary condition usually only requires overriding the
+Implementation of a FVM Dirichlet boundary condition usually only requires overriding the
 `boundaryValue` method. The `boundaryValue` method must return the value
 of the variable on the Dirichlet boundary.
 

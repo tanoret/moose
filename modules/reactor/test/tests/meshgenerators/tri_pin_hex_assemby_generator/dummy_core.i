@@ -15,7 +15,7 @@
     quad_center_elements = true
   []
   [assm1]
-    type = HexIDPatternedMeshGenerator
+    type = PatternedHexMeshGenerator
     inputs = 'pin_1'
     id_name ='test_id1'
     hexagon_size = 20
@@ -38,15 +38,15 @@
     ring_intervals = '1 1;1 1;1 1'
     ring_block_ids = '200 400;200 400;200 400'
     background_block_ids = '40'
+    background_block_names = 'background_1'
     num_sectors_per_side = 14
     background_intervals = 2
     hexagon_size = ${fparse 40.0/sqrt(3.0)}
     ring_offset = 0.6
-    azimuthal_interval_style = equal_length
     assembly_orientation = pin_up
   []
   [pattern]
-    type = HexIDPatternedMeshGenerator
+    type = PatternedHexMeshGenerator
     inputs = 'assm1 assm_up'
     id_name ='test_id2'
     pattern = '0 0;
@@ -54,5 +54,12 @@
                0 0'
     pattern_boundary = none
     generate_core_metadata = true
+  []
+[]
+
+[Outputs]
+  [out]
+    type = Exodus
+    output_extra_element_ids = false
   []
 []

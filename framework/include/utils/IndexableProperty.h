@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -70,6 +70,7 @@ IndexableProperty<T, is_ad>::validParams()
                                                          "The name of the material property");
   params.template addParam<std::vector<unsigned int>>(
       "component",
+      {},
       "Index vector of the scalar component to extract from "
       "the material property (empty for scalar properties)");
   return params;

@@ -1,6 +1,6 @@
-# Output System
+# [Output System](syntax/Outputs/index.md)
 
-A system for producing outputting simulation data to the screen or files.
+A system for outputting simulation data to the screen or files.
 
 !---
 
@@ -36,15 +36,34 @@ The following two methods for creating an Output object are equivalent within th
 
 !---
 
+## Customizing Output
+
+The content of each `Output` can customized, see for example for an [Exodus](Exodus.md) output:
+
+```
+[Outputs]
+  [out]
+    type = Exodus
+    output_material_properties = true
+    # removes some quantities from the output
+    hide = 'power_pp pressure_var'
+  []
+[]
+```
+
+!---
+
 ## Common Parameters
 
 ```text
 [Outputs]
-  interval = 10
-  exodus = true
-  [all]
+  interval = 10 # this is a time step interval
+  [exo]
     type = Exodus
     interval = 1 # overrides interval from top-level
+  []
+  [cp]
+    type = Checkpoint # Uses interval specified from top-level
   []
 []
 ```
@@ -71,9 +90,9 @@ using the short-cut syntax.  sub-blocks use the actual sub-block name as the suf
 []
 ```
 
-The use of 'file_base' anywhere in the `[Outputs]` block disables all default naming behavior.
-
 !---
 
 !style fontsize=85%
 !include output_types.md
+
+Paraview can read many of these (CSV, Exodus, Nemesis, VTK, GMV)

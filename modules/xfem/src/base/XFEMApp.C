@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #include "XFEMApp.h"
 #include "XFEMAppTypes.h"
-#include "TensorMechanicsApp.h"
+#include "SolidMechanicsApp.h"
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
@@ -21,6 +21,7 @@ XFEMApp::validParams()
 
   params.set<bool>("automatic_automatic_scaling") = false;
   params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
 
   return params;
 }
@@ -49,20 +50,22 @@ XFEMApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
   Registry::registerActionsTo(af, {"XFEMApp"});
   associateSyntaxInner(s, af);
 
-  TensorMechanicsApp::registerAll(f, af, s);
+  SolidMechanicsApp::registerAll(f, af, s);
 }
 
 void
 XFEMApp::registerApps()
 {
   registerApp(XFEMApp);
+
+  SolidMechanicsApp::registerApps();
 }
 
 void
 XFEMApp::registerObjectDepends(Factory & factory)
 {
   mooseDeprecated("use registerAll instead of registerObjectsDepends");
-  TensorMechanicsApp::registerObjects(factory);
+  SolidMechanicsApp::registerObjects(factory);
 }
 
 void
@@ -76,7 +79,7 @@ void
 XFEMApp::associateSyntaxDepends(Syntax & syntax, ActionFactory & action_factory)
 {
   mooseDeprecated("use registerAll instead of associateSyntaxDepends");
-  TensorMechanicsApp::associateSyntax(syntax, action_factory);
+  SolidMechanicsApp::associateSyntax(syntax, action_factory);
 }
 
 void

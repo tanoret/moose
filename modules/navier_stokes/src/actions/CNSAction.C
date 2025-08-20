@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,6 +21,8 @@
 #include "libmesh/vector_value.h"
 #include "libmesh/string_to_enum.h"
 
+using namespace libMesh;
+
 registerMooseAction("NavierStokesApp", CNSAction, "add_navier_stokes_variables");
 registerMooseAction("NavierStokesApp", CNSAction, "add_navier_stokes_kernels");
 registerMooseAction("NavierStokesApp", CNSAction, "add_navier_stokes_bcs");
@@ -38,7 +40,7 @@ CNSAction::validParams()
   params.addParam<MooseEnum>("equation_type", type, "Navier-Stokes equation type");
 
   params.addParam<std::vector<SubdomainName>>(
-      "block", "The list of block ids (SubdomainID) on which NS equation is defined on");
+      "block", {}, "The list of block ids (SubdomainID) on which NS equation is defined on");
 
   params.addRequiredParam<UserObjectName>("fluid_properties",
                                           "The name of the user object for fluid properties");

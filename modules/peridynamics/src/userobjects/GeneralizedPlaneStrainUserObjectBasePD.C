@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -49,8 +49,7 @@ GeneralizedPlaneStrainUserObjectBasePD::initialize()
 void
 GeneralizedPlaneStrainUserObjectBasePD::threadJoin(const UserObject & uo)
 {
-  const GeneralizedPlaneStrainUserObjectBasePD & gpsuo =
-      static_cast<const GeneralizedPlaneStrainUserObjectBasePD &>(uo);
+  const auto & gpsuo = static_cast<const GeneralizedPlaneStrainUserObjectBasePD &>(uo);
   _residual += gpsuo._residual;
   _jacobian += gpsuo._jacobian;
 }

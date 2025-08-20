@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,6 +24,8 @@ public:
 protected:
   /// Heat transfer coefficient
   const Function & _htc;
+  /// Coupling area fraction
+  const Real & _coupling_area_fraction;
 
 public:
   static InputParameters validParams();

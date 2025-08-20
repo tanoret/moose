@@ -28,9 +28,9 @@
   []
 []
 
-[HeatStructureMaterials]
+[SolidProperties]
   [hs_mat]
-    type = SolidMaterialProperties
+    type = ThermalFunctionSolidProperties
      rho = 1
      cp = 1
      k = 1
@@ -52,14 +52,14 @@
 
   [hs1]
     type = HeatStructurePlate
-    fp = eos
     position = '0 0 0'
     orientation = '1 0 0'
     n_elems = 10
     length = 1
     depth = 0.1
     names = 'blk'
-    materials = 'hs_mat'
+    solid_properties = 'hs_mat'
+    solid_properties_T_ref = '300'
     n_part_elems = 1
     widths = '0.1'
   []
@@ -78,14 +78,14 @@
 
   [hs2]
     type = HeatStructurePlate
-    fp = eos
     position = '0 0 0'
     orientation = '0 1 0'
     n_elems = 10
     length = 1
     depth = 0.1
     names = 'blk'
-    materials = 'hs_mat'
+    solid_properties = 'hs_mat'
+    solid_properties_T_ref = '300'
     n_part_elems = 1
     widths = '0.1'
   []
@@ -104,14 +104,14 @@
 
   [hs3]
     type = HeatStructurePlate
-    fp = eos
     position = '0 0 0'
     orientation = '0 0 1'
     n_elems = 10
     length = 1
     depth = 0.1
     names = 'blk'
-    materials = 'hs_mat'
+    solid_properties = 'hs_mat'
+    solid_properties_T_ref = '300'
     n_part_elems = 1
     widths = '0.1'
   []
@@ -121,6 +121,7 @@
     connections = 'pipe1:in pipe2:in pipe3:in'
     position = '0 0 0'
     volume = 1e-5
+    use_scalar_variables = false
   []
 
   [in1]

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,11 +18,14 @@ typedef BatchMaterial<
     // tuple representation
     BatchMaterialUtils::TupleStd,
     // output data type
-    Real,
+    std::tuple<Real, Real>,
     // gathered input data types:
     BatchMaterialUtils::GatherVariable,
     BatchMaterialUtils::GatherMatProp<RankTwoTensor>,
-    BatchMaterialUtils::GatherMatProp<Real>>
+    BatchMaterialUtils::GatherMatProp<Real>,
+    BatchMaterialUtils::GatherVariableOld,
+    BatchMaterialUtils::GatherMatPropOld<RankTwoTensor>,
+    BatchMaterialUtils::GatherMatPropOld<Real>>
 
     BatchMaterialTestParent;
 

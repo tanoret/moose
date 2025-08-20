@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,7 @@ PODResidualTransfer::validParams()
   params.addClassDescription("Transfers residual vectors from the sub-application to a "
                              "a container in the Trainer object.");
   params.suppressParameter<MultiMooseEnum>("direction");
+  params.suppressParameter<MultiAppName>("multi_app");
   return params;
 }
 
@@ -56,7 +57,7 @@ PODResidualTransfer::transferResidual(dof_id_type base_i, dof_id_type multi_app_
 
   // Getting reference to the non-linear system
   FEProblemBase & app_problem = getFromMultiApp()->appProblemBase(multi_app_i);
-  NonlinearSystemBase & nl = app_problem.getNonlinearSystemBase();
+  NonlinearSystemBase & nl = app_problem.getNonlinearSystemBase(/*nl_sys_num=*/0);
 
   // Looping over the residual tags and extracting the corresponding vector.
   for (unsigned int tag_i = 0; tag_i < tag_names.size(); ++tag_i)
@@ -80,7 +81,7 @@ PODResidualTransfer::transferResidual(dof_id_type base_i, dof_id_type multi_app_
       const std::vector<dof_id_type> & var_dofs = nl.getVariableGlobalDoFs();
 
       // Extracting the corresponding part of the residual vector.
-      full_residual.get(var_dofs, split_residual[var_i].get_values());
+      full_residual.localize(split_residual[var_i].get_values(), var_dofs);
     }
 
     // Inserting the contribution of this residual into the reduced operator in

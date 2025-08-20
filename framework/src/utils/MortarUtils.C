@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,8 @@
 #include "metaphysicl/dualnumberarray.h"
 #include "Eigen/Dense"
 
+using MetaPhysicL::NumberArray;
+
 typedef DualNumber<Real, NumberArray<2, Real>> Dual2;
 
 namespace Moose
@@ -27,12 +29,12 @@ projectQPoints3d(const Elem * const msm_elem,
                  const QBase & qrule_msm,
                  std::vector<Point> & q_pts)
 {
-  auto && msm_order = msm_elem->default_order();
-  auto && msm_type = msm_elem->type();
+  const auto msm_elem_order = msm_elem->default_order();
+  const auto msm_elem_type = msm_elem->type();
 
   // Get normal to linearized element, could store and query but computation is easy
-  Point e1 = msm_elem->point(0) - msm_elem->point(1);
-  Point e2 = msm_elem->point(2) - msm_elem->point(1);
+  const Point e1 = msm_elem->point(0) - msm_elem->point(1);
+  const Point e2 = msm_elem->point(2) - msm_elem->point(1);
   const Point normal = e2.cross(e1).unit();
 
   // Get sub-elem (for second order meshes, otherwise trivial)
@@ -48,6 +50,7 @@ projectQPoints3d(const Elem * const msm_elem,
       case QUAD4:
         return {{0, 1, 2, 3}};
       case TRI6:
+      case TRI7:
         switch (sub_elem)
         {
           case 0:
@@ -109,6 +112,7 @@ projectQPoints3d(const Elem * const msm_elem,
       case QUAD4:
         return Point(nu, xi, 0);
       case TRI6:
+      case TRI7:
         switch (sub_elem)
         {
           case 0:
@@ -165,6 +169,7 @@ projectQPoints3d(const Elem * const msm_elem,
     {
       case TRI3:
       case TRI6:
+      case TRI7:
         return TRI3;
       case QUAD4:
       case QUAD9:
@@ -198,8 +203,10 @@ projectQPoints3d(const Elem * const msm_elem,
     // Get physical point on msm_elem to project
     Point x0;
     for (auto n : make_range(msm_elem->n_nodes()))
-      x0 += Moose::fe_lagrange_2D_shape(
-                msm_type, msm_order, n, static_cast<const TypeVector<Real> &>(qrule_msm.qp(qp))) *
+      x0 += Moose::fe_lagrange_2D_shape(msm_elem_type,
+                                        msm_elem_order,
+                                        n,
+                                        static_cast<const TypeVector<Real> &>(qrule_msm.qp(qp))) *
             msm_elem->point(n);
 
     // Use msm_elem quadrature point as initial guess
@@ -260,15 +267,17 @@ projectQPoints3d(const Elem * const msm_elem,
       // erroring simply truncate quadrature point, these points typically have very small
       // contributions to integrals
       auto & qp_back = q_pts.back();
-      if (primal_elem->type() == TRI3 || primal_elem->type() == TRI6)
+      if (primal_elem->type() == TRI3 || primal_elem->type() == TRI6 || primal_elem->type() == TRI7)
       {
-        if (qp_back(0) < 0 || qp_back(1) < 0 || qp_back(0) + qp_back(1) > 1)
+        if (qp_back(0) < -TOLERANCE || qp_back(1) < -TOLERANCE ||
+            qp_back(0) + qp_back(1) > (1 + TOLERANCE))
           mooseException("Quadrature point: ", qp_back, " out of bounds, truncating.");
       }
       else if (primal_elem->type() == QUAD4 || primal_elem->type() == QUAD8 ||
                primal_elem->type() == QUAD9)
       {
-        if (qp_back(0) < -1 || qp_back(0) > 1 || qp_back(1) < -1 || qp_back(1) > 1)
+        if (qp_back(0) < (-1 - TOLERANCE) || qp_back(0) > (1 + TOLERANCE) ||
+            qp_back(1) < (-1 - TOLERANCE) || qp_back(1) > (1 + TOLERANCE))
           mooseException("Quadrature point: ", qp_back, " out of bounds, truncating");
       }
     }

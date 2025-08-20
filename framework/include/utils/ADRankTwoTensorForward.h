@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,4 +15,4 @@
 typedef RankTwoTensorTempl<ADReal> ADRankTwoTensor;
 
 // for backward compatibility
-typedef RankTwoTensorTempl<DualReal> DualRankTwoTensor;
+typedef RankTwoTensorTempl<ADReal> DualRankTwoTensor;

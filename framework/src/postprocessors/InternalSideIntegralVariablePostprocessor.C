@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -44,7 +44,7 @@ InternalSideIntegralVariablePostprocessor::InternalSideIntegralVariablePostproce
 Real
 InternalSideIntegralVariablePostprocessor::computeFaceInfoIntegral(const FaceInfo * const fi)
 {
-  return MetaPhysicL::raw_value((*_fv_variable)(makeCDFace(*fi)));
+  return MetaPhysicL::raw_value((*_fv_variable)(makeCDFace(*fi), determineState()));
 }
 
 Real

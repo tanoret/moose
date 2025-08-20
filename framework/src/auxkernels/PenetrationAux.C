@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,8 +15,6 @@
 #include "MooseMesh.h"
 
 #include "libmesh/string_to_enum.h"
-
-const Real PenetrationAux::NotPenetrated = -999999;
 
 registerMooseObject("MooseApp", PenetrationAux);
 
@@ -98,7 +96,7 @@ PenetrationAux::PenetrationAux(const InputParameters & parameters)
 Real
 PenetrationAux::computeValue()
 {
-  const Node * current_node = NULL;
+  const Node * current_node = nullptr;
 
   if (_nodal)
     current_node = _current_node;
@@ -107,7 +105,9 @@ PenetrationAux::computeValue()
 
   PenetrationInfo * pinfo = _penetration_locator._penetration_info[current_node->id()];
 
-  Real retVal(NotPenetrated);
+  // A node that doesn't project has zero force, closest point (i.e. not computed), slip, and its
+  // mechanical status is not in contact.
+  Real retVal(0);
 
   if (pinfo)
     switch (_quantity)
@@ -214,7 +214,7 @@ PenetrationAux::computeValue()
         retVal = pinfo->_mech_status;
         break;
       default:
-        mooseError("Unknown PA_ENUM");
+        mooseError("Unknown penetration info quantity in auxiliary kernel.");
     } // switch
 
   return retVal;

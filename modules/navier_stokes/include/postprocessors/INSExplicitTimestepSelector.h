@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,11 +23,11 @@ public:
   INSExplicitTimestepSelector(const InputParameters & parameters);
   virtual ~INSExplicitTimestepSelector();
 
-  virtual void initialize();
-  virtual void execute();
-  virtual Real getValue();
-  virtual void finalize();
-  virtual void threadJoin(const UserObject & uo);
+  virtual void initialize() override;
+  virtual void execute() override;
+  virtual Real getValue() const override;
+  virtual void finalize() override;
+  virtual void threadJoin(const UserObject & uo) override;
 
 protected:
   /// The value of dt (NOTE: _dt member variable is already defined)

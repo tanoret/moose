@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,4 +20,4 @@ class TestHarnessTester(TestHarnessTestCase):
         with self.assertRaises(subprocess.CalledProcessError) as cm:
             self.runTests('--pedantic-checks', '-i', 'output_clobber_simple')
         e = cm.exception
-        self.assertIn('Diagnostic analysis', e.output.decode('utf-8'))
+        self.assertIn('Diagnostic analysis', e.output)

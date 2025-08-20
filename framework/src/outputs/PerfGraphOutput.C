@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -58,14 +58,14 @@ PerfGraphOutput::PerfGraphOutput(const InputParameters & parameters)
 }
 
 bool
-PerfGraphOutput::shouldOutput(const ExecFlagType & type)
+PerfGraphOutput::shouldOutput()
 {
   // We don't want the Perflog to get dumped at odd times. Ignore the FORCED flag.
-  return _execute_on.contains(type);
+  return _execute_on.isValueSet(_current_execute_flag);
 }
 
 void
-PerfGraphOutput::output(const ExecFlagType & /*type*/)
+PerfGraphOutput::output()
 {
   if (!_app.getParam<bool>("no_timing"))
   {

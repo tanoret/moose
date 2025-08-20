@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -43,9 +43,9 @@ class MooseVariableField : public MooseVariableFieldBase,
 {
 public:
   // type for gradient, second and divergence of template class OutputType
-  typedef typename TensorTools::IncrementRank<OutputType>::type OutputGradient;
-  typedef typename TensorTools::IncrementRank<OutputGradient>::type OutputSecond;
-  typedef typename TensorTools::DecrementRank<OutputType>::type OutputDivergence;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputType>::type OutputGradient;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputGradient>::type OutputSecond;
+  typedef typename libMesh::TensorTools::DecrementRank<OutputType>::type OutputDivergence;
 
   // shortcut for types storing values on quadrature points
   typedef MooseArray<OutputType> FieldVariableValue;
@@ -58,9 +58,9 @@ public:
   typedef typename Moose::ShapeType<OutputType>::type OutputShape;
 
   // type for gradient, second and divergence of shape functions of template class OutputType
-  typedef typename TensorTools::IncrementRank<OutputShape>::type OutputShapeGradient;
-  typedef typename TensorTools::IncrementRank<OutputShapeGradient>::type OutputShapeSecond;
-  typedef typename TensorTools::DecrementRank<OutputShape>::type OutputShapeDivergence;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputShape>::type OutputShapeGradient;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputShapeGradient>::type OutputShapeSecond;
+  typedef typename libMesh::TensorTools::DecrementRank<OutputShape>::type OutputShapeDivergence;
 
   // shortcut for types storing shape function values on quadrature points
   typedef MooseArray<std::vector<OutputShape>> FieldVariablePhiValue;
@@ -82,6 +82,10 @@ public:
   typedef MooseArray<OutputData> DoFValue;
 
   MooseVariableField(const InputParameters & parameters);
+
+  virtual Moose::VarFieldType fieldType() const override;
+  virtual bool isArray() const override;
+  virtual bool isVector() const override;
 
   static InputParameters validParams();
 
@@ -115,6 +119,11 @@ public:
   virtual const ADTemplateVariableGradient<OutputType> & adGradSlnDot() const = 0;
 
   /**
+   * AD curl solution getter
+   */
+  virtual const ADTemplateVariableCurl<OutputType> & adCurlSln() const = 0;
+
+  /**
    * AD grad neighbor solution getter
    */
   virtual const ADTemplateVariableGradient<OutputType> & adGradSlnNeighbor() const = 0;
@@ -123,6 +132,11 @@ public:
    * AD grad of time derivative neighbor solution getter
    */
   virtual const ADTemplateVariableGradient<OutputType> & adGradSlnNeighborDot() const = 0;
+
+  /**
+   * AD curl neighbor solution getter
+   */
+  virtual const ADTemplateVariableCurl<OutputType> & adCurlSlnNeighbor() const = 0;
 
   /**
    * AD second solution getter
@@ -158,6 +172,16 @@ public:
    * Return the AD dof values
    */
   virtual const MooseArray<ADReal> & adDofValues() const = 0;
+
+  /**
+   * Return the AD neighbor dof values
+   */
+  virtual const MooseArray<ADReal> & adDofValuesNeighbor() const = 0;
+
+  /**
+   * Return the AD time derivatives at dofs
+   */
+  virtual const MooseArray<ADReal> & adDofValuesDot() const = 0;
 
   ///@{
   /**
@@ -212,6 +236,11 @@ public:
   virtual bool computingCurl() const = 0;
 
   /**
+   * Whether or not this variable is computing any divergence quantities
+   */
+  virtual bool computingDiv() const = 0;
+
+  /**
    * Return the variable's elemental shape functions
    */
   virtual const FieldVariablePhiValue & phi() const = 0;
@@ -230,6 +259,11 @@ public:
    * Curl of the shape functions
    */
   virtual const FieldVariablePhiValue & curlPhi() const = 0;
+
+  /**
+   * Divergence of the shape functions
+   */
+  virtual const FieldVariablePhiDivergence & divPhi() const = 0;
 
   /**
    * Return the variable's shape functions on an element face
@@ -280,9 +314,20 @@ public:
   virtual const FieldVariablePhiSecond & secondPhiNeighbor() const = 0;
 
   /**
+   * Return the variable's shape functions on a lower-dimensional element
+   */
+  virtual const FieldVariablePhiValue & phiLower() const = 0;
+
+  /**
    * Set local DOF values and evaluate the values on quadrature points
    */
   virtual void setDofValues(const DenseVector<OutputData> & values) = 0;
+
+  /**
+   * Set local DOF values for a lower dimensional element and evaluate the values on quadrature
+   * points
+   */
+  virtual void setLowerDofValues(const DenseVector<OutputData> & values) = 0;
 
   /**
    * Whether or not this variable is actually using the shape function value.
@@ -323,10 +368,13 @@ public:
   virtual const DoFValue & dofValuesDotDotNeighbor() const = 0;
   virtual const DoFValue & dofValuesDotDotOld() const = 0;
   virtual const DoFValue & dofValuesDotDotOldNeighbor() const = 0;
-  virtual const MooseArray<Number> & dofValuesDuDotDu() const = 0;
-  virtual const MooseArray<Number> & dofValuesDuDotDuNeighbor() const = 0;
-  virtual const MooseArray<Number> & dofValuesDuDotDotDu() const = 0;
-  virtual const MooseArray<Number> & dofValuesDuDotDotDuNeighbor() const = 0;
+  virtual const MooseArray<libMesh::Number> & dofValuesDuDotDu() const = 0;
+  virtual const MooseArray<libMesh::Number> & dofValuesDuDotDuNeighbor() const = 0;
+  virtual const MooseArray<libMesh::Number> & dofValuesDuDotDotDu() const = 0;
+  virtual const MooseArray<libMesh::Number> & dofValuesDuDotDotDuNeighbor() const = 0;
+
+  template <bool is_ad>
+  const MooseArray<GenericReal<is_ad>> & genericDofValues() const;
 
   /**
    * tag values getters
@@ -334,10 +382,12 @@ public:
   virtual const FieldVariableValue & vectorTagValue(TagID tag) const = 0;
   virtual const DoFValue & nodalVectorTagValue(TagID tag) const = 0;
   virtual const DoFValue & vectorTagDofValue(TagID tag) const = 0;
+  virtual const DoFValue & nodalMatrixTagValue(TagID tag) const = 0;
+  virtual const FieldVariableValue & matrixTagValue(TagID tag) const = 0;
 
-  void meshChanged() override;
-  void residualSetup() override;
-  void jacobianSetup() override;
+  virtual void residualSetup() override;
+  virtual void jacobianSetup() override;
+  virtual void timestepSetup() override;
 
   using MooseVariableFieldBase::hasBlocks;
   /*
@@ -350,87 +400,43 @@ public:
   bool hasBlocks(const SubdomainID id) const override { return BlockRestrictable::hasBlocks(id); }
 
 protected:
-  using FunctorArg = typename Moose::ADType<OutputType>::type;
-  using Moose::FunctorBase<FunctorArg>::evaluate;
-  using Moose::FunctorBase<FunctorArg>::evaluateGradient;
-  using Moose::FunctorBase<FunctorArg>::evaluateDot;
-  using typename Moose::FunctorBase<FunctorArg>::ValueType;
-  using typename Moose::FunctorBase<FunctorArg>::DotType;
-  using typename Moose::FunctorBase<FunctorArg>::GradientType;
-
-  using ElemQpArg = Moose::ElemQpArg;
-  using ElemSideQpArg = Moose::ElemSideQpArg;
-  using ElemPointArg = Moose::ElemPointArg;
-
-  ValueType evaluate(const ElemQpArg & elem_qp, unsigned int state) const override final;
-  ValueType evaluate(const ElemSideQpArg & elem_side_qp, unsigned int state) const override final;
-  ValueType evaluate(const ElemPointArg & elem_point, unsigned int state) const override final;
-
-  GradientType evaluateGradient(const ElemQpArg & elem_qp, unsigned int state) const override;
-  GradientType evaluateGradient(const ElemSideQpArg & elem_side_qp,
-                                unsigned int state) const override final;
-
-  DotType evaluateDot(const ElemQpArg & elem_qp, unsigned int state) const override final;
-  DotType evaluateDot(const ElemSideQpArg & elem_side_qp, unsigned int state) const override final;
+  /**
+   * Get the solution corresponding to the provided state
+   */
+  const libMesh::NumericVector<libMesh::Number> & getSolution(const Moose::StateArg & state) const;
 
   /// the time integrator used for computing time derivatives
   const TimeIntegrator * const _time_integrator;
 
   /// A dummy ADReal variable
   mutable ADReal _ad_real_dummy = 0;
-
-private:
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-  /**
-   * Compute the solution, gradient, and time derivative with provided shape functions
-   */
-  template <typename Shapes, typename Solution, typename GradShapes, typename GradSolution>
-  void computeSolution(const Elem * elem,
-                       const QBase *,
-                       unsigned int state,
-                       const Shapes & phi,
-                       Solution & local_soln,
-                       const GradShapes & grad_phi,
-                       GradSolution & grad_local_soln,
-                       Solution & dot_local_soln) const;
-
-  /**
-   * Evaluate solution and gradient for the \p elem_qp argument
-   */
-  void evaluateOnElement(const ElemQpArg & elem_qp, const unsigned int state) const;
-
-  /**
-   * Evaluate solution and gradient for the \p elem_side_qp argument
-   */
-  void evaluateOnElementSide(const ElemSideQpArg & elem_side_qp, const unsigned int state) const;
-#endif
-
-  /// Keep track of the current elem-qp functor element in order to enable local caching (e.g. if we
-  /// call evaluate on the same element, but just with a different quadrature point, we can return
-  /// previously computed results indexed at the different qp
-  mutable const Elem * _current_elem_qp_functor_elem = nullptr;
-
-  /// The values of the solution for the \p _current_elem_qp_functor_elem
-  mutable std::vector<ValueType> _current_elem_qp_functor_sln;
-
-  /// The values of the gradient for the \p _current_elem_qp_functor_elem
-  mutable std::vector<GradientType> _current_elem_qp_functor_gradient;
-
-  /// The values of the time derivative for the \p _current_elem_qp_functor_elem
-  mutable std::vector<DotType> _current_elem_qp_functor_dot;
-
-  /// Keep track of the current elem-side-qp functor element and side in order to enable local
-  /// caching (e.g. if we call evaluate with the same element and side, but just with a different
-  /// quadrature point, we can return previously computed results indexed at the different qp
-  mutable std::pair<const Elem *, unsigned int> _current_elem_side_qp_functor_elem_side{
-      nullptr, libMesh::invalid_uint};
-
-  /// The values of the solution for the \p _current_elem_side_qp_functor_elem_side
-  mutable std::vector<ValueType> _current_elem_side_qp_functor_sln;
-
-  /// The values of the gradient for the \p _current_elem_side_qp_functor_elem_side
-  mutable std::vector<GradientType> _current_elem_side_qp_functor_gradient;
-
-  /// The values of the time derivative for the \p _current_elem_side_qp_functor_elem_side
-  mutable std::vector<DotType> _current_elem_side_qp_functor_dot;
 };
+
+template <>
+template <>
+const MooseArray<Real> & MooseVariableField<Real>::genericDofValues<false>() const;
+template <>
+template <>
+const MooseArray<Real> & MooseVariableField<RealVectorValue>::genericDofValues<false>() const;
+template <>
+template <>
+const MooseArray<Real> & MooseVariableField<RealEigenVector>::genericDofValues<false>() const;
+
+template <typename OutputType>
+template <bool is_ad>
+const MooseArray<GenericReal<is_ad>> &
+MooseVariableField<OutputType>::genericDofValues() const
+{
+  return adDofValues();
+}
+
+#define usingMooseVariableFieldMembers                                                             \
+  usingMooseVariableFieldBaseMembers;                                                              \
+  using MooseVariableField<OutputType>::_time_integrator;                                          \
+  using MooseVariableField<OutputType>::_ad_real_dummy;                                            \
+  using MooseVariableField<OutputType>::getSolution
+
+// Prevent implicit instantiation in other translation units where these classes are used
+extern template class MooseVariableField<Real>;
+extern template class MooseVariableField<RealVectorValue>;
+extern template class MooseVariableField<RealEigenVector>;

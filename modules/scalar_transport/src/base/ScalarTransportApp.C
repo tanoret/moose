@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,7 +16,7 @@
 #include "NavierStokesApp.h"
 #include "ThermalHydraulicsApp.h"
 #include "FluidPropertiesApp.h"
-#include "HeatConductionApp.h"
+#include "HeatTransferApp.h"
 #include "RdgApp.h"
 #include "RayTracingApp.h"
 #include "SolidPropertiesApp.h"
@@ -27,6 +27,7 @@ ScalarTransportApp::validParams()
 {
   InputParameters params = MooseApp::validParams();
   params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
   params.set<bool>("automatic_automatic_scaling") = false;
   return params;
 }
@@ -48,19 +49,31 @@ ScalarTransportApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
   NavierStokesApp::registerAll(f, af, s);
   ThermalHydraulicsApp::registerAll(f, af, s);
   FluidPropertiesApp::registerAll(f, af, s);
-  HeatConductionApp::registerAll(f, af, s);
+  HeatTransferApp::registerAll(f, af, s);
   RdgApp::registerAll(f, af, s);
   RayTracingApp::registerAll(f, af, s);
   SolidPropertiesApp::registerAll(f, af, s);
   MiscApp::registerAll(f, af, s);
 
   /* register custom execute flags, action syntax, etc. here */
+  auto & syntax = s;
+  registerSyntax("MultiSpeciesDiffusionCG", "Physics/MultiSpeciesDiffusion/ContinuousGalerkin/*");
 }
 
 void
 ScalarTransportApp::registerApps()
 {
   registerApp(ScalarTransportApp);
+
+  ChemicalReactionsApp::registerApps();
+  NavierStokesApp::registerApps();
+  ThermalHydraulicsApp::registerApps();
+  FluidPropertiesApp::registerApps();
+  HeatTransferApp::registerApps();
+  RdgApp::registerApps();
+  RayTracingApp::registerApps();
+  SolidPropertiesApp::registerApps();
+  MiscApp::registerApps();
 }
 
 /***************************************************************************************************

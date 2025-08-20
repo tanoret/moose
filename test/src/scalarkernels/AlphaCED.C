@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,26 +34,10 @@ AlphaCED::reinit()
 {
 }
 
-void
-AlphaCED::computeResidual()
-{
-  DenseVector<Number> & re = _assembly.residualBlock(_var.number());
-  for (_i = 0; _i < re.size(); _i++)
-    re(_i) += computeQpResidual();
-}
-
 Real
 AlphaCED::computeQpResidual()
 {
   return _u[_i] - _value;
-}
-
-void
-AlphaCED::computeJacobian()
-{
-  DenseMatrix<Number> & ke = _assembly.jacobianBlock(_var.number(), _var.number());
-  for (_i = 0; _i < ke.m(); _i++)
-    ke(_i, _i) += computeQpJacobian();
 }
 
 Real

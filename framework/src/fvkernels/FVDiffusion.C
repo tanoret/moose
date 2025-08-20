@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,7 @@ InputParameters
 FVDiffusion::validParams()
 {
   InputParameters params = FVFluxKernel::validParams();
+  params += FVDiffusionInterpolationInterface::validParams();
   params.addClassDescription("Computes residual for diffusion operator for finite volume method.");
   params.addRequiredParam<MooseFunctorName>("coeff", "diffusion coefficient");
   MooseEnum coeff_interp_method("average harmonic", "harmonic");
@@ -22,48 +23,65 @@ FVDiffusion::validParams()
       "coeff_interp_method",
       coeff_interp_method,
       "Switch that can select face interpolation method for diffusion coefficients.");
+
+  // We need at least 2 layers here with the least accurate interpolation
   params.set<unsigned short>("ghost_layers") = 2;
+
+  // We add the relationship manager here, this will select the right number of
+  // ghosting layers depending on the chosen interpolation method
+  params.addRelationshipManager(
+      "ElementSideNeighborLayers",
+      Moose::RelationshipManagerType::GEOMETRIC | Moose::RelationshipManagerType::ALGEBRAIC |
+          Moose::RelationshipManagerType::COUPLING,
+      [](const InputParameters & obj_params, InputParameters & rm_params)
+      { FVRelationshipManagerInterface::setRMParamsDiffusion(obj_params, rm_params, 3); });
 
   return params;
 }
 
 FVDiffusion::FVDiffusion(const InputParameters & params)
   : FVFluxKernel(params),
+    FVDiffusionInterpolationInterface(params),
     _coeff(getFunctor<ADReal>("coeff")),
     _coeff_interp_method(
         Moose::FV::selectInterpolationMethod(getParam<MooseEnum>("coeff_interp_method")))
 {
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  mooseError(
-      "FVDiffusion is not supported by local AD indexing. In order to use this object, please run "
-      "the configure script in the root MOOSE directory with the configure option "
-      "'--with-ad-indexing-type=global'. Note that global indexing is now the default "
-      "configuration for AD indexing type.");
-#endif
-  if ((_var.faceInterpolationMethod() == Moose::FV::InterpMethod::SkewCorrectedAverage) &&
-      (_tid == 0))
-    adjustRMGhostLayers(std::max((unsigned short)(3), _pars.get<unsigned short>("ghost_layers")));
 }
 
 ADReal
 FVDiffusion::computeQpResidual()
 {
   using namespace Moose::FV;
+  const auto state = determineState();
 
-  auto dudn = gradUDotNormal();
+  auto dudn = gradUDotNormal(state, _correct_skewness);
   ADReal coeff;
 
   // If we are on internal faces, we interpolate the diffusivity as usual
   if (_var.isInternalFace(*_face_info))
-    interpolate(
-        _coeff_interp_method, coeff, _coeff(elemArg()), _coeff(neighborArg()), *_face_info, true);
+  {
+    const ADReal coeff_elem = _coeff(elemArg(), state);
+    const ADReal coeff_neighbor = _coeff(neighborArg(), state);
+    // If the diffusion coefficients are zero, then we can early return 0 (and avoid warnings if we
+    // have a harmonic interpolation)
+    if (!coeff_elem.value() && !coeff_neighbor.value())
+      return 0;
+
+    interpolate(_coeff_interp_method, coeff, coeff_elem, coeff_neighbor, *_face_info, true);
+  }
   // Else we just use the boundary values (which depend on how the diffusion
   // coefficient is constructed)
   else
   {
     const auto face = singleSidedFaceArg();
-    coeff = _coeff(face);
+    coeff = _coeff(face, state);
   }
+
+  // Real x_coord = _face_info->faceCentroid()(0);
+  // const auto flux = coeff * dudn;
+  // if(x_coord <= 0.01 || x_coord >= 0.99){
+  //   printf("In FVDiffusion : x = %f, flux = %f\n", x_coord, flux.value());
+  // }
 
   return -1 * coeff * dudn;
 }

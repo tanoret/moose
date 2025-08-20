@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,5 +29,5 @@ PWCNSFVMomentumFluxBC::PWCNSFVMomentumFluxBC(const InputParameters & params)
 ADReal
 PWCNSFVMomentumFluxBC::computeQpResidual()
 {
-  return WCNSFVMomentumFluxBC::computeQpResidual() / _eps(singleSidedFaceArg());
+  return WCNSFVMomentumFluxBC::computeQpResidual() / _eps(singleSidedFaceArg(), determineState());
 }

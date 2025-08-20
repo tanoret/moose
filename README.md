@@ -15,15 +15,15 @@ Some of the capability at your fingertips:
 * Continuous and Discontinuous Galerkin (DG) (at the same time!)
 * Intuitive parallel multiscale solves (see videos below)
 * Dimension agnostic, parallel geometric search (for contact related applications)
-* Flexible, plugable graphical user interface
-* ~30 plugable interfaces allow specialization of every part of the solve
+* Flexible, pluggable graphical user interface
+* ~30 pluggable interfaces allow specialization of every part of the solve
 
 More Information
 ================
 
-**For more information, including installation instructions, please see the official website: [mooseframework.org](https://mooseframework.org)**
+**For more information, including installation instructions, please see the official website: [https://mooseframework.inl.gov](https://mooseframework.inl.gov)**
 
 Contributing
 ============
 
-For information on how to contribute code changes to MOOSE please [see this article](https://mooseframework.org/framework/contributing.html).
+For information on how to contribute code changes to MOOSE please [see this article](https://mooseframework.inl.gov/framework/contributing.html).

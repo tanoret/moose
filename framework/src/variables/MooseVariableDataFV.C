@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,9 +36,10 @@ MooseVariableDataFV<OutputType>::MooseVariableDataFV(const MooseVariableFV<Outpu
 
   : MooseVariableDataBase<OutputType>(var, sys, tid),
     MeshChangedInterface(var.parameters()),
+    _var(var),
     _fe_type(_var.feType()),
     _var_num(_var.number()),
-    _assembly(_subproblem.assembly(_tid, var.kind() == Moose::VAR_NONLINEAR ? sys.number() : 0)),
+    _assembly(_subproblem.assembly(_tid, var.kind() == Moose::VAR_SOLVER ? sys.number() : 0)),
     _element_type(element_type),
     _ad_zero(0),
     _need_second(false),
@@ -49,9 +50,9 @@ MooseVariableDataFV<OutputType>::MooseVariableDataFV(const MooseVariableFV<Outpu
     _need_curl_old(false),
     _need_curl_older(false),
     // for FV variables, they use each other's ad_u values to compute ghost cell
-    // values - we don't have any way to propogate these inter-variable-data
+    // values - we don't have any way to propagate these inter-variable-data
     // dependencies. So if something needs an ad_u value, that need isn't
-    // propogated through to both the element and the neighbor
+    // propagated through to both the element and the neighbor
     // data structures. So instead just set _need_ad+_need_ad_u values to true always.
     _need_ad(true),
     _need_ad_u(true),
@@ -60,11 +61,17 @@ MooseVariableDataFV<OutputType>::MooseVariableDataFV(const MooseVariableFV<Outpu
     _need_ad_grad_u(false),
     _need_ad_grad_u_dot(false),
     _need_ad_second_u(false),
-    _time_integrator(_sys.getTimeIntegrator()),
+    _time_integrator(_sys.queryTimeIntegrator(_var_num)),
     _elem(elem),
     _displaced(dynamic_cast<const DisplacedSystem *>(&_sys) ? true : false),
     _qrule(nullptr)
 {
+  _fv_elemental_kernel_query_cache =
+      _subproblem.getMooseApp().theWarehouse().query().template condition<AttribSystem>(
+          "FVElementalKernel");
+  _fv_flux_kernel_query_cache =
+      _subproblem.getMooseApp().theWarehouse().query().template condition<AttribSystem>(
+          "FVFluxKernel");
 }
 
 template <typename OutputType>
@@ -94,6 +101,7 @@ MooseVariableDataFV<OutputType>::uDot() const
 {
   if (_sys.solutionUDot())
   {
+    _var.requireQpComputations();
     _need_u_dot = true;
     return _u_dot;
   }
@@ -108,6 +116,7 @@ MooseVariableDataFV<OutputType>::uDotDot() const
 {
   if (_sys.solutionUDotDot())
   {
+    _var.requireQpComputations();
     _need_u_dotdot = true;
     return _u_dotdot;
   }
@@ -123,6 +132,7 @@ MooseVariableDataFV<OutputType>::uDotOld() const
 {
   if (_sys.solutionUDotOld())
   {
+    _var.requireQpComputations();
     _need_u_dot_old = true;
     return _u_dot_old;
   }
@@ -138,6 +148,7 @@ MooseVariableDataFV<OutputType>::uDotDotOld() const
 {
   if (_sys.solutionUDotDotOld())
   {
+    _var.requireQpComputations();
     _need_u_dotdot_old = true;
     return _u_dotdot_old;
   }
@@ -148,11 +159,20 @@ MooseVariableDataFV<OutputType>::uDotDotOld() const
 }
 
 template <typename OutputType>
+const typename MooseVariableDataFV<OutputType>::FieldVariableValue &
+MooseVariableDataFV<OutputType>::sln(Moose::SolutionState state) const
+{
+  _var.requireQpComputations();
+  return MooseVariableDataBase<OutputType>::sln(state);
+}
+
+template <typename OutputType>
 const typename MooseVariableDataFV<OutputType>::FieldVariableGradient &
 MooseVariableDataFV<OutputType>::gradSlnDot() const
 {
   if (_sys.solutionUDot())
   {
+    _var.requireQpComputations();
     _need_grad_dot = true;
     return _grad_u_dot;
   }
@@ -167,6 +187,7 @@ MooseVariableDataFV<OutputType>::gradSlnDotDot() const
 {
   if (_sys.solutionUDotDot())
   {
+    _var.requireQpComputations();
     _need_grad_dotdot = true;
     return _grad_u_dotdot;
   }
@@ -180,6 +201,7 @@ template <typename OutputType>
 const typename MooseVariableDataFV<OutputType>::FieldVariableSecond &
 MooseVariableDataFV<OutputType>::secondSln(Moose::SolutionState state) const
 {
+  _var.requireQpComputations();
   switch (state)
   {
     case Moose::Current:
@@ -217,6 +239,7 @@ template <typename OutputType>
 const typename MooseVariableDataFV<OutputType>::FieldVariableCurl &
 MooseVariableDataFV<OutputType>::curlSln(Moose::SolutionState state) const
 {
+  _var.requireQpComputations();
   switch (state)
   {
     case Moose::Current:
@@ -240,17 +263,6 @@ MooseVariableDataFV<OutputType>::curlSln(Moose::SolutionState state) const
     default:
       mooseError("We don't currently support curl from the previous non-linear iteration");
   }
-}
-
-namespace
-{
-template <typename T, typename T2>
-void
-assignForAllQps(const T & value, T2 & array, const unsigned int nqp)
-{
-  for (const auto qp : make_range(nqp))
-    array[qp] = value;
-}
 }
 
 template <typename OutputType>
@@ -399,11 +411,7 @@ template <typename OutputType>
 const std::vector<dof_id_type> &
 MooseVariableDataFV<OutputType>::initDofIndices()
 {
-  if (_prev_elem != _elem)
-  {
-    _dof_map.dof_indices(_elem, _dof_indices, _var_num);
-    _prev_elem = _elem;
-  }
+  Moose::initDofIndices(*this, *_elem);
   return _dof_indices;
 }
 
@@ -460,28 +468,28 @@ MooseVariableDataFV<OutputType>::computeValues()
     if (second_required)
     {
       if (_need_second)
-        _second_u[qp] = 0;
+        _second_u[qp] = 0.;
 
       if (_need_second_previous_nl)
-        _second_u_previous_nl[qp] = 0;
+        _second_u_previous_nl[qp] = 0.;
 
       if (is_transient)
       {
         if (_need_second_old)
-          _second_u_old[qp] = 0;
+          _second_u_old[qp] = 0.;
 
         if (_need_second_older)
-          _second_u_older[qp] = 0;
+          _second_u_older[qp] = 0.;
       }
     }
 
     if (curl_required)
     {
       if (_need_curl)
-        _curl_u[qp] = 0;
+        _curl_u[qp] = 0.;
 
       if (is_transient && _need_curl_old)
-        _curl_u_old[qp] = 0;
+        _curl_u_old[qp] = 0.;
     }
 
     for (auto tag : _required_vector_tags)
@@ -508,20 +516,14 @@ MooseVariableDataFV<OutputType>::computeAD(const unsigned int num_dofs, const un
   // AD stuff.  So we just skip all this when that is the case.  Maybe there
   // is a better way to do this - like just checking if getMaxVarNDofsPerElem
   // returns zero?
-  std::vector<FVKernel *> ks1;
-  std::vector<FVKernel *> ks2;
-  _subproblem.getMooseApp()
-      .theWarehouse()
-      .query()
-      .template condition<AttribSystem>("FVElementalKernel")
-      .queryInto(ks1);
-  _subproblem.getMooseApp()
-      .theWarehouse()
-      .query()
-      .template condition<AttribSystem>("FVFluxKernel")
-      .queryInto(ks2);
-  if (ks1.size() == 0 && ks2.size() == 0)
-    return;
+  std::vector<FVKernel *> ks;
+  _fv_elemental_kernel_query_cache.queryInto(ks);
+  if (ks.size() == 0)
+  {
+    _fv_flux_kernel_query_cache.queryInto(ks);
+    if (ks.size() == 0)
+      return;
+  }
 
   _ad_dof_values.resize(num_dofs);
   if (_need_ad_u)
@@ -545,23 +547,6 @@ MooseVariableDataFV<OutputType>::computeAD(const unsigned int num_dofs, const un
     _ad_u_dotdot.resize(nqp);
   }
 
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  auto ad_offset = Moose::adOffset(
-      _var_num, _sys.getMaxVarNDofsPerElem(), _element_type, _sys.system().n_vars());
-  mooseAssert(_var.kind() == Moose::VarKindType::VAR_AUXILIARY || ad_offset || !_var_num,
-              "Either this is the zeroth variable or we should have an offset");
-
-#ifndef MOOSE_SPARSE_AD
-  if (ad_offset + num_dofs > MOOSE_AD_MAX_DOFS_PER_ELEM)
-    mooseError("Current number of dofs per element ",
-               ad_offset + num_dofs,
-               " is greater than AD_MAX_DOFS_PER_ELEM of ",
-               MOOSE_AD_MAX_DOFS_PER_ELEM,
-               ". You can run `configure --with-derivative-size=<n>` to request a larger "
-               "derivative container.");
-#endif
-#endif
-
   if (_need_ad_second_u)
     assignForAllQps(0, _ad_second_u, nqp);
 
@@ -580,11 +565,7 @@ MooseVariableDataFV<OutputType>::computeAD(const unsigned int num_dofs, const un
 
     // NOTE!  You have to do this AFTER setting the value!
     if (do_derivatives)
-#ifdef MOOSE_GLOBAL_AD_INDEXING
       Moose::derivInsert(_ad_dof_values[i].derivatives(), _dof_indices[i], 1.);
-#else
-      Moose::derivInsert(_ad_dof_values[i].derivatives(), ad_offset + i, 1.);
-#endif
 
     if (_need_ad_u_dot && safeToComputeADUDot() && _time_integrator->dt())
     {
@@ -600,14 +581,10 @@ MooseVariableDataFV<OutputType>::computeAD(const unsigned int num_dofs, const un
     assignForAllQps(_ad_dof_values[0], _ad_u, nqp);
 
   if (_need_ad_grad_u)
-    assignForAllQps(
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-        static_cast<const MooseVariableFV<OutputType> &>(_var).adGradSln(_elem),
-#else
-        _ad_zero,
-#endif
-        _ad_grad_u,
-        nqp);
+    assignForAllQps(static_cast<const MooseVariableFV<OutputType> &>(_var).adGradSln(
+                        _elem, Moose::currentState()),
+                    _ad_grad_u,
+                    nqp);
 
   if (_need_ad_u_dot)
   {
@@ -772,9 +749,6 @@ MooseVariableDataFV<OutputType>::fetchADDoFValues()
   auto n = _dof_indices.size();
   libmesh_assert(n);
   _ad_dof_values.resize(n);
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  auto ad_offset = _var_num * _sys.getMaxVarNDofsPerNode();
-#endif
 
   const bool do_derivatives =
       ADReal::do_derivatives && _sys.number() == _subproblem.currentNlSysNum();
@@ -783,11 +757,7 @@ MooseVariableDataFV<OutputType>::fetchADDoFValues()
   {
     _ad_dof_values[i] = _vector_tags_dof_u[_solution_tag][i];
     if (do_derivatives)
-#ifdef MOOSE_GLOBAL_AD_INDEXING
       Moose::derivInsert(_ad_dof_values[i].derivatives(), _dof_indices[i], 1.);
-#else
-      Moose::derivInsert(_ad_dof_values[i].derivatives(), ad_offset + i, 1.);
-#endif
   }
 }
 

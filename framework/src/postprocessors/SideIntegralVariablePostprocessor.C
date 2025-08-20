@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,7 +34,7 @@ SideIntegralVariablePostprocessor::SideIntegralVariablePostprocessor(
                                  Moose::VarFieldType::VAR_FIELD_STANDARD),
     _u(coupledValue("variable")),
     _grad_u(coupledGradient("variable")),
-    _fv(_fv_variable)
+    _fv(_fv_variable || _linear_fv_variable)
 {
   addMooseVariableDependency(&mooseVariableField());
 
@@ -44,7 +44,7 @@ SideIntegralVariablePostprocessor::SideIntegralVariablePostprocessor(
 Real
 SideIntegralVariablePostprocessor::computeFaceInfoIntegral(const FaceInfo * const fi)
 {
-  return MetaPhysicL::raw_value((*_fv_variable)(makeCDFace(*fi)));
+  return MetaPhysicL::raw_value((*_field_variable)(makeCDFace(*fi), determineState()));
 }
 
 Real
@@ -56,6 +56,5 @@ SideIntegralVariablePostprocessor::computeQpIntegral()
 bool
 SideIntegralVariablePostprocessor::hasFaceSide(const FaceInfo & fi, const bool fi_elem_side) const
 {
-  mooseAssert(_fv_variable, "Must be non-null");
-  return _fv_variable->hasFaceSide(fi, fi_elem_side);
+  return _field_variable->hasFaceSide(fi, fi_elem_side);
 }

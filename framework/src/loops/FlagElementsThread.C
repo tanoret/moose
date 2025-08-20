@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -61,6 +61,8 @@ FlagElementsThread::FlagElementsThread(FlagElementsThread & x, Threads::split sp
 void
 FlagElementsThread::onElement(const Elem * elem)
 {
+  mooseAssert(elem->active(), "This thread should only act on active elements");
+
   // By default do nothing, and only grab the marker from the solution if the current variable is
   // active
   // on the element subdomain.

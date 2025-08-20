@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,7 +8,7 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PeridynamicsApp.h"
-#include "TensorMechanicsApp.h" // tensor mechanics dependency
+#include "SolidMechanicsApp.h" // solid mechanics dependency
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
@@ -21,6 +21,7 @@ PeridynamicsApp::validParams()
   params.set<bool>("automatic_automatic_scaling") = false;
 
   params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
 
   return params;
 }
@@ -38,6 +39,8 @@ void
 PeridynamicsApp::registerApps()
 {
   registerApp(PeridynamicsApp);
+
+  SolidMechanicsApp::registerApps();
 }
 
 void
@@ -62,14 +65,14 @@ PeridynamicsApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
   Registry::registerActionsTo(af, {"PeridynamicsApp"});
   associateSyntaxInner(s, af);
 
-  TensorMechanicsApp::registerAll(f, af, s);
+  SolidMechanicsApp::registerAll(f, af, s);
 }
 
 void
 PeridynamicsApp::registerObjectDepends(Factory & factory)
 {
   mooseDeprecated("use registerAll instead of registerObjectsDepends");
-  TensorMechanicsApp::registerObjects(factory);
+  SolidMechanicsApp::registerObjects(factory);
 }
 
 void
@@ -84,7 +87,7 @@ void
 PeridynamicsApp::associateSyntaxDepends(Syntax & syntax, ActionFactory & action_factory)
 {
   mooseDeprecated("use registerAll instead of registerObjectsDepends");
-  TensorMechanicsApp::associateSyntax(syntax, action_factory);
+  SolidMechanicsApp::associateSyntax(syntax, action_factory);
 }
 
 void

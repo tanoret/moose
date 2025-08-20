@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,12 +24,8 @@ DerivativeSumMaterialTempl<is_ad>::validParams()
                                             "Base name of the parsed sum material property");
 
   // All arguments of the parsed expression (free energy) being summed
-  params.addDeprecatedCoupledVar(
-      "args",
-      "Arguments of the free energy functions being summed - use vector coupling",
-      "args is deprecated, use coupled_variables instead");
-  // TODO Make required once deprecation is handled, see #19119
-  params.addCoupledVar("coupled_variables", "Vector of names of variables being summed");
+  params.addRequiredCoupledVar("args", "Vector of names of variables being summed");
+  params.deprecateCoupledVar("args", "coupled_variables", "02/07/2024");
 
   params.addCoupledVar("displacement_gradients",
                        "Vector of displacement gradient variables (see "
@@ -37,7 +33,7 @@ DerivativeSumMaterialTempl<is_ad>::validParams()
                        "action)");
 
   // Advanced arguments to construct a sum of the form \f$ c+\gamma\sum_iF_i \f$
-  params.addParam<std::vector<Real>>("prefactor", "Prefactor to multiply the sum term with.");
+  params.addParam<std::vector<Real>>("prefactor", {}, "Prefactor to multiply the sum term with.");
   params.addParam<Real>("constant", 0.0, "Constant to be added to the prefactor multiplied sum.");
 
   params.addParam<bool>("validate_coupling",

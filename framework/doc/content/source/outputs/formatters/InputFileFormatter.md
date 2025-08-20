@@ -1,6 +1,6 @@
 # InputFileFormatter
 
-This class produces produces a dump of the `InputParameters` that appears like the normal input
+This class produces a dump of the `InputParameters` that appears like the normal input
 file syntax.
 
 This formatter is used for the `--show-input` command line option, described
@@ -134,4 +134,4 @@ disabled invalid parameters.
 []
 ```
 
-!listing moose/test/tests/kernels/simple_diffusion/simple_diffusion.i caption=Input file used to show to formatting
+!listing stork/test/tests/kernels/simple_diffusion/simple_diffusion.i caption=Input file used to show to formatting

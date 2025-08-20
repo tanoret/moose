@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -77,5 +77,15 @@ Real computeMin(const std::vector<Real> & data);
  * @param the data vector
  */
 std::vector<Real> computeVectorABS(const std::vector<Real> & data);
+
+/**
+ * return a resampled vector from a population given a weight vector.
+ *
+ * @param the given inputs (population)
+ * @param the weight vector
+ * @param the number of dimensions
+ * @param a random number between 0 and 1
+ */
+unsigned int weightedResample(const std::vector<Real> & weights, Real rnd);
 
 } // namespace AdaptiveMonteCarloUtils

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,7 +30,6 @@ public:
   void finalize() override{};
 
 private:
-  const Real _tol;
   /// Communicator used for operations
   const libMesh::Parallel::Communicator _my_comm;
   OptimizationReporterBase * _optReporter = nullptr;

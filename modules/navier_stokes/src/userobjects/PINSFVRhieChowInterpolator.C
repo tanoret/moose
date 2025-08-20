@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,6 +21,8 @@ PINSFVRhieChowInterpolator::validParams()
   auto params = INSFVRhieChowInterpolator::validParams();
   params.addClassDescription("Performs interpolations and reconstructions of porosity and computes "
                              "the Rhie-Chow face velocities.");
+  ExecFlagEnum & exec_enum = params.set<ExecFlagEnum>("execute_on", /*quiet=*/true);
+  exec_enum.setAdditionalValue(EXEC_INITIAL);
   params.addRequiredParam<MooseFunctorName>(NS::porosity, "The porosity");
   params.addParam<unsigned short>(
       "smoothing_layers",
@@ -41,11 +43,10 @@ PINSFVRhieChowInterpolator::validParams()
 PINSFVRhieChowInterpolator::PINSFVRhieChowInterpolator(const InputParameters & params)
   : INSFVRhieChowInterpolator(params),
     _eps(getFunctor<ADReal>(NS::porosity)),
-    _smoothed_eps(_moose_mesh, NS::smoothed_porosity),
+    _smoothed_eps(_moose_mesh, NS::smoothed_porosity, /*extrapolated_boundary*/ true),
     _epss(libMesh::n_threads(), nullptr),
     _smoothed_epss(libMesh::n_threads(), nullptr),
-    _smoothing_layers(getParam<unsigned short>("smoothing_layers")),
-    _pinsfv_setup_done(false)
+    _smoothing_layers(getParam<unsigned short>("smoothing_layers"))
 {
   if (_smoothing_layers && _eps.wrapsType<MooseVariableBase>())
     paramError(
@@ -62,7 +63,7 @@ PINSFVRhieChowInterpolator::PINSFVRhieChowInterpolator(const InputParameters & p
 
   for (const auto tid : make_range(libMesh::n_threads()))
   {
-    _epss[tid] = &UserObject::_subproblem.getFunctor<ADReal>(porosity_name, tid, name());
+    _epss[tid] = &UserObject::_subproblem.getFunctor<ADReal>(porosity_name, tid, name(), true);
 
     if (_smoothing_layers > 0)
     {
@@ -71,7 +72,7 @@ PINSFVRhieChowInterpolator::PINSFVRhieChowInterpolator(const InputParameters & p
         UserObject::_subproblem.addFunctor(NS::smoothed_porosity, _smoothed_eps, tid);
 
       _smoothed_epss[tid] =
-          &UserObject::_subproblem.getFunctor<ADReal>(NS::smoothed_porosity, tid, name());
+          &UserObject::_subproblem.getFunctor<ADReal>(NS::smoothed_porosity, tid, name(), true);
     }
   }
 }
@@ -79,7 +80,7 @@ PINSFVRhieChowInterpolator::PINSFVRhieChowInterpolator(const InputParameters & p
 void
 PINSFVRhieChowInterpolator::meshChanged()
 {
-  insfvSetup();
+  INSFVRhieChowInterpolator::meshChanged();
   pinsfvSetup();
 }
 
@@ -111,31 +112,17 @@ PINSFVRhieChowInterpolator::pinsfvSetup()
 
   const auto saved_do_derivatives = ADReal::do_derivatives;
   ADReal::do_derivatives = true;
-  Moose::FV::interpolateReconstruct(_smoothed_eps, _eps, _smoothing_layers, false, _geometric_fi);
+  Moose::FV::interpolateReconstruct(
+      _smoothed_eps, _eps, _smoothing_layers, false, _geometric_fi, determineState());
   ADReal::do_derivatives = saved_do_derivatives;
 
   // Assign the new functor to all
   for (const auto tid : make_range((unsigned int)(1), libMesh::n_threads()))
   {
     auto & other_smoothed_epss = const_cast<Moose::Functor<ADReal> &>(
-        UserObject::_subproblem.getFunctor<ADReal>(NS::smoothed_porosity, tid, name()));
+        UserObject::_subproblem.getFunctor<ADReal>(NS::smoothed_porosity, tid, name(), true));
     other_smoothed_epss.assign(_smoothed_eps);
   }
-}
-
-void
-PINSFVRhieChowInterpolator::residualSetup()
-{
-  // We cant do this on initialSetup because user objects are initialized before
-  // functions are, so the porosity function is not available for interpolation-reconstruction
-  // on initialSetup().
-  if (!_pinsfv_setup_done)
-  {
-    pinsfvSetup();
-    _pinsfv_setup_done = true;
-  }
-
-  INSFVRhieChowInterpolator::residualSetup();
 }
 
 bool
@@ -144,14 +131,14 @@ PINSFVRhieChowInterpolator::isFaceGeometricallyRelevant(const FaceInfo & fi) con
   if (&fi.elem() == libMesh::remote_elem)
     return false;
 
-  bool on_us = _sub_ids.count(fi.elem().subdomain_id());
+  bool on_us = blockIDs().count(fi.elem().subdomain_id());
 
   if (fi.neighborPtr())
   {
     if (&fi.neighbor() == libMesh::remote_elem)
       return false;
 
-    on_us = on_us || _sub_ids.count(fi.neighbor().subdomain_id());
+    on_us = on_us || blockIDs().count(fi.neighbor().subdomain_id());
   }
 
   if (!on_us)
@@ -168,10 +155,10 @@ PINSFVRhieChowInterpolator::isFaceGeometricallyRelevant(const FaceInfo & fi) con
   // remote. If we are not a boundary face, then at this point we're safe
   //
 
-  if (!Moose::FV::onBoundary(_sub_ids, fi))
+  if (!Moose::FV::onBoundary(blockIDs(), fi))
     return true;
 
-  const auto & boundary_elem = (fi.neighborPtr() && _sub_ids.count(fi.neighbor().subdomain_id()))
+  const auto & boundary_elem = (fi.neighborPtr() && blockIDs().count(fi.neighbor().subdomain_id()))
                                    ? fi.neighbor()
                                    : fi.elem();
 
@@ -186,4 +173,30 @@ PINSFVRhieChowInterpolator::isFaceGeometricallyRelevant(const FaceInfo & fi) con
 
   // We made it through all the tests!
   return true;
+}
+
+void
+PINSFVRhieChowInterpolator::initialize()
+{
+  if (_current_execute_flag == EXEC_INITIAL)
+    pinsfvSetup();
+  else
+    // Cannot compute Rhie Chow coefficients on initial
+    INSFVRhieChowInterpolator::initialize();
+}
+
+void
+PINSFVRhieChowInterpolator::execute()
+{
+  // Cannot compute Rhie Chow coefficients on initial
+  if (_current_execute_flag != EXEC_INITIAL)
+    INSFVRhieChowInterpolator::execute();
+}
+
+void
+PINSFVRhieChowInterpolator::finalize()
+{
+  // Cannot compute Rhie Chow coefficients on initial
+  if (_current_execute_flag != EXEC_INITIAL)
+    INSFVRhieChowInterpolator::finalize();
 }

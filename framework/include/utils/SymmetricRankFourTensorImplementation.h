@@ -1,11 +1,13 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
 //*
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
+
+#pragma once
 
 #include "SymmetricRankFourTensor.h"
 
@@ -31,8 +33,7 @@ namespace MathUtils
 template <>
 void mooseSetToZero<SymmetricRankFourTensorTempl<Real>>(SymmetricRankFourTensorTempl<Real> & v);
 template <>
-void
-mooseSetToZero<SymmetricRankFourTensorTempl<DualReal>>(SymmetricRankFourTensorTempl<DualReal> & v);
+void mooseSetToZero<SymmetricRankFourTensorTempl<ADReal>>(SymmetricRankFourTensorTempl<ADReal> & v);
 }
 
 template <typename T>
@@ -77,26 +78,33 @@ SymmetricRankFourTensorTempl<T>::SymmetricRankFourTensorTempl(const InitMethod i
 }
 
 template <typename T>
+SymmetricRankFourTensorTempl<T>::SymmetricRankFourTensorTempl(const RankFourTensorTempl<T> & t)
+{
+  for (const auto a : make_range(N))
+    for (const auto b : make_range(N))
+    {
+      const auto & idx = full_index[a][b];
+      auto i = idx[0];
+      auto j = idx[1];
+      auto k = idx[2];
+      auto l = idx[3];
+      (*this)(a, b) =
+          (t(i, j, k, l) + t(j, i, l, k) + t(j, i, k, l) + t(i, j, l, k)) / 4 * mandelFactor(a, b);
+    }
+}
+
+template <typename T>
 SymmetricRankFourTensorTempl<T>::operator RankFourTensorTempl<T>()
 {
-  // Full tensor indices in the Mandel/Voigt representation
-  static constexpr unsigned int g[6][6][4] = {
-      {{1, 1, 1, 1}, {1, 1, 2, 2}, {1, 1, 3, 3}, {1, 1, 2, 3}, {1, 1, 1, 3}, {1, 1, 1, 2}},
-      {{2, 2, 1, 1}, {2, 2, 2, 2}, {2, 2, 3, 3}, {2, 2, 2, 3}, {2, 2, 1, 3}, {2, 2, 1, 2}},
-      {{3, 3, 1, 1}, {3, 3, 2, 2}, {3, 3, 3, 3}, {3, 3, 2, 3}, {3, 3, 1, 3}, {3, 3, 1, 2}},
-      {{2, 3, 1, 1}, {2, 3, 2, 2}, {2, 3, 3, 3}, {2, 3, 2, 3}, {2, 3, 1, 3}, {2, 3, 1, 2}},
-      {{1, 3, 1, 1}, {1, 3, 2, 2}, {1, 3, 3, 3}, {1, 3, 2, 3}, {1, 3, 1, 3}, {1, 3, 1, 2}},
-      {{1, 2, 1, 1}, {1, 2, 2, 2}, {1, 2, 3, 3}, {1, 2, 2, 3}, {1, 2, 1, 3}, {1, 2, 1, 2}}};
-
   auto & q = *this;
   RankFourTensorTempl<T> r;
   for (const auto a : make_range(N))
     for (const auto b : make_range(N))
     {
-      const auto i = g[a][b][0] - 1;
-      const auto j = g[a][b][1] - 1;
-      const auto k = g[a][b][2] - 1;
-      const auto l = g[a][b][3] - 1;
+      const auto i = full_index[a][b][0];
+      const auto j = full_index[a][b][1];
+      const auto k = full_index[a][b][2];
+      const auto l = full_index[a][b][3];
 
       // Rijkl = Rjikl = Rijlk = Rjilk
       r(i, j, k, l) = q(a, b) / mandelFactor(a, b);
@@ -149,14 +157,6 @@ SymmetricRankFourTensorTempl<T>::rotate(const TypeTensor<T> & R)
 
   // rotate tensor
   (*this) = M * (*this) * M.transposeMajor();
-}
-
-template <typename T>
-SymmetricRankFourTensorTempl<T> &
-SymmetricRankFourTensorTempl<T>::operator=(const SymmetricRankFourTensorTempl<T> & a)
-{
-  std::copy(a._vals.begin(), a._vals.end(), _vals.begin());
-  return *this;
 }
 
 template <typename T>
@@ -495,14 +495,14 @@ SymmetricRankFourTensorTempl<T>::sum3x3() const
 }
 
 template <typename T>
-VectorValue<T>
+libMesh::VectorValue<T>
 SymmetricRankFourTensorTempl<T>::sum3x1() const
 {
   mooseAssert(LIBMESH_DIM == 3, "This method assumes LIBMESH_DIM == 3");
   // used for volumetric locking correction
-  return VectorValue<T>(_vals[0] + _vals[1] + _vals[2],
-                        _vals[6] + _vals[7] + _vals[8],
-                        _vals[12] + _vals[13] + _vals[14]);
+  return libMesh::VectorValue<T>(_vals[0] + _vals[1] + _vals[2],
+                                 _vals[6] + _vals[7] + _vals[8],
+                                 _vals[12] + _vals[13] + _vals[14]);
 }
 
 template <typename T>

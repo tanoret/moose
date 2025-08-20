@@ -8,6 +8,13 @@
     requirement = 'The system shall be able to simulate natural convection by adding the Boussinesq approximation to the incompressible Navier-Stokes equations.'
     valgrind = HEAVY
   []
+  [constants]
+    type = Exodiff
+    input = boussinesq_square_constant_names.i
+    exodiff = boussinesq_square_constant_names_out.e
+    requirement = 'The system shall support passing constants for material property names to a kernel which passes its parameters to a material.'
+    valgrind = HEAVY
+  []
   [threaded_exo]
     type = Exodiff
     input = boussinesq_square.i
@@ -49,7 +56,7 @@
     ratio_tol = 3e-7
     cli_args = "Mesh/gen/nx=8 Mesh/gen/ny=8 Outputs/active='' -snes_test_err 1e-9"
     requirement = 'The system shall have an accurate Jacobian provided by automatic differentiation when computing the Boussinesq approximation with SUPG and PSPG stabilization.'
-    method = "!dbg" # this problem is highly nonlinear and takes ~21 nonlinear iterations to solve in serial. Hence this is a relatively long test
+    capabilities = 'method!=dbg' # this problem is highly nonlinear and takes ~21 nonlinear iterations to solve in serial. Hence this is a relatively long test
   []
   [exo_stab_action]
     type = 'Exodiff'

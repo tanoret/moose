@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,7 @@
 #include "ThreadedNodeLoop.h"
 #include "MooseObjectTagWarehouse.h"
 
+class NonlinearSystemBase;
 class AuxiliarySystem;
 class NodalKernelBase;
 
@@ -21,6 +22,7 @@ class ComputeNodalKernelBCJacobiansThread
 {
 public:
   ComputeNodalKernelBCJacobiansThread(FEProblemBase & fe_problem,
+                                      NonlinearSystemBase & nl,
                                       MooseObjectTagWarehouse<NodalKernelBase> & nodal_kernels,
                                       const std::set<TagID> & tags);
 
@@ -35,8 +37,11 @@ public:
   void join(const ComputeNodalKernelBCJacobiansThread & /*y*/);
 
 protected:
-  FEProblemBase & _fe_problem;
+  /// Print information about the loop, mostly order of execution of objects
+  void printGeneralExecutionInformation() const override;
 
+  FEProblemBase & _fe_problem;
+  NonlinearSystemBase & _nl;
   AuxiliarySystem & _aux_sys;
 
   const std::set<TagID> & _tags;

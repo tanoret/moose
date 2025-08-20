@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,7 +25,7 @@ public:
   ParaviewComponentAnnotationMap(const InputParameters & parameters);
 
 protected:
-  virtual void output(const ExecFlagType & type);
+  virtual void output();
   virtual std::string filename();
 
 public:

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,6 +24,8 @@ FluidProperties3EqnMaterial::validParams()
   params.addRequiredCoupledVar("rhoEA", "Conserved total energy");
 
   params.addRequiredParam<UserObjectName>("fp", "The name of the user object for fluid properties");
+  params.addClassDescription(
+      "Defines material properties from fluid properties to serve in the 3-equation model");
 
   return params;
 }

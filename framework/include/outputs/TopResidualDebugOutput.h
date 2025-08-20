@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,8 @@
 #include "PetscOutput.h"
 
 #include "libmesh/system.h"
+
+class NonlinearSystemBase;
 
 /**
  * A structure for storing data related to top residuals
@@ -82,7 +84,7 @@ protected:
   /**
    * Perform the debugging output
    */
-  virtual void output(const ExecFlagType & type) override;
+  virtual void output() override;
 
   /**
    * Prints the n top residuals for the variables in the system
@@ -104,6 +106,9 @@ protected:
   /// Number of residuals to display
   unsigned int _num_residuals;
 
+  /// Reference to MOOSE's nonlinear system
+  NonlinearSystemBase & _nl;
+
   /// Reference to libMesh system
-  System & _sys;
+  libMesh::System & _sys;
 };

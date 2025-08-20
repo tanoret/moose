@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,7 @@
 #include "MooseVariableScalar.h"
 #include "SubProblem.h"
 #include "NonlinearSystem.h"
+#include "FEProblemBase.h"
 
 #include "libmesh/threads.h"
 #include "libmesh/quadrature.h"
@@ -32,7 +33,7 @@ Kernel::Kernel(const InputParameters & parameters)
     MooseVariableInterface<Real>(this,
                                  false,
                                  "variable",
-                                 Moose::VarKindType::VAR_NONLINEAR,
+                                 Moose::VarKindType::VAR_SOLVER,
                                  Moose::VarFieldType::VAR_FIELD_STANDARD),
     _var(*mooseVariable()),
     _test(_var.phi()),
@@ -50,7 +51,7 @@ Kernel::Kernel(const InputParameters & parameters)
   {
     MooseVariable * var = &_subproblem.getStandardVariable(_tid, _save_in_strings[i]);
 
-    if (_fe_problem.getNonlinearSystemBase().hasVariable(_save_in_strings[i]))
+    if (_fe_problem.getNonlinearSystemBase(_sys.number()).hasVariable(_save_in_strings[i]))
       paramError("save_in", "cannot use solution variable as save-in variable");
 
     if (var->feType() != _var.feType())
@@ -70,7 +71,7 @@ Kernel::Kernel(const InputParameters & parameters)
   {
     MooseVariable * var = &_subproblem.getStandardVariable(_tid, _diag_save_in_strings[i]);
 
-    if (_fe_problem.getNonlinearSystemBase().hasVariable(_diag_save_in_strings[i]))
+    if (_fe_problem.getNonlinearSystemBase(_sys.number()).hasVariable(_diag_save_in_strings[i]))
       paramError("diag_save_in", "cannot use solution variable as diag save-in variable");
 
     if (var->feType() != _var.feType())
@@ -90,6 +91,9 @@ Kernel::Kernel(const InputParameters & parameters)
 void
 Kernel::computeResidual()
 {
+  if (!hasVectorTags())
+    return;
+
   prepareVectorTag(_assembly, _var.number());
 
   precalculateResidual();
@@ -189,4 +193,27 @@ Kernel::computeOffDiagJacobianScalar(const unsigned int jvar)
         _local_ke(_i, _j) += _JxW[_qp] * _coord[_qp] * computeQpOffDiagJacobianScalar(jvar);
 
   accumulateTaggedLocalMatrix();
+}
+
+void
+Kernel::computeResidualAndJacobian()
+{
+  computeResidual();
+
+  for (const auto & [ivariable, jvariable] : _fe_problem.couplingEntries(_tid, _sys.number()))
+  {
+    const unsigned int ivar = ivariable->number();
+    const unsigned int jvar = jvariable->number();
+
+    if (ivar != _var.number())
+      continue;
+
+    if (_is_implicit)
+    {
+      prepareShapes(jvar);
+      computeOffDiagJacobian(jvar);
+    }
+  }
+
+  /// TODO: add nonlocal Jacobians and scalar Jacobians
 }

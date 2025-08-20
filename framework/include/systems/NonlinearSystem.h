@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,7 +24,8 @@
  *
  * It is a part of FEProblemBase ;-)
  */
-class NonlinearSystem : public NonlinearSystemBase
+class NonlinearSystem : public NonlinearSystemBase,
+                        public libMesh::NonlinearImplicitSystem::ComputePreCheck
 {
 public:
   NonlinearSystem(FEProblemBase & problem, const std::string & name);
@@ -32,12 +33,13 @@ public:
 
   virtual void solve() override;
 
-  void init() override;
+  virtual void preInit() override;
 
   /**
    * Quit the current solve as soon as possible.
    */
-  virtual void stopSolve() override;
+  virtual void stopSolve(const ExecFlagType & exec_flag,
+                         const std::set<TagID> & vector_tags_to_close) override;
 
   /**
    * Returns the current nonlinear iteration number.  In libmesh, this is
@@ -58,24 +60,31 @@ public:
 
   virtual NumericVector<Number> & RHS() override { return *_nl_implicit_sys.rhs; }
 
-  virtual NonlinearSolver<Number> * nonlinearSolver() override
+  virtual libMesh::NonlinearSolver<Number> * nonlinearSolver() override
   {
     return _nl_implicit_sys.nonlinear_solver.get();
   }
 
   virtual SNES getSNES() override;
 
-  virtual NonlinearImplicitSystem & sys() { return _nl_implicit_sys; }
+  virtual libMesh::NonlinearImplicitSystem & sys() { return _nl_implicit_sys; }
 
-  virtual void attachPreconditioner(Preconditioner<Number> * preconditioner) override;
+  virtual void attachPreconditioner(libMesh::Preconditioner<Number> * preconditioner) override;
 
-  void residualAndJacobianTogether() override;
+  virtual void residualAndJacobianTogether() override;
+
+  virtual void precheck(const NumericVector<Number> & precheck_soln,
+                        NumericVector<Number> & search_direction,
+                        bool & changed,
+                        libMesh::NonlinearImplicitSystem & S) override;
+
+  virtual void potentiallySetupFiniteDifferencing() override;
 
 protected:
   void computeScalingJacobian() override;
   void computeScalingResidual() override;
 
-  NonlinearImplicitSystem & _nl_implicit_sys;
+  libMesh::NonlinearImplicitSystem & _nl_implicit_sys;
   ComputeResidualFunctor _nl_residual_functor;
   ComputeFDResidualFunctor _fd_residual_functor;
   ComputeResidualAndJacobian _resid_and_jac_functor;
@@ -99,6 +108,8 @@ private:
    * method.
    */
   void setupColoringFiniteDifferencedPreconditioner();
+
+  virtual bool matrixFromColoring() const override { return _use_coloring_finite_difference; }
 
   bool _use_coloring_finite_difference;
 };

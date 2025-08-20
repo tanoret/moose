@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,7 @@
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
+#include "Capabilities.h"
 
 InputParameters
 ChemicalReactionsApp::validParams()
@@ -19,6 +20,7 @@ ChemicalReactionsApp::validParams()
 
   params.set<bool>("automatic_automatic_scaling") = false;
   params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
 
   return params;
 }
@@ -42,7 +44,8 @@ associateSyntaxInner(Syntax & syntax, ActionFactory & /*action_factory*/)
   registerSyntax("AddSecondarySpeciesAction", "ReactionNetwork/SolidKineticReactions");
   registerSyntax("AddCoupledEqSpeciesAction", "ReactionNetwork/AqueousEquilibriumReactions");
   registerSyntax("AddCoupledSolidKinSpeciesAction", "ReactionNetwork/SolidKineticReactions");
-  registerSyntax("ChemicalCompositionAction", "ChemicalComposition");
+  registerSyntax("CommonChemicalCompositionAction", "ChemicalComposition");
+  registerSyntax("ChemicalCompositionAction", "ChemicalComposition/*");
 }
 
 void
@@ -56,6 +59,13 @@ ChemicalReactionsApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
 void
 ChemicalReactionsApp::registerApps()
 {
+  const std::string doc = "Thermochimica Gibbs energy minimization library support ";
+#ifdef THERMOCHIMICA_ENABLED
+  addCapability("thermochimica", true, doc + "is available.");
+#else
+  addCapability("thermochimica", false, doc + "is not available.");
+#endif
+
   registerApp(ChemicalReactionsApp);
 }
 

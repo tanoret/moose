@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,12 +22,12 @@ UniqueExtraIDMeshGenerator::validParams()
   params.addRequiredParam<std::vector<ExtraElementIDName>>(
       "id_name",
       "Existing extra integer ID names that is used to generate a new extra integer ID by finding "
-      "unique combintaions of their values");
+      "unique combinations of their values");
   params.addRequiredParam<ExtraElementIDName>("new_id_name", "New extra integer ID name");
   params.addParam<std::vector<unsigned int>>(
       "new_id_rule",
-      "Vector of unsigned integers to determine new integer ID values by mutiplying the provided "
-      "integers to the correpsonding existing ID values and then summing the resulting values");
+      "Vector of unsigned integers to determine new integer ID values by multiplying the provided "
+      "integers to the corresponding existing ID values and then summing the resulting values");
   params.addClassDescription("Add a new extra element integer ID by finding unique combinations of "
                              "the existing extra element integer ID values");
   return params;
@@ -49,9 +49,7 @@ std::unique_ptr<MeshBase>
 UniqueExtraIDMeshGenerator::generate()
 {
   std::unique_ptr<MeshBase> mesh = std::move(_input);
-  std::set<SubdomainID> block_ids = {Moose::ANY_BLOCK_ID};
-  std::map<dof_id_type, dof_id_type> parsed_ids =
-      MooseMeshUtils::getExtraIDUniqueCombinationMap(*mesh, block_ids, _extra_ids);
+  auto parsed_ids = MooseMeshUtils::getExtraIDUniqueCombinationMap(*mesh, {}, _extra_ids);
 
   // override the extra ID values from MooseMeshUtils::getExtraIDUniqueCombinationMap by using
   // new_id_rule

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -37,6 +37,8 @@ public:
                                                      unsigned int comp = 0) const;
 
   std::vector<const VariableValue *> coupledNeighborValues(const std::string & var_name) const;
+  std::vector<const VariableValue *> coupledNeighborValuesOld(const std::string & var_name) const;
+  std::vector<const VariableValue *> coupledNeighborValuesOlder(const std::string & var_name) const;
 
   /**
    * Get the coupled neighbor variable value for \p var_name with derivative information for
@@ -44,6 +46,20 @@ public:
    */
   virtual const ADVariableValue & adCoupledNeighborValue(const std::string & var_name,
                                                          unsigned int comp = 0) const;
+
+  /**
+   * Retrieve the coupled neighbor variable value whether AD or not
+   */
+  template <bool is_ad>
+  const auto & coupledGenericNeighborValue(const std::string & var_name,
+                                           unsigned int comp = 0) const;
+
+  /**
+   * Retrieve the coupled neighbor variable gradient whether AD or not
+   */
+  template <bool is_ad>
+  const auto & coupledGenericNeighborGradient(const std::string & var_name,
+                                              unsigned int comp = 0) const;
 
   /**
    * Get the time derivative of the coupled neighbor variable value for \p var_name with derivative
@@ -114,3 +130,25 @@ public:
 protected:
   bool _neighbor_nodal;
 };
+
+template <bool is_ad>
+const auto &
+NeighborCoupleable::coupledGenericNeighborValue(const std::string & var_name,
+                                                const unsigned int comp) const
+{
+  if constexpr (is_ad)
+    return adCoupledNeighborValue(var_name, comp);
+  else
+    return coupledNeighborValue(var_name, comp);
+}
+
+template <bool is_ad>
+const auto &
+NeighborCoupleable::coupledGenericNeighborGradient(const std::string & var_name,
+                                                   const unsigned int comp) const
+{
+  if constexpr (is_ad)
+    return adCoupledNeighborGradient(var_name, comp);
+  else
+    return coupledNeighborGradient(var_name, comp);
+}

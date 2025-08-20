@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,9 @@
 
 // MOOSE includes
 #include "StaticallyAllocatedSet.h"
+#include "Conversion.h"
+#include "MooseTypes.h"
+#include "libMeshReducedNamespace.h"
 
 // Local includes
 #include "DebugRay.h"
@@ -127,7 +130,7 @@ bool isWithinSegment(const Point & segment1,
  * @param neighbor_set The set to fill the neighbors into
  * @param untested_set Set for internal use
  * @param next_untested_set Set for internal use
- * @param active_neighbor_children Temprorary vector for use in the search
+ * @param active_neighbor_children Temporary vector for use in the search
  */
 void findPointNeighbors(
     const Elem * const elem,
@@ -162,8 +165,9 @@ void findEdgeNeighbors(
  * allocated set and accepts a functor for the rejection/acceptance of an element.
  *
  * Returns the active neighbors that fit the criteria of keep_functor.
+ * Does not the return the current element (elem)
  *
- * @param elem The element
+ * @param elem The element for which we are searching for the neighbors
  * @param neighbor_set The set to fill the neighbors into
  * @param untested_set Set for internal use
  * @param next_untested_set Set for internal use
@@ -186,16 +190,15 @@ findNeighbors(
   untested_set.clear();
   next_untested_set.clear();
 
-  neighbor_set.insert(elem);
   untested_set.insert(elem);
 
   while (!untested_set.empty())
   {
     // Loop over all the elements in the patch that haven't already been tested
-    for (const Elem * elem : untested_set)
-      for (auto current_neighbor : elem->neighbor_ptr_range())
-        if (current_neighbor &&
-            current_neighbor != remote_elem) // we have a real neighbor on elem side
+    for (const Elem * const test_elem : untested_set)
+      for (const auto * const current_neighbor : test_elem->neighbor_ptr_range())
+        if (current_neighbor && current_neighbor != remote_elem &&
+            current_neighbor != elem) // we have a real neighbor on elem side
         {
           if (current_neighbor->active()) // ... if it is active
           {
@@ -209,10 +212,11 @@ findNeighbors(
           else // ... the neighbor is *not* active,
           {    // ... so add *all* neighboring
                // active children that touch p
-            current_neighbor->active_family_tree_by_neighbor(active_neighbor_children, elem);
+            current_neighbor->active_family_tree_by_neighbor(active_neighbor_children, test_elem);
 
             for (const Elem * current_child : active_neighbor_children)
-              if (!neighbor_set.contains(current_child) && keep_functor(current_child))
+              if (!neighbor_set.contains(current_child) && keep_functor(current_child) &&
+                  current_child != elem)
               {
                 next_untested_set.insert(current_child);
                 neighbor_set.insert(current_child);
@@ -556,7 +560,7 @@ bool intersectQuad(const Point & start,
  * @return Whether or not the line segment intersected with the face
  */
 template <typename T>
-typename std::enable_if<std::is_base_of<Face, T>::value, bool>::type
+typename std::enable_if<std::is_base_of<libMesh::Face, T>::value, bool>::type
 sideIntersectedByLine(const Elem * elem,
                       const Point & start_point,
                       const Point & direction,
@@ -594,9 +598,11 @@ sideIntersectedByLine(const Elem * elem,
   if (segment_vertex != SEGMENT_VERTEX_NONE)
   {
     intersected_extrema.setVertex(T::side_nodes_map[side][segment_vertex]);
-    mooseAssert(intersected_extrema.vertexPoint(elem).absolute_fuzzy_equals(intersection_point,
-                                                                            TRACE_TOLERANCE),
-                "Doesn't intersect vertex");
+    mooseAssert(
+        intersected_extrema.vertexPoint(elem).absolute_fuzzy_equals(intersection_point,
+                                                                    3 * TRACE_TOLERANCE),
+        "Doesn't intersect vertex at: " + Moose::stringify(intersected_extrema.vertexPoint(elem)) +
+            " tentative intersection point: " + Moose::stringify(intersection_point));
   }
 
   return intersected;
@@ -728,7 +734,7 @@ sideIntersectedByLine(const Elem * elem,
  * @return Whether or not the line segment intersected with the face
  */
 template <typename T>
-typename std::enable_if<std::is_base_of<Pyramid, T>::value, bool>::type
+typename std::enable_if<std::is_base_of<libMesh::Pyramid, T>::value, bool>::type
 sideIntersectedByLine(const Elem * elem,
                       const Point & start_point,
                       const Point & direction,
@@ -799,7 +805,7 @@ sideIntersectedByLine(const Elem * elem,
  * @return Whether or not the line segment intersected with the face
  */
 template <typename T>
-typename std::enable_if<std::is_base_of<Prism, T>::value, bool>::type
+typename std::enable_if<std::is_base_of<libMesh::Prism, T>::value, bool>::type
 sideIntersectedByLine(const Elem * elem,
                       const Point & start_point,
                       const Point & direction,
@@ -860,7 +866,7 @@ sideIntersectedByLine(const Elem * elem,
  */
 bool isTraceableElem(const Elem * elem);
 /**
- * @return Whether or not the element is traceable with adapativity
+ * @return Whether or not the element is traceable with adaptivity
  */
 bool isAdaptivityTraceableElem(const Elem * elem);
 
@@ -885,8 +891,8 @@ unsigned short atVertexOnSide(const Elem * elem, const Point & point, const unsi
  * Returns the number of nodes on a side for an Elem that is not a Pyramid or Prism.
  */
 template <typename T>
-inline typename std::enable_if<!std::is_base_of<Pyramid, T>::value &&
-                                   !std::is_base_of<Prism, T>::value,
+inline typename std::enable_if<!std::is_base_of<libMesh::Pyramid, T>::value &&
+                                   !std::is_base_of<libMesh::Prism, T>::value,
                                unsigned short>::type
 nodesPerSide(const unsigned short)
 {
@@ -907,7 +913,7 @@ nodesPerSide(const unsigned short side)
  * Returns the number of nodes on a side on a Prism elem.
  */
 template <typename T>
-inline typename std::enable_if<std::is_base_of<Prism, T>::value, unsigned short>::type
+inline typename std::enable_if<std::is_base_of<libMesh::Prism, T>::value, unsigned short>::type
 nodesPerSide(const unsigned short side)
 {
   return T::nodes_per_side - (side == 0 || side == 4);
@@ -1025,7 +1031,7 @@ bool withinExtremaOnSide(const Elem * const elem,
  * @return If the point is within an edge on the side of the element
  */
 template <typename T>
-typename std::enable_if<std::is_base_of<Cell, T>::value, bool>::type withinEdgeOnSideTempl(
+typename std::enable_if<std::is_base_of<libMesh::Cell, T>::value, bool>::type withinEdgeOnSideTempl(
     const Elem * const elem, const Point & point, const unsigned short side, ElemExtrema & extrema);
 
 /**
@@ -1035,7 +1041,7 @@ typename std::enable_if<std::is_base_of<Cell, T>::value, bool>::type withinEdgeO
  * edges, therefore this function errors.
  */
 template <typename T>
-typename std::enable_if<!std::is_base_of<Cell, T>::value, bool>::type
+typename std::enable_if<!std::is_base_of<libMesh::Cell, T>::value, bool>::type
 withinEdgeOnSideTempl(const Elem * const, const Point &, const unsigned short, ElemExtrema &)
 {
   mooseError("Should not call withinEdgeOnSideTempl() with a non-Cell derived Elem");

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,7 +8,7 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ContactApp.h"
-#include "TensorMechanicsApp.h"
+#include "SolidMechanicsApp.h"
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
@@ -20,6 +20,7 @@ ContactApp::validParams()
 
   params.set<bool>("automatic_automatic_scaling") = false;
   params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
 
   return params;
 }
@@ -37,6 +38,7 @@ static void
 associateSyntaxInner(Syntax & syntax, ActionFactory & /*action_factory*/)
 {
   registerSyntax("ContactAction", "Contact/*");
+  registerSyntax("ExplicitDynamicsContactAction", "ExplicitDynamicsContact/*");
 
   registerTask("output_penetration_info_vars", false);
   registerTask("add_contact_aux_variable", false);
@@ -53,13 +55,15 @@ ContactApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
   Registry::registerActionsTo(af, {"ContactApp"});
   associateSyntaxInner(s, af);
 
-  TensorMechanicsApp::registerAll(f, af, s);
+  SolidMechanicsApp::registerAll(f, af, s);
 }
 
 void
 ContactApp::registerApps()
 {
   registerApp(ContactApp);
+
+  SolidMechanicsApp::registerApps();
 }
 
 void
@@ -81,14 +85,14 @@ void
 ContactApp::registerObjectDepends(Factory & factory)
 {
   mooseDeprecated("use registerAll instead of registerObjectsDepends");
-  TensorMechanicsApp::registerObjects(factory);
+  SolidMechanicsApp::registerObjects(factory);
 }
 
 void
 ContactApp::associateSyntaxDepends(Syntax & syntax, ActionFactory & action_factory)
 {
   mooseDeprecated("use registerAll instead of registerObjectsDepends");
-  TensorMechanicsApp::associateSyntax(syntax, action_factory);
+  SolidMechanicsApp::associateSyntax(syntax, action_factory);
 }
 
 extern "C" void

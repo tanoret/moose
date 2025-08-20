@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,10 +23,10 @@ MaterialDerivativeTestMaterial::validParams()
 MaterialDerivativeTestMaterial::MaterialDerivativeTestMaterial(const InputParameters & parameters)
   : DerivativeMaterialInterface<Material>(parameters),
     _p(declareProperty<Real>("material_derivative_test_property")),
-    _dpdu(declarePropertyDerivative<Real>("material_derivative_test_property",
-                                          getVar("var1", 0)->name())),
-    _dpdv(declarePropertyDerivative<Real>("material_derivative_test_property",
-                                          getVar("var2", 0)->name())),
+    _dpdu(
+        declarePropertyDerivative<Real>("material_derivative_test_property", coupledName("var1"))),
+    _dpdv(
+        declarePropertyDerivative<Real>("material_derivative_test_property", coupledName("var2"))),
     _u(coupledValue("var1")),
     _v(coupledValue("var2"))
 {

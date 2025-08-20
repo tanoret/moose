@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -37,7 +37,7 @@ NodalIntegralPostprocessorBasePD::execute()
 }
 
 Real
-NodalIntegralPostprocessorBasePD::getValue()
+NodalIntegralPostprocessorBasePD::getValue() const
 {
   return _integral_value;
 }
@@ -49,7 +49,6 @@ NodalIntegralPostprocessorBasePD::finalize()
 void
 NodalIntegralPostprocessorBasePD::threadJoin(const UserObject & uo)
 {
-  const NodalIntegralPostprocessorBasePD & pps =
-      static_cast<const NodalIntegralPostprocessorBasePD &>(uo);
+  const auto & pps = static_cast<const NodalIntegralPostprocessorBasePD &>(uo);
   _integral_value += pps._integral_value;
 }

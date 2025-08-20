@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -47,8 +47,9 @@ protected:
 
   /// convert cartesian+time coordinates into grid coordinates
   template <bool is_ad>
-  MooseADWrapper<GridPoint, is_ad> pointInGrid(const MooseADWrapper<Real, is_ad> & t,
-                                               const MooseADWrapper<Point, is_ad> & p) const;
+  Moose::GenericType<GridPoint, is_ad>
+  pointInGrid(const Moose::GenericType<Real, is_ad> & t,
+              const Moose::GenericType<Point, is_ad> & p) const;
 
   /**
    * This does the core work.  Given a point, pt, defined

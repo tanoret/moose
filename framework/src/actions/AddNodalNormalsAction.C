@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,10 +14,10 @@
 #include "libmesh/fe.h"
 #include "libmesh/string_to_enum.h"
 
+using namespace libMesh;
+
 registerMooseAction("MooseApp", AddNodalNormalsAction, "add_aux_variable");
-
 registerMooseAction("MooseApp", AddNodalNormalsAction, "add_postprocessor");
-
 registerMooseAction("MooseApp", AddNodalNormalsAction, "add_user_object");
 
 InputParameters
@@ -28,9 +28,10 @@ AddNodalNormalsAction::validParams()
                              "facing normal from a node.");
 
   // Initialize the 'boundary' input option to default to any boundary
-  std::vector<BoundaryName> everywhere(1, "ANY_BOUNDARY_ID");
   params.addParam<std::vector<BoundaryName>>(
-      "boundary", everywhere, "The boundary ID or name where the normals will be computed");
+      "boundary",
+      {"ANY_BOUNDARY_ID"},
+      "The boundary ID or name where the normals will be computed");
   params.addParam<BoundaryName>("corner_boundary", "boundary ID or name with nodes at 'corners'");
   MooseEnum orders("FIRST SECOND", "FIRST");
   params.addParam<MooseEnum>("order",

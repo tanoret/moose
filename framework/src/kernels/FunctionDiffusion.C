@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,7 +16,7 @@ InputParameters
 FunctionDiffusion::validParams()
 {
   InputParameters params = Diffusion::validParams();
-  params.addClassDescription("The Laplacian operator with a function coefficient.");
+  params.addClassDescription("Diffusion with a function coefficient.");
   params.addParam<FunctionName>("function", 1.0, "Function multiplier for diffusion term.");
   params.addCoupledVar("v",
                        "Coupled concentration variable for kernel to operate on; if this "

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -38,6 +38,22 @@ NeighborCoupleable::coupledNeighborValues(const std::string & var_name) const
 {
   auto func = [this, &var_name](unsigned int comp)
   { return &coupledNeighborValue(var_name, comp); };
+  return coupledVectorHelper<const VariableValue *>(var_name, func);
+}
+
+std::vector<const VariableValue *>
+NeighborCoupleable::coupledNeighborValuesOld(const std::string & var_name) const
+{
+  auto func = [this, &var_name](unsigned int comp)
+  { return &coupledNeighborValueOld(var_name, comp); };
+  return coupledVectorHelper<const VariableValue *>(var_name, func);
+}
+
+std::vector<const VariableValue *>
+NeighborCoupleable::coupledNeighborValuesOlder(const std::string & var_name) const
+{
+  auto func = [this, &var_name](unsigned int comp)
+  { return &coupledNeighborValueOlder(var_name, comp); };
   return coupledVectorHelper<const VariableValue *>(var_name, func);
 }
 

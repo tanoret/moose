@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,6 +27,7 @@ class MooseMesh;
 class Syntax;
 class ActionFactory;
 class FEProblem;
+class PhysicsBase;
 
 /**
  * Storage for action instances.
@@ -107,7 +108,7 @@ public:
    * @param name The action name.
    */
   template <class T>
-  const T & getAction(const std::string & name)
+  const T & getAction(const std::string & name) const
   {
     typename std::shared_ptr<T> p;
     for (auto act_ptr : _all_ptrs)
@@ -120,8 +121,31 @@ public:
       }
     }
     if (!p)
-      mooseError("Action with name being ", name, " does not exist");
+    {
+      std::vector<std::string> all_names;
+      for (auto act_ptr : _all_ptrs)
+        if (!act_ptr->name().empty())
+          all_names.push_back(act_ptr->name());
+        else
+          all_names.push_back("unnamed");
+      mooseError("Action with name '",
+                 name,
+                 "' does not exist.\n These are the Actions that do exist:",
+                 Moose::stringify(all_names));
+    }
     return *p;
+  }
+  template <class T>
+  T * getPhysics(const std::string & name) const
+  {
+    auto physics = const_cast<T *>(&getAction<T>(name));
+    if (!dynamic_cast<const PhysicsBase *>(physics))
+      mooseError("The Physics requested of type '",
+                 MooseUtils::prettyCppType<T>(),
+                 "' and name '",
+                 name,
+                 "' is not derived from the PhysicsBase class");
+    return physics;
   }
 
   /**
@@ -144,6 +168,23 @@ public:
     for (auto & pair : actions)
       action_vector.push_back(pair.second.get());
     return action_vector;
+  }
+
+  /**
+   * Retrieve all Physics with a specific type ordered by their names
+   */
+  template <class T>
+  std::vector<T *> getPhysics()
+  {
+    const auto physics_vector = getActions<T>();
+    for (const auto phys_ptr : physics_vector)
+      if (!dynamic_cast<const PhysicsBase *>(phys_ptr))
+        mooseError("The Physics requested of type '",
+                   MooseUtils::prettyCppType<T>(),
+                   "' and name '",
+                   phys_ptr->name(),
+                   "' is not derived from the PhysicsBase class");
+    return physics_vector;
   }
 
   /**
@@ -238,8 +279,19 @@ public:
   const std::string & getMooseAppName();
   const std::string & getCurrentTaskName() const { return _current_task; }
 
+  /**
+   * @return The current action that is running, if any
+   */
+  const Action * getCurrentAction() const { return _current_action; }
+  /**
+   * @return The name of the current action that is running
+   */
   std::string getCurrentActionName() const;
 
+  /**
+   * @returns True if a task with the name \p task is registered.
+   */
+  bool hasTask(const std::string & task) const;
   /**
    * @returns True if the registered task with the name \p task is complete.
    */
@@ -289,6 +341,8 @@ protected:
   // When executing the actions in the warehouse, this string will always contain
   // the current task name
   std::string _current_task;
+  // The current action that is running
+  Action * _current_action;
 
   //
   // data created by actions
@@ -307,7 +361,8 @@ private:
   /// Last task to run before (optional) early termination - blank means no early termination.
   std::string _final_task;
 
-  ActionIterator _act_iter;
-
   const std::list<Action *> _empty_action_list;
+
+  /// Mutex for preventing read/write races for _completed_tasks
+  mutable std::mutex _completed_tasks_mutex;
 };

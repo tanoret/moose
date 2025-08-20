@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -38,7 +38,7 @@ public:
    * Returns the value stored in _my_value
    * @return A const reference to the value of the postprocessor
    */
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
 
 private:
   /// Flag for initializing the old value

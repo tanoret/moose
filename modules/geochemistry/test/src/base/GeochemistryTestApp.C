@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -41,7 +41,7 @@ GeochemistryTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bo
 void
 GeochemistryTestApp::registerApps()
 {
-  registerApp(GeochemistryApp);
+  GeochemistryApp::registerApps();
   registerApp(GeochemistryTestApp);
 }
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -54,10 +54,12 @@ Q2PAction::validParams()
   params.addRequiredParam<Real>("gas_viscosity", "The gas viscosity");
   params.addRequiredParam<Real>("diffusivity", "The diffusivity");
   params.addParam<std::vector<OutputName>>("output_nodal_masses_to",
+                                           {},
                                            "Output Nodal masses to this Output object.  If you "
                                            "don't want any outputs, don't input anything here");
   params.addParam<std::vector<OutputName>>(
       "output_total_masses_to",
+      {},
       "Output total water and gas mass to this Output object.  If you "
       "don't want any outputs, don't input anything here");
   params.addParam<bool>("save_gas_flux_in_Q2PGasFluxResidual",
@@ -212,8 +214,8 @@ Q2PAction::act()
 
   if (_current_task == "add_aux_variable")
   {
-    FEType fe_type(Utility::string_to_enum<Order>(getParam<MooseEnum>("ORDER")),
-                   Utility::string_to_enum<FEFamily>("LAGRANGE"));
+    libMesh::FEType fe_type(Utility::string_to_enum<Order>(getParam<MooseEnum>("ORDER")),
+                            Utility::string_to_enum<libMesh::FEFamily>("LAGRANGE"));
     auto type = AddVariableAction::variableType(fe_type);
     auto var_params = _factory.getValidParams(type);
     var_params.set<MooseEnum>("family") = "LAGRANGE";

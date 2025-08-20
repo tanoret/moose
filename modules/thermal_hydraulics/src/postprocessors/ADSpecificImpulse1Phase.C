@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,7 +10,7 @@
 #include "ADSpecificImpulse1Phase.h"
 #include "SinglePhaseFluidProperties.h"
 #include "Numerics.h"
-#include "THMIndices3Eqn.h"
+#include "THMIndicesVACE.h"
 #include "ADBoundaryFluxBase.h"
 
 registerMooseObject("ThermalHydraulicsApp", ADSpecificImpulse1Phase);
@@ -39,7 +39,7 @@ ADSpecificImpulse1Phase::validParams()
 
 ADSpecificImpulse1Phase::ADSpecificImpulse1Phase(const InputParameters & parameters)
   : SidePostprocessor(parameters),
-    _n_components(THM3Eqn::N_CONS_VAR),
+    _n_components(THMVACE1D::N_FLUX_INPUTS),
     _boundary_name(getParam<std::vector<BoundaryName>>("boundary")[0]),
     _boundary_uo_name(_boundary_name + ":boundary_uo"),
     _boundary_uo(getUserObjectByName<ADBoundaryFluxBase>(_boundary_uo_name)),
@@ -53,7 +53,8 @@ ADSpecificImpulse1Phase::ADSpecificImpulse1Phase(const InputParameters & paramet
     _max_nit(getParam<unsigned int>("bisection_max_it")),
     _cumulative(getParam<bool>("cumulative")),
     _accumulated_mass_flow_rate(declareRestartableData<Real>("accumulated_mass_flow_rate", 0)),
-    _accumulated_thrust(declareRestartableData<Real>("accumulated_thrust", 0))
+    _accumulated_thrust(declareRestartableData<Real>("accumulated_thrust", 0)),
+    _value(0.0)
 {
   if (_cumulative && !_fe_problem.isTransient())
     paramError("cumulative", "Must be false unless problem is transient");
@@ -78,16 +79,9 @@ ADSpecificImpulse1Phase::initialize()
 }
 
 Real
-ADSpecificImpulse1Phase::getValue()
+ADSpecificImpulse1Phase::getValue() const
 {
-  if (_cumulative)
-  {
-    _accumulated_thrust += _dt * _thrust;
-    _accumulated_mass_flow_rate += _dt * _mass_flow_rate;
-    return _accumulated_thrust / _accumulated_mass_flow_rate / THM::gravity_const;
-  }
-  else
-    return _thrust / _mass_flow_rate / THM::gravity_const;
+  return _value;
 }
 
 void
@@ -95,6 +89,15 @@ ADSpecificImpulse1Phase::finalize()
 {
   gatherSum(_thrust);
   gatherSum(_mass_flow_rate);
+
+  if (_cumulative)
+  {
+    _accumulated_thrust += _dt * _thrust;
+    _accumulated_mass_flow_rate += _dt * _mass_flow_rate;
+    _value = _accumulated_thrust / _accumulated_mass_flow_rate / THM::gravity_const;
+  }
+  else
+    _value = _thrust / _mass_flow_rate / THM::gravity_const;
 }
 
 void

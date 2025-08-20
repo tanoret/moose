@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -77,7 +77,7 @@ RANFSNormalMechanicalContact::RANFSNormalMechanicalContact(const InputParameters
 void
 RANFSNormalMechanicalContact::initialSetup()
 {
-  auto system_coupling_matrix = _subproblem.couplingMatrix();
+  auto system_coupling_matrix = _subproblem.couplingMatrix(_sys.number());
 
   for (MooseIndex(_vars) i = 0; i < _vars.size(); ++i)
     for (MooseIndex(_vars) j = 0; j < _vars.size(); ++j)

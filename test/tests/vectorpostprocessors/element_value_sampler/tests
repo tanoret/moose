@@ -3,8 +3,7 @@
   design = 'ElementValueSampler.md'
 
   [element_value_sampler]
-    requirement = 'The system shall support sampling of a field variable at the centroid of every '
-                  'element in the domain'
+    requirement = 'The system shall support sampling of a field variable at the centroid of every element in the domain'
     [monomial]
       type = 'CSVDiff'
       input = 'element_value_sampler.i'
@@ -22,14 +21,40 @@
 
       detail = 'for FV variables,'
     []
-    [lagrange]
+    [mixed_fe_fv]
+      type = 'CSVDiff'
+      input = 'mixed_fe_fv_sampler.i'
+      csvdiff = 'mixed_fe_fv_sampler_out_element_value_sampler_0001.csv'
+      mesh_mode = REPLICATED
+
+      detail = 'for finite volume variables mixed with finite element variables,'
+    []
+  []
+  [exceptions]
+    requirement = 'The system shall throw an error if the variables specified for elemental sampling are'
+    [nodal]
       type = 'RunException'
       input = 'element_value_sampler.i'
       cli_args = 'AuxVariables/u/family=LAGRANGE AuxVariables/u/order=FIRST'
-      expect_err = "The variable 'u' is not elemental"
+      expect_err = "The variable 'u' is a nodal variable. Nodal variables can be sampled using a 'NodalValueSampler'"
       mesh_mode = REPLICATED
-
-      detail = 'but not for nodal variables.'
+      detail = 'nodal variables,'
+    []
+    [vector]
+      type = 'RunException'
+      input = 'element_value_sampler.i'
+      cli_args = 'AuxVariables/u/family=MONOMIAL_VEC ICs/active='
+      expect_err = "The variable 'u' is a vector variable. Sampling those is not currently supported"
+      mesh_mode = REPLICATED
+      detail = 'vector variables,'
+    []
+    [array]
+      type = 'RunException'
+      input = 'element_value_sampler.i'
+      cli_args = 'AuxVariables/u/components=8 ICs/active='
+      expect_err = "The variable 'u' is an array variable. Sampling those is not currently supported"
+      mesh_mode = REPLICATED
+      detail = 'and array variables.'
     []
   []
 []

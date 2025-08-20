@@ -65,6 +65,19 @@
     issues = '#21162'
     mesh_mode = 'REPLICATED'
   []
+  [elem_flip_second_order]
+    type = 'Exodiff'
+    input = elem_flip.i
+    cli_args = 'Mesh/gmg/elem_type=QUAD8 --mesh-only elem_flip_second.e'
+    exodiff = 'elem_flip_second.e'
+    exodiff_opts = '-pedantic'
+    recover = false
+
+    requirement = 'The system shall be able to fix the negative-volume second order elements by flipping them during extrusion.'
+    design = 'AdvancedExtruderGenerator.md'
+    issues = '#21162'
+    mesh_mode = 'REPLICATED'
+  []
   [extruder_then_parsed_gen_sideset]
     type = 'Exodiff'
     input = advanced_extruder_then_parsed_gen_sideset.i
@@ -92,7 +105,8 @@
     cli_args = 'Mesh/extrude/heights="1 2 -3" --mesh-only'
     expect_err = "Cannot have both positive and negative heights!"
 
-    requirement = "The system shall error if missing a consistent positive or negative extrusion direction."
+    requirement = "The system shall report an error if missing a consistent positive or negative "
+                  "extrusion direction."
     design = "AdvancedExtruderGenerator.md"
     issues = "#21273"
   []
@@ -106,5 +120,61 @@
     requirement = 'The system shall be able to retain and swap boundary ids during extrusion.'
     design = 'AdvancedExtruderGenerator.md'
     issues = '#21852'
+    skip = 'Pending libmesh PR #4121 being merged'
+  []
+  [helicoidal]
+    type = Exodiff
+    input = 'helicoidal.i'
+    exodiff = 'helicoidal_in.e'
+    cli_args = '--mesh-only'
+    recover = false
+
+    requirement = 'The system shall be able to helically extrude a 2D mesh into a twisted 3D mesh.'
+    design = 'AdvancedExtruderGenerator.md'
+    issues = '#25486'
+  []
+
+  [errors]
+    requirement = 'The system shall error'
+    issues = '#22117'
+    design = 'AdvancedExtruderGenerator.md'
+    [bad_subdomain_swap]
+      type = RunException
+      input = advanced_extruder_with_boundary_swap.i
+      cli_args = "Mesh/extrude/subdomain_swaps='1234 11 2 12 3 13; ; '"
+      detail = 'if the source subdomain for a subdomain swap in a layer does not exist in the mesh,'
+      expect_err = 'The block \'1234\' was not found within the mesh'
+    []
+    [bad_boundary_swap]
+      type = RunException
+      input = advanced_extruder_with_boundary_swap.i
+      cli_args = "Mesh/extrude/boundary_swaps='101 11 2 12; ; '"
+      detail = 'if the source boundary for a boundary swap in a layer does not exist in the mesh,'
+      expect_err = 'The boundary \'101\' was not found within the mesh'
+    []
+    [bad_upward_source_subdomain]
+      type = RunException
+      input = advanced_extruder_with_boundary_swap.i
+      cli_args = "Mesh/extrude/upward_boundary_source_blocks='1234; ; ' Mesh/extrude/upward_boundary_ids='10; ; '"
+      detail = 'if the source subdomain for an upward boundary assignment in a layer does not exist in the mesh,'
+      expect_err = 'The block \'1234\' was not found within the mesh'
+    []
+    [bad_downward_source_subdomain]
+      type = RunException
+      input = advanced_extruder_with_boundary_swap.i
+      cli_args = "Mesh/extrude/downward_boundary_source_blocks='1234; ; ' Mesh/extrude/downward_boundary_ids='1; ; '"
+      detail = 'if the source subdomain for an downward boundary assignment in a layer does not exist in the mesh,'
+      expect_err = 'The block \'1234\' was not found within the mesh'
+    []
+  []
+  [named_boundaries]
+    type = Exodiff
+    input = named_boundaries.i
+    exodiff = named_boundaries_in.e
+    issues = '#29908'
+    design = 'AdvancedExtruderGenerator.md'
+    requirement = 'The system shall be able to assign names to the top and bottom boundaries of an extrusion.'
+    cli_args = '--mesh-only'
+    recover = false
   []
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -76,7 +76,7 @@ CreateProblemDefaultAction::act()
 
       params.set<MooseMesh *>("mesh") = _mesh.get();
       params.set<bool>("use_nonlinear") = _app.useNonlinear();
-      if (_pars.isParamSetByUser("_solve"))
+      if (_pars.isParamValid("_solve"))
         params.set<bool>("solve") = getParam<bool>("_solve");
 
       _problem = _factory.create<FEProblemBase>(type, "MOOSE Problem", params);

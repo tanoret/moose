@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -47,7 +47,7 @@ ElectromagneticsTestApp::registerAll(Factory & f,
 void
 ElectromagneticsTestApp::registerApps()
 {
-  registerApp(ElectromagneticsApp);
+  ElectromagneticsApp::registerApps();
   registerApp(ElectromagneticsTestApp);
 }
 

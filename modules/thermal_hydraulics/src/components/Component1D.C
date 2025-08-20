@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,11 +13,11 @@
 InputParameters
 Component1D::validParams()
 {
-  InputParameters params = GeometricalComponent::validParams();
+  InputParameters params = GeneratedMeshComponent::validParams();
   return params;
 }
 
-Component1D::Component1D(const InputParameters & parameters) : GeometricalComponent(parameters) {}
+Component1D::Component1D(const InputParameters & parameters) : GeneratedMeshComponent(parameters) {}
 
 void
 Component1D::buildMeshNodes()
@@ -88,16 +88,14 @@ Component1D::buildMesh()
     if (i == 0)
     {
       Point pt = _position;
-      _connections[Component1DConnection::IN].push_back(
-          Connection(pt, elem->node_ptr(0), bc_id_inlet, -1));
+      _connections[Component1DConnection::IN].push_back(Connection(pt, elem, 0, bc_id_inlet, -1));
       boundary_info.add_side(elem, 0, bc_id_inlet);
       binfo.sideset_name(bc_id_inlet) = genName(name(), "in");
     }
     if (i == (_n_elem - 1))
     {
       Point pt = _position + _length * _dir;
-      _connections[Component1DConnection::OUT].push_back(
-          Connection(pt, elem->node_ptr(1), bc_id_outlet, 1));
+      _connections[Component1DConnection::OUT].push_back(Connection(pt, elem, 1, bc_id_outlet, 1));
       boundary_info.add_side(elem, 1, bc_id_outlet);
       binfo.sideset_name(bc_id_outlet) = genName(name(), "out");
     }

@@ -45,7 +45,7 @@
 ## Enabling Checkpoints
 
 - Advanced restart in MOOSE requires checkpoint files.
-- To enable automatic checkpoints using the default options (every time step, and keep last two) in your simulation simply add the following flag to your input file:
+- To enable constant checkpoint writing using the default options (every time step, and keep last two) in your simulation simply add the following flag to your input file:
 
 ```puppet
 [Outputs]
@@ -55,7 +55,10 @@
 
 *If you need more control over the checkpoint system, you can create a subblock in the input file that will allow you to change the file format, suffix, frequency of output, the number of checkpoint files to keep, etc.*
 
-For a complete list see the Doxygen page for Checkpoint. * You should always set `num_files` to at least 2 to minimize the chance of ending up with a corrupt restart file.
+For a complete list see the Doxygen page for Checkpoint.
+
+!alert note
+You should always set [!param](/Outputs/Checkpoint/num_files) to at least 2 to minimize the chance of ending up with a corrupt restart file.
 
 ```puppet
 [Outputs]
@@ -67,6 +70,24 @@ For a complete list see the Doxygen page for Checkpoint. * You should always set
 []
 ```
 
+## Automatic Checkpoints
+
+In the event that the user forgets to enable checkpoints, MOOSE automatically creates a checkpoint object in the background for convenience. This object writes a checkpoint every 1 hour of wall time or at the end of the next time step, whichever is later.
+This wall time interval length may be modified by defining a checkpoint block and setting the [!param](/Outputs/Checkpoint/wall_time_interval) parameter:
+
+```puppet
+[Outputs]
+  [./my_checkpoint]
+    type = Checkpoint
+    wall_time_interval = 3600 # interval length in seconds
+  [../]
+[]
+```
+
+In case of emergency (i.e., a long test that must be aborted due to external circumstances), the background checkpoint can manually write out a checkpoint file. To do this, find the process ID by running `ps` in another terminal window, and searching for your currently running MOOSE instance. Once you have located this PID, enter `kill -s USR1 <yourPIDhere>`. At the end of the current time step solve, MOOSE will output its current progress into a checkpoint file that can be used later to restart the test from the same point.
+
+Note that while this command is called `kill`, it does not actually terminate the MOOSE process if used with this syntax, it will merely trigger the MOOSE instance to write out to a checkpoint.
+
 ## Advanced Restart
 
 - This method is best suited for situations when the mesh from the previous simulation and the current simulation match but all variables should be reloaded and all stateful data should be restored.
@@ -76,7 +97,7 @@ For a complete list see the Doxygen page for Checkpoint. * You should always set
 ```puppet
 [Mesh]
   #Serial number should match corresponding Executioner parameter
-  file = out_cp/0010_mesh.cpr
+  file = out_cp/0010-mesh.cpa.gz
   #This method of restart is only supported on serial meshes
   distribution = serial
 []

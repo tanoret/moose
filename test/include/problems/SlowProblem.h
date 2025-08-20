@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,5 +23,12 @@ public:
   virtual void solve(unsigned int) override;
 
 protected:
+  /// Another timed routine
+  void otherTimedSection() const;
+  /// Get the time to sleep for
+  Real getDelay() const;
+
   const std::vector<Real> _seconds_to_sleep;
+  const bool _nested_print;
+  const bool _nested_section;
 };

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -7,9 +7,11 @@
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
+#pragma once
+
 #include "Assembly.h"
 #include "FEProblemBase.h"
-#include "MooseUtils.h"
+#include "MaterialBase.h"
 #include "MaterialWarehouse.h"
 
 #include "libmesh/quadrature.h"
@@ -76,7 +78,8 @@ loopOverMortarSegments(
     const std::map<SubdomainID, std::deque<MaterialBase *>> & secondary_ip_sub_to_mats,
     const std::map<SubdomainID, std::deque<MaterialBase *>> & primary_ip_sub_to_mats,
     const std::deque<MaterialBase *> & secondary_boundary_mats,
-    const ActionFunctor act)
+    const ActionFunctor act,
+    const bool reinit_mortar_user_objects)
 {
   const auto & primary_secondary_boundary_id_pair = amg.primarySecondaryBoundaryIDPair();
 
@@ -99,7 +102,7 @@ loopOverMortarSegments(
   const auto & JxW_msm = assembly.jxWMortar();
 
   // Set required material properties
-  std::set<unsigned int> needed_mat_props;
+  std::unordered_set<unsigned int> needed_mat_props;
   for (const auto & consumer : consumers)
   {
     const auto & mp_deps = consumer->getMatPropDependencies();
@@ -185,7 +188,7 @@ loopOverMortarSegments(
       if (assembly.needDual())
         mooseAssert(JxW.size() == expected_length, "Fewer than expected JxW values computed");
 #endif
-    }
+    } // end loop over msm_elems
 
     // Reinit dual shape coeffs if dual shape functions needed
     // lindsayad: is there any need to make sure we do this on both reference and displaced?
@@ -243,13 +246,8 @@ loopOverMortarSegments(
       // it's safest to keep making calls on fe_problem instead of subproblem
 
       // reinit the variables/residuals/jacobians on the secondary interior
-      fe_problem.reinitElemFaceRef(reinit_secondary_elem,
-                                   secondary_side_id,
-                                   secondary_boundary_id,
-                                   TOLERANCE,
-                                   &xi1_pts,
-                                   nullptr,
-                                   tid);
+      fe_problem.reinitElemFaceRef(
+          reinit_secondary_elem, secondary_side_id, TOLERANCE, &xi1_pts, nullptr, tid);
 
       const Elem * reinit_primary_elem = primary_ip;
 
@@ -259,13 +257,8 @@ loopOverMortarSegments(
         reinit_primary_elem = fe_problem.mesh().elemPtr(reinit_primary_elem->id());
 
       // reinit the variables/residuals/jacobians on the primary interior
-      fe_problem.reinitNeighborFaceRef(reinit_primary_elem,
-                                       primary_side_id,
-                                       primary_boundary_id,
-                                       TOLERANCE,
-                                       &xi2_pts,
-                                       nullptr,
-                                       tid);
+      fe_problem.reinitNeighborFaceRef(
+          reinit_primary_elem, primary_side_id, TOLERANCE, &xi2_pts, nullptr, tid);
 
       // reinit neighbor materials, but be careful not to execute stateful materials since
       // conceptually they don't make sense with mortar (they're not interpolary)
@@ -294,6 +287,9 @@ loopOverMortarSegments(
                                      &secondary_ip_mats);
       fe_problem.reinitMaterialsBoundary(
           secondary_boundary_id, /*tid=*/tid, /*swap_stateful=*/false, &secondary_boundary_mats);
+
+      if (reinit_mortar_user_objects)
+        fe_problem.reinitMortarUserObjects(primary_boundary_id, secondary_boundary_id, displaced);
 
       act();
 
@@ -338,7 +334,7 @@ setupMortarMaterials(const Consumers & consumers,
     if (mat_warehouse[mat_data_type].hasActiveBlockObjects(sub_id, tid))
     {
       auto & sub_mats = mat_warehouse[mat_data_type].getActiveBlockObjects(sub_id, tid);
-      return MooseUtils::buildRequiredMaterials(consumers, sub_mats, /*allow_stateful=*/false);
+      return MaterialBase::buildRequiredMaterials(consumers, sub_mats, /*allow_stateful=*/false);
     }
     else
       return {};
@@ -363,7 +359,7 @@ setupMortarMaterials(const Consumers & consumers,
   {
     auto & boundary_mats = mat_warehouse.getActiveBoundaryObjects(secondary_boundary, tid);
     secondary_boundary_mats =
-        MooseUtils::buildRequiredMaterials(consumers, boundary_mats, /*allow_stateful=*/false);
+        MaterialBase::buildRequiredMaterials(consumers, boundary_mats, /*allow_stateful=*/false);
   }
 }
 }

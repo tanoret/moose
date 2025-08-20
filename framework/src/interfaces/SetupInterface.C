@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,7 +14,6 @@
 InputParameters
 SetupInterface::validParams()
 {
-
   InputParameters params = emptyInputParameters();
 
   // Add the 'execute_on' input parameter for users to set
@@ -32,7 +31,8 @@ SetupInterface::SetupInterface(const MooseObject * moose_object)
         (moose_object->parameters().getCheckedPointerParam<FEProblemBase *>("_fe_problem_base"))
             ->getCurrentExecuteOnFlag())
 {
-  _empty_execute_enum.clear(); // remove any flags for the case when "execute_on" is not used
+  _empty_execute_enum
+      .clearSetValues(); // remove any flags for the case when "execute_on" is not used
 }
 
 SetupInterface::~SetupInterface() {}

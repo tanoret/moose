@@ -2,6 +2,7 @@ Large portions of this software were developed at the Idaho National Laboratory.
 
 Major contributors include the following:
 The Commonwealth Scientific and Industrial Research Organisation
+The United Kingdom Atomic Energy Authority
 
 Other contributors include the following:
 The University of Texas at Austin
@@ -9,13 +10,14 @@ Argonne National Laboratory
 Los Alamos National Laboratory
 Oak Ridge National Laboratory
 Massachusetts Institute of Technology
+Science and Technology Facilities Council Hartree Centre
 
 For complete author information reference the Git repository
 https://github.com/idaholab/moose
 
 The following are the complete copyright notices for select institutions
 
-© 2010-2022 Battelle Energy Alliance, LLC
+© 2010-2024 Battelle Energy Alliance, LLC
 ALL RIGHTS RESERVED
 
 Prepared by Battelle Energy Alliance, LLC

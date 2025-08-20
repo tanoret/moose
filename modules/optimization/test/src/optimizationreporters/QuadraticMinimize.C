@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,7 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "QuadraticMinimize.h"
+#include "libmesh/petsc_vector.h"
 
 registerMooseObject("OptimizationTestApp", QuadraticMinimize);
 
@@ -25,6 +26,7 @@ QuadraticMinimize::QuadraticMinimize(const InputParameters & parameters)
     _result(getParam<Real>("objective")),
     _solution(getParam<std::vector<Real>>("solution"))
 {
+  setICsandBounds();
   if (_solution.size() != _ndof)
     paramError("solution", "Size not equal to number of degrees of freedom (", _ndof, ").");
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,8 +8,10 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "Factory.h"
+#include "Registry.h"
 #include "InfixIterator.h"
 #include "InputParameterWarehouse.h"
+#include "FEProblemBase.h"
 // Just for testing...
 #include "Diffusion.h"
 
@@ -18,15 +20,15 @@ Factory::Factory(MooseApp & app) : _app(app) {}
 Factory::~Factory() {}
 
 void
-Factory::reg(const std::string & label,
-             const std::string & obj_name,
-             const buildPtr & build_ptr,
-             const paramsPtr & params_ptr,
-             const std::string & deprecated_time,
-             const std::string & replacement_name,
-             const std::string & file,
-             int line)
+Factory::reg(std::shared_ptr<RegistryEntryBase> obj)
 {
+  const std::string obj_name = obj->name();
+  const std::string & label = obj->_label;
+  const std::string & deprecated_time = obj->_deprecated_time;
+  const std::string & replacement_name = obj->_replaced_by;
+  const std::string & file = obj->_file;
+  const int line = obj->_line;
+
   // do nothing if we have already added this exact object before
   auto key = std::make_pair(label, obj_name);
   if (_objects_by_label.find(key) != _objects_by_label.end())
@@ -44,13 +46,12 @@ Factory::reg(const std::string & label,
   if (_registerable_objects.empty() ||
       _registerable_objects.find(obj_name) != _registerable_objects.end())
   {
-    if (_name_to_build_pointer.find(obj_name) != _name_to_build_pointer.end())
+    if (_name_to_object.find(obj_name) != _name_to_object.end())
       mooseError("Object '" + obj_name + "' registered from multiple files: ",
                  file,
                  " and ",
                  _name_to_line.getInfo(obj_name).file());
-    _name_to_build_pointer[obj_name] = build_ptr;
-    _name_to_params_pointer[obj_name] = params_ptr;
+    _name_to_object[obj_name] = obj;
     _objects_by_label.insert(key);
   }
   _name_to_line.addInfo(obj_name, file, line);
@@ -64,108 +65,68 @@ Factory::reg(const std::string & label,
 }
 
 InputParameters
-Factory::getValidParams(const std::string & obj_name)
+Factory::getValidParams(const std::string & obj_name) const
 {
-  std::map<std::string, paramsPtr>::iterator it = _name_to_params_pointer.find(obj_name);
+  const auto it = _name_to_object.find(obj_name);
 
   // Check if the object is registered
-  if (it == _name_to_params_pointer.end())
+  if (it == _name_to_object.end())
     reportUnregisteredError(obj_name);
 
   // Print out deprecated message, if it exists
   deprecatedMessage(obj_name);
 
   // Return the parameters
-  paramsPtr & func = it->second;
-  InputParameters params = (*func)();
+  auto params = it->second->buildParameters();
   params.addPrivateParam("_moose_app", &_app);
 
   return params;
 }
 
-MooseObjectPtr
+std::unique_ptr<MooseObject>
+Factory::createUnique(const std::string & obj_name,
+                      const std::string & name,
+                      const InputParameters & parameters,
+                      THREAD_ID tid /* =0 */,
+                      bool print_deprecated /* =true */)
+{
+  if (print_deprecated)
+    mooseDeprecated("Factory::create() is deprecated, please use Factory::create<T>() instead");
+
+  // Build the parameters that are stored in the InputParameterWarehouse for this
+  // object, set a few other things and do a little error checking
+  auto & warehouse_params = initialize(obj_name, name, parameters, tid);
+
+  // call the function pointer to build the object
+  _currently_constructing.push_back(&warehouse_params);
+  auto obj = _name_to_object.at(obj_name)->build(warehouse_params);
+  _currently_constructing.pop_back();
+
+  finalize(obj_name, *obj);
+
+  return obj;
+}
+
+std::shared_ptr<MooseObject>
 Factory::create(const std::string & obj_name,
                 const std::string & name,
                 const InputParameters & parameters,
                 THREAD_ID tid /* =0 */,
                 bool print_deprecated /* =true */)
 {
-  if (print_deprecated)
-    mooseDeprecated("Factory::create() is deprecated, please use Factory::create<T>() instead");
+  std::shared_ptr<MooseObject> object =
+      createUnique(obj_name, name, parameters, tid, print_deprecated);
 
-  // Pointer to the object constructor
-  std::map<std::string, buildPtr>::iterator it = _name_to_build_pointer.find(obj_name);
-
-  // Check if the object is registered
-  if (it == _name_to_build_pointer.end())
-    reportUnregisteredError(obj_name);
-
-  // Print out deprecated message, if it exists
-  deprecatedMessage(obj_name);
-
-  // Create the actual parameters object that the object will reference
-  InputParameters & params =
-      _app.getInputParameterWarehouse().addInputParameters(name, parameters, tid);
-
-  // Set the _type parameter
-  params.set<std::string>("_type") = obj_name;
-
-  // Check to make sure that all required parameters are supplied
-  params.checkParams(name);
-
-  // register type name as constructed
-  _constructed_types.insert(obj_name);
-
-  // add FEProblem pointers to object's params object
-  if (_app.actionWarehouse().problemBase())
-    _app.actionWarehouse().problemBase()->setInputParametersFEProblem(params);
-
-  // call the function pointer to build the object
-  buildPtr & func = it->second;
-  auto obj = (*func)(params);
-
-  auto fep = std::dynamic_pointer_cast<FEProblemBase>(obj);
-  if (fep)
+  if (auto fep = std::dynamic_pointer_cast<FEProblemBase>(object))
     _app.actionWarehouse().problemBase() = fep;
 
-  // Make sure no unexpected parameters were added by the object's constructor or by the action
-  // initiating this create call.  All parameters modified by the constructor must have already
-  // been specified in the object's validParams function.
-  InputParameters orig_params = getValidParams(obj_name);
-  if (orig_params.n_parameters() != parameters.n_parameters())
-  {
-    std::set<std::string> orig, populated;
-    for (const auto & it : orig_params)
-      orig.emplace(it.first);
-    for (const auto & it : parameters)
-      populated.emplace(it.first);
-
-    std::set<std::string> diff;
-    std::set_difference(populated.begin(),
-                        populated.end(),
-                        orig.begin(),
-                        orig.end(),
-                        std::inserter(diff, diff.begin()));
-
-    if (!diff.empty())
-    {
-      std::stringstream ss;
-      for (const auto & name : diff)
-        ss << ", " << name;
-      mooseError("attempted to set unregistered parameter(s) for ",
-                 obj_name,
-                 " object:\n    ",
-                 ss.str().substr(2));
-    }
-  }
-
-  return obj;
+  return object;
 }
 
 void
 Factory::releaseSharedObjects(const MooseObject & moose_object, THREAD_ID tid)
 {
-  _app.getInputParameterWarehouse().removeInputParameters(moose_object, tid);
+  _app.getInputParameterWarehouse().removeInputParameters(moose_object, tid, {});
 }
 
 void
@@ -197,13 +158,22 @@ Factory::parseTime(const std::string t_str)
 }
 
 void
-Factory::deprecatedMessage(const std::string obj_name)
+Factory::deprecatedMessage(const std::string obj_name) const
 {
-  std::map<std::string, std::time_t>::iterator time_it = _deprecated_time.find(obj_name);
+  const auto time_it = _deprecated_time.find(obj_name);
 
   // If the object is not deprecated return
   if (time_it == _deprecated_time.end())
     return;
+
+  // If the message has already been printed, return
+  if (_deprecated_types.count(obj_name))
+    return;
+  _deprecated_types.emplace(obj_name);
+
+  // We dont need a backtrace on this, this is user-facing
+  const auto current_show_trace = Moose::show_trace;
+  Moose::show_trace = false;
 
   // Get the current time
   std::time_t now;
@@ -215,7 +185,7 @@ Factory::deprecatedMessage(const std::string obj_name)
   // Message storage
   std::ostringstream msg;
 
-  std::map<std::string, std::string>::iterator name_it = _deprecated_name.find(obj_name);
+  const auto name_it = _deprecated_name.find(obj_name);
 
   // Expired object
   if (now > t_end)
@@ -223,7 +193,7 @@ Factory::deprecatedMessage(const std::string obj_name)
     msg << "***** Invalid Object: " << obj_name << " *****\n";
     msg << "Expired on " << ctime(&t_end);
 
-    // Append replacement object, if it exsits
+    // Append replacement object, if it exists
     if (name_it != _deprecated_name.end())
       msg << "Update your application using the '" << name_it->second << "' object";
 
@@ -238,13 +208,14 @@ Factory::deprecatedMessage(const std::string obj_name)
     msg << "Deprecated Object: " << obj_name << "\n";
     msg << "This object will be removed on " << ctime(&t_end);
 
-    // Append replacement object, if it exsits
+    // Append replacement object, if it exists
     if (name_it != _deprecated_name.end())
       msg << "Replace " << obj_name << " with " << name_it->second;
 
     // Produce the error message
     mooseDeprecated(msg.str());
   }
+  Moose::show_trace = current_show_trace;
 }
 
 void
@@ -263,7 +234,7 @@ Factory::reportUnregisteredError(const std::string & obj_name) const
     oss << '\n';
   }
 
-  oss << "\nIf you are trying to find this object in a dynamically linked library, make sure that\n"
+  oss << "\nIf you are trying to find this object in a dynamically loaded library, make sure that\n"
          "the library can be found either in your \"Problem/library_path\" parameter or in the\n"
          "MOOSE_LIBRARY_PATH environment variable.";
 
@@ -277,6 +248,12 @@ Factory::getConstructedObjects() const
   for (const auto & name : _constructed_types)
     list.push_back(name);
   return list;
+}
+
+const InputParameters *
+Factory::currentlyConstructing() const
+{
+  return _currently_constructing.size() ? _currently_constructing.back() : nullptr;
 }
 
 FileLineInfo
@@ -299,4 +276,81 @@ Factory::associatedClassName(const std::string & name) const
     return "";
   else
     return it->second;
+}
+
+InputParameters &
+Factory::initialize(const std::string & type,
+                    const std::string & name,
+                    const InputParameters & from_params,
+                    const THREAD_ID tid)
+{
+  // Pointer to the object constructor
+  const auto it = _name_to_object.find(type);
+
+  // Check if the object is registered
+  if (it == _name_to_object.end())
+    reportUnregisteredError(type);
+
+  // Print out deprecated message, if it exists
+  deprecatedMessage(type);
+
+  // Create the actual parameters object that the object will reference
+  InputParameters & params =
+      _app.getInputParameterWarehouse().addInputParameters(name, from_params, tid, {});
+
+  // Add the hit node from the action if it isn't set already (it might be set
+  // already because someone had a better option than just the action)
+  // If it isn't set, it typically means that this object was created by a
+  // non-MooseObjectAction Action
+  if (!params.getHitNode() || params.getHitNode()->isRoot())
+    if (const auto hit_node = _app.getCurrentActionHitNode())
+      params.setHitNode(*hit_node, {});
+
+  // Set the _type parameter
+  params.set<std::string>("_type") = type;
+
+  // Check to make sure that all required parameters are supplied
+  params.finalize(name);
+
+  // register type name as constructed
+  _constructed_types.insert(type);
+
+  // add FEProblem pointers to object's params object
+  if (_app.actionWarehouse().problemBase())
+    _app.actionWarehouse().problemBase()->setInputParametersFEProblem(params);
+
+  return params;
+}
+
+void
+Factory::finalize(const std::string & type, const MooseObject & object)
+{
+  // Make sure no unexpected parameters were added by the object's constructor or by the action
+  // initiating this create call.  All parameters modified by the constructor must have already
+  // been specified in the object's validParams function.
+  InputParameters orig_params = getValidParams(type);
+  const auto & object_params = object.parameters();
+  if (orig_params.n_parameters() != object_params.n_parameters())
+  {
+    std::set<std::string> orig, populated;
+    for (const auto & it : orig_params)
+      orig.emplace(it.first);
+    for (const auto & it : object_params)
+      populated.emplace(it.first);
+
+    std::set<std::string> diff;
+    std::set_difference(populated.begin(),
+                        populated.end(),
+                        orig.begin(),
+                        orig.end(),
+                        std::inserter(diff, diff.begin()));
+
+    if (!diff.empty())
+    {
+      std::stringstream ss;
+      for (const auto & name : diff)
+        ss << ", " << name;
+      object.mooseError("Attempted to set unregistered parameter(s):\n    ", ss.str().substr(2));
+    }
+  }
 }

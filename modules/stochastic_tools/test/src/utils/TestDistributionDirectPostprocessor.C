@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,7 +39,7 @@ TestDistributionDirectPostprocessor::TestDistributionDirectPostprocessor(
 }
 
 PostprocessorValue
-TestDistributionDirectPostprocessor::getValue()
+TestDistributionDirectPostprocessor::getValue() const
 {
   if (_distribution_method == "pdf")
     return _distribution.pdf(_value, _mean, _std_dev);

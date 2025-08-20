@@ -200,9 +200,9 @@ $\left( -\kappa_i \nabla^2 c_i +  \frac{\partial f_{loc}}{\partial c_i} + \frac{
 ## See also
 
 - [Phase Field FAQ](FAQ.md) - Frequently asked questions for MOOSE phase-field models.
-- [Actions](phase_field/Actions.md) - Simplify the setup of of the phase field equations using MOOSE actions
+- [Actions](phase_field/Actions.md) - Simplify the setup of the phase field equations using MOOSE actions
 - [Free Energy Materials](FunctionMaterials/FreeEnergy.md) - The key component in the modular free energy phase field modeling approach. This page lists the available function materials and explains how to define a free energy function and combine multiple free energy contributions (including elastic energy) into a total free energy.
 - [Function Material Kernels](FunctionMaterialKernels.md) - Kernels which utilize free energy densities provides by Function Material. These are the recommended phase field kernels.
 - [ExpressionBuilder](FunctionMaterials/ExpressionBuilder.md) - Use automatic differentiation with Free energies defined in the C++ code.
 - [Multi-Phase Models](MultiPhase/WBM.md) - Combine multiple single phase free energies into multiphase field models using these tools.
-- [Mechanics Coupling](Mechanics_Coupling.md) - Free energies can also be combined with the deformation energy calculated using the Tensor Mechanics module.
+- [Mechanics Coupling](Mechanics_Coupling.md) - Free energies can also be combined with the deformation energy calculated using the solid mechanics module.

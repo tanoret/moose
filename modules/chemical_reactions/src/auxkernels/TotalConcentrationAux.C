@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,6 +18,7 @@ TotalConcentrationAux::validParams()
   params.addCoupledVar("primary_species", "Primary species free concentration");
   params.addParam<std::vector<Real>>(
       "sto_v",
+      {},
       "The stoichiometric coefficient of primary species in secondary equilibrium species");
   params.addCoupledVar("v",
                        "Secondary equilibrium species in which the primary species is involved");

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -67,16 +67,7 @@ protected:
   /// The worn-out depth due to Archard's law (Aux Kernel computed value)
   Real _worn_depth;
 
-  /// Worn-out depth for this step.
-  Real _worn_out_depth_dt;
-
   /// The gap velocity vector at the current quadrature point, used when we are not interpolating the normal
   /// vector, multipled by JxW
   RealVectorValue _qp_gap_velocity_nodal;
-
-  /// The current test function index
-  unsigned int _i;
-
-  /// The current quadrature point index
-  unsigned int _qp;
 };

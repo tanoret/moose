@@ -91,7 +91,7 @@ where the polyline coordinates and weighting are defined in the following [Const
 
 !listing modules/porous_flow/test/tests/dirackernels/pls02reporter.i block=Reporters
 
-Reporter input provides an easy way to control polyline sink point locations from a [Sampler](Samplers/index.md) multi-app.  
+Reporter input provides an easy way to control polyline sink point locations from a [Sampler](Samplers/index.md) multi-app.
 It is an error to supply both plaint text file and reporter input for the point data.
 
 Rather than manually specifying each point via the separate points file or reporter, the second input format allows the
@@ -160,7 +160,7 @@ For instance:
 
 !listing modules/porous_flow/test/tests/dirackernels/pls02.i block=DiracKernels
 
-The `PorousFlowPolylineSink` is always accompanied by a [`PorousFlowSumQuantity`](PorousFlowSumQuantity.md) UserObject and often by a [`PorousFlowPlotQuantity`](PorousFlowPlotQuantity.md) Postprocessor
+The `PorousFlowPolyLineSink` is always accompanied by a [`PorousFlowSumQuantity`](PorousFlowSumQuantity.md) UserObject and often by a [`PorousFlowPlotQuantity`](PorousFlowPlotQuantity.md) Postprocessor
 
 !listing modules/porous_flow/test/tests/dirackernels/pls02.i start=[pls_total_outflow_mass] end=[dictator]
 
@@ -179,7 +179,7 @@ $L_{\mathrm{seg}}$ is already handled by [eq:pls], and the other terms of $C$ wi
 into the piecewise linear function, $L$.  Three standard types of $L$ are used in groundwater models.
 
 - A perennial stream, where fluid can seep from the porespace to the stream, and vice versa.  Then $L = (C/L_{\mathrm{seg}})(P - P_{\mathrm{atm}})$, where $P_{\mathrm{atm}}$ involves the river stage height;
-- An ephemral stream, where fluid can only seep from the porespace to the stream, but not viceversa
+- An ephemeral stream, where fluid can only seep from the porespace to the stream, but not vice versa
   has $L = (C/L_{\mathrm{seg}}) (P-P_{\mathrm{atm}})$ if $P>P_{\mathrm{atm}}$, and zero otherwise.  This is a pure
   sink since $s>0$ always;
 - A rate-limited stream, where fluid can exchange between the groundwater and stream, but the rate is
@@ -316,7 +316,7 @@ Bottomhole pressure, $P_{\mathrm{bot}}$ | 0 |
 Gravity | 0 |
 Unit fluid weight | 0 |
 Element size | $2\times 2\times 2\,$m$^{3}$ |
-Isotropoic permeability | $10^{-12}\,$m$^{2}$ |
+Isotropic permeability | $10^{-12}\,$m$^{2}$ |
 Fluid reference density | 1000 kg.m$^{-3}$ |
 Fluid bulk modulus | 2 GPa |
 Fluid viscosity | $10^{-3}\,$Pa.s |
@@ -378,7 +378,7 @@ Each of these record the total fluid flux (kg) injected by or produced by the bo
 
 ### Reproducing the steady-state 2D analytical solution
 
-The PorousFlow fluid equation (see [governing equations](governing_equations.md)) for a fully-saturated medium with $\rho \propto
+The PorousFlow fluid equation (see [governing equations](porous_flow/governing_equations.md)) for a fully-saturated medium with $\rho \propto
 \exp(P/B)$ and large constant bulk modulus $B$ becomes Darcy's equation
 \begin{equation}
 \frac{\partial}{\partial t}\rho =  \nabla_{i}\alpha_{ij}\nabla_{j}\rho

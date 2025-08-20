@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,9 +34,6 @@ protected:
    */
   std::set<boundary_id_type> _mesh_boundary_ids;
 
-  /// the input mesh to which the sidesets will be added
-  std::unique_ptr<MeshBase> & _input;
-
-  /// Mesh meta data for holding the map from boundary IDs to the normals of the corresponding bounrares
+  /// Mesh meta data for holding the map from boundary IDs to the normals of the corresponding boundaries
   std::map<BoundaryID, RealVectorValue> & _boundary_to_normal_map;
 };

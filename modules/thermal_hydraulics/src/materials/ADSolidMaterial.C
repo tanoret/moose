@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,12 +10,13 @@
 #include "ADSolidMaterial.h"
 #include "HeatConductionModel.h"
 
-registerMooseObject("ThermalHydraulicsApp", ADSolidMaterial);
+registerMooseObjectDeprecated("ThermalHydraulicsApp", ADSolidMaterial, "04/31/2024 24:00");
 
 InputParameters
 ADSolidMaterial::validParams()
 {
   InputParameters params = Material::validParams();
+  params.addClassDescription("Computes solid thermal properties as a function of temperature");
   // Coupled variables
   params.addRequiredCoupledVar("T", "Temperature in the solid");
 
@@ -32,6 +33,9 @@ ADSolidMaterial::ADSolidMaterial(const InputParameters & parameters)
     _temp(adCoupledValue("T")),
     _props(getUserObject<SolidMaterialProperties>("properties"))
 {
+  mooseDeprecated(
+      "Heat structure materials are deprecated in favor of SolidProperties objects, so this "
+      "Material should no longer be used. See heat structure documentation for more information.");
 }
 
 void

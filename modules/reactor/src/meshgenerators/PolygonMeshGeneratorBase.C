@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,8 +9,12 @@
 
 #include "PolygonMeshGeneratorBase.h"
 #include "MooseUtils.h"
+#include "FormattedTable.h"
 
 #include <cmath>
+#include <iomanip>
+
+using namespace libMesh;
 
 InputParameters
 PolygonMeshGeneratorBase::validParams()
@@ -59,7 +63,8 @@ PolygonMeshGeneratorBase::buildGeneralSlice(
     const unsigned int side_index,
     const bool quad_center_elements,
     const Real center_quad_factor,
-    const Real rotation_angle)
+    const Real rotation_angle,
+    const bool generate_side_specific_boundaries)
 {
   const Real virtual_pitch = 2.0 * primary_side_length * cos(azimuthal_angle / 360.0 * M_PI);
   const Real virtual_side_number = 360.0 / azimuthal_angle;
@@ -88,9 +93,11 @@ PolygonMeshGeneratorBase::buildGeneralSlice(
                          0,
                          quad_center_elements,
                          center_quad_factor,
+                         false,
                          true,
                          0,
-                         pitch_scale_factor);
+                         pitch_scale_factor,
+                         generate_side_specific_boundaries);
   MeshTools::Modification::rotate(*mesh, rotation_angle, 0, 0);
   return mesh;
 }
@@ -120,10 +127,13 @@ PolygonMeshGeneratorBase::buildSimpleSlice(
     const subdomain_id_type block_id_shift,
     const bool quad_center_elements,
     const Real center_quad_factor,
-    const bool create_interface_boundaries,
-    const boundary_id_type boundary_id_shift)
+    const bool create_inward_interface_boundaries,
+    const bool create_outward_interface_boundaries,
+    const boundary_id_type boundary_id_shift,
+    const bool generate_side_specific_boundaries,
+    const TRI_ELEM_TYPE tri_elem_type,
+    const QUAD_ELEM_TYPE quad_elem_type)
 {
-
   return buildSlice(ring_radii,
                     ring_layers,
                     ring_radial_biases,
@@ -147,9 +157,13 @@ PolygonMeshGeneratorBase::buildSimpleSlice(
                     block_id_shift,
                     quad_center_elements,
                     center_quad_factor,
-                    create_interface_boundaries,
+                    create_inward_interface_boundaries,
+                    create_outward_interface_boundaries,
                     boundary_id_shift,
-                    1.0);
+                    1.0,
+                    generate_side_specific_boundaries,
+                    tri_elem_type,
+                    quad_elem_type);
 }
 
 std::unique_ptr<ReplicatedMesh>
@@ -177,12 +191,70 @@ PolygonMeshGeneratorBase::buildSlice(
     const subdomain_id_type block_id_shift,
     const bool quad_center_elements,
     const Real center_quad_factor,
-    const bool create_interface_boundaries,
+    const bool create_inward_interface_boundaries,
+    const bool create_outward_interface_boundaries,
     const boundary_id_type boundary_id_shift,
-    const Real pitch_scale_factor)
+    const Real pitch_scale_factor,
+    const bool generate_side_specific_boundaries,
+    const TRI_ELEM_TYPE tri_elem_type,
+    const QUAD_ELEM_TYPE quad_elem_type)
 {
+  const unsigned short order = quad_elem_type == QUAD_ELEM_TYPE::QUAD4 ? 1 : 2;
+  if (order != (tri_elem_type == TRI_ELEM_TYPE::TRI3 ? 1 : 2))
+    mooseError("In mesh generator ",
+               this->name(),
+               ", an incompatible elements type combination is used when calling "
+               "PolygonMeshGeneratorBase::buildSlice().");
+  // In order to create quadratic elements (i.e., order = 2), we creates nodes with double mesh
+  // density. Thus, the related parameters need to be modified accordingly. A prefix "mod_" is used
+  // to indicate the modified parameters.
+
+  // For ring_layers, modification is to double the number of layers for order = 2
+  std::vector<unsigned int> mod_ring_layers(ring_layers);
+  std::for_each(
+      mod_ring_layers.begin(), mod_ring_layers.end(), [&order](unsigned int & n) { n *= order; });
+  // For ring_radial_biases, modification is to take the square root of the original biases for
+  // order = 2
+  std::vector<Real> mod_ring_radial_biases(ring_radial_biases);
+  std::for_each(mod_ring_radial_biases.begin(),
+                mod_ring_radial_biases.end(),
+                [&order](Real & n) { n = std::pow(n, 1.0 / order); });
+  // ducts_layers is similar to ring_layers
+  std::vector<unsigned int> mod_ducts_layers(ducts_layers);
+  std::for_each(
+      mod_ducts_layers.begin(), mod_ducts_layers.end(), [&order](unsigned int & n) { n *= order; });
+  // duct_radial_biases is similar to ring_radial_biases
+  std::vector<Real> mod_duct_radial_biases(duct_radial_biases);
+  std::for_each(mod_duct_radial_biases.begin(),
+                mod_duct_radial_biases.end(),
+                [&order](Real & n) { n = std::pow(n, 1.0 / order); });
+  // Azimuthal mesh density is also doubled for order = 2
+  const unsigned int mod_num_sectors_per_side = num_sectors_per_side * order;
+  const unsigned int mod_background_intervals = background_intervals * order;
+  // background_radial_bias is similar to ring_radial_biases
+  const Real mod_background_radial_bias = std::pow(background_radial_bias, 1.0 / order);
+  // Perform similar modifications for boundary layer parameters
+  const auto mod_ring_inner_boundary_layer_params =
+      modifiedMultiBdryLayerParamsCreator(ring_inner_boundary_layer_params, order);
+  const auto mod_ring_outer_boundary_layer_params =
+      modifiedMultiBdryLayerParamsCreator(ring_outer_boundary_layer_params, order);
+  const auto mod_duct_inner_boundary_layer_params =
+      modifiedMultiBdryLayerParamsCreator(duct_inner_boundary_layer_params, order);
+  const auto mod_duct_outer_boundary_layer_params =
+      modifiedMultiBdryLayerParamsCreator(duct_outer_boundary_layer_params, order);
+
+  const auto mod_background_inner_boundary_layer_params =
+      modifiedSingleBdryLayerParamsCreator(background_inner_boundary_layer_params, order);
+  const auto mod_background_outer_boundary_layer_params =
+      modifiedSingleBdryLayerParamsCreator(background_outer_boundary_layer_params, order);
+
+  // The distance parameters of the rings and duct need to be modified too as they may be involved
+  // in the boundary layer cases.
+  std::vector<Real> mod_ducts_center_dist(ducts_center_dist);
+  std::vector<Real> mod_ring_radii(ring_radii);
   bool has_rings(ring_radii.size());
   bool has_ducts(ducts_center_dist.size());
+  bool has_background(background_intervals);
   auto mesh = buildReplicatedMesh(2);
 
   // Calculate biasing terms
@@ -203,6 +275,23 @@ PolygonMeshGeneratorBase::buildSlice(
                                              ducts_layers,
                                              duct_inner_boundary_layer_params,
                                              duct_outer_boundary_layer_params);
+  // Equivalent "mod_" parts
+  const auto mod_main_background_bias_terms =
+      biasTermsCalculator(mod_background_radial_bias, mod_background_intervals);
+  const auto mod_inner_background_bias_terms =
+      biasTermsCalculator(mod_background_inner_boundary_layer_params.bias,
+                          mod_background_inner_boundary_layer_params.intervals);
+  const auto mod_outer_background_bias_terms =
+      biasTermsCalculator(mod_background_outer_boundary_layer_params.bias,
+                          mod_background_outer_boundary_layer_params.intervals);
+  auto mod_rings_bias_terms = biasTermsCalculator(mod_ring_radial_biases,
+                                                  mod_ring_layers,
+                                                  mod_ring_inner_boundary_layer_params,
+                                                  mod_ring_outer_boundary_layer_params);
+  auto mod_duct_bias_terms = biasTermsCalculator(mod_duct_radial_biases,
+                                                 mod_ducts_layers,
+                                                 mod_duct_inner_boundary_layer_params,
+                                                 mod_duct_outer_boundary_layer_params);
 
   std::vector<unsigned int> total_ring_layers;
   for (unsigned int i = 0; i < ring_layers.size(); i++)
@@ -213,8 +302,23 @@ PolygonMeshGeneratorBase::buildSlice(
   {
     total_ring_layers.push_back(background_inner_boundary_layer_params.intervals);
     rings_bias_terms.push_back(inner_background_bias_terms);
-    ring_radii.push_back(ring_radii.back() + background_inner_boundary_layer_params.width);
+    ring_radii.push_back((ring_radii.empty() ? 0.0 : ring_radii.back()) +
+                         background_inner_boundary_layer_params.width);
     has_rings = true;
+  }
+  std::vector<unsigned int> mod_total_ring_layers;
+  for (unsigned int i = 0; i < mod_ring_layers.size(); i++)
+    mod_total_ring_layers.push_back(mod_ring_layers[i] +
+                                    mod_ring_inner_boundary_layer_params.intervals[i] +
+                                    mod_ring_outer_boundary_layer_params.intervals[i]);
+
+  if (mod_background_inner_boundary_layer_params.intervals)
+  {
+    mod_total_ring_layers.push_back(mod_background_inner_boundary_layer_params.intervals);
+    mod_rings_bias_terms.push_back(mod_inner_background_bias_terms);
+    mod_ring_radii.push_back((mod_ring_radii.empty() ? 0.0 : mod_ring_radii.back()) +
+                             mod_background_inner_boundary_layer_params.width);
+    // has_rings should be modified before in the none "mod_" part
   }
 
   std::vector<unsigned int> total_ducts_layers;
@@ -223,7 +327,9 @@ PolygonMeshGeneratorBase::buildSlice(
     total_ducts_layers.push_back(background_outer_boundary_layer_params.intervals);
     duct_bias_terms.insert(duct_bias_terms.begin(), outer_background_bias_terms);
     ducts_center_dist.insert(ducts_center_dist.begin(),
-                             ducts_center_dist.front() -
+                             (ducts_center_dist.empty()
+                                  ? pitch / 2.0 / std::cos(M_PI / virtual_side_number)
+                                  : ducts_center_dist.front()) -
                                  background_outer_boundary_layer_params.width);
     has_ducts = true;
   }
@@ -231,8 +337,28 @@ PolygonMeshGeneratorBase::buildSlice(
     total_ducts_layers.push_back(ducts_layers[i] + duct_inner_boundary_layer_params.intervals[i] +
                                  duct_outer_boundary_layer_params.intervals[i]);
 
-  unsigned int angle_number =
-      azimuthal_tangent.size() == 0 ? num_sectors_per_side : (azimuthal_tangent.size() - 1);
+  std::vector<unsigned int> mod_total_ducts_layers;
+  if (mod_background_outer_boundary_layer_params.intervals)
+  {
+    mod_total_ducts_layers.push_back(mod_background_outer_boundary_layer_params.intervals);
+    mod_duct_bias_terms.insert(mod_duct_bias_terms.begin(), mod_outer_background_bias_terms);
+    mod_ducts_center_dist.insert(mod_ducts_center_dist.begin(),
+                                 (mod_ducts_center_dist.empty()
+                                      ? pitch / 2.0 / std::cos(M_PI / virtual_side_number)
+                                      : mod_ducts_center_dist.front()) -
+                                     mod_background_outer_boundary_layer_params.width);
+    // has_ducts should be modified before in the none "mod_" part
+  }
+  for (unsigned int i = 0; i < mod_ducts_layers.size(); i++)
+    mod_total_ducts_layers.push_back(mod_ducts_layers[i] +
+                                     mod_duct_inner_boundary_layer_params.intervals[i] +
+                                     mod_duct_outer_boundary_layer_params.intervals[i]);
+
+  unsigned int angle_number = azimuthal_tangent.size() == 0
+                                  ? num_sectors_per_side
+                                  : ((azimuthal_tangent.size() - 1) / order);
+  unsigned int mod_angle_number =
+      azimuthal_tangent.size() == 0 ? mod_num_sectors_per_side : (azimuthal_tangent.size() - 1);
 
   // Geometries
   const Real corner_to_corner =
@@ -242,23 +368,28 @@ PolygonMeshGeneratorBase::buildSlice(
       {0.5 * corner_to_corner * pitch_scale_factor * std::sin(2.0 * M_PI / virtual_side_number),
        0.5 * corner_to_corner * pitch_scale_factor * std::cos(2.0 * M_PI / virtual_side_number)}};
   const unsigned int div_num = angle_number / 2 + 1;
-  std::vector<std::vector<Node *>> nodes(div_num, std::vector<Node *>(div_num));
+  const unsigned int mod_div_num = mod_angle_number / 2 + 1;
+
+  // From now on, we work on the nodes, which need the "mod_" parameters
+  std::vector<std::vector<Node *>> nodes(mod_div_num, std::vector<Node *>(mod_div_num));
   if (quad_center_elements)
   {
     Real ring_radii_0;
 
     if (has_rings)
-      ring_radii_0 = ring_radii.front() * rings_bias_terms.front().front();
+      ring_radii_0 = ring_radii.front() * mod_rings_bias_terms.front()[order - 1];
     else if (has_ducts)
-      ring_radii_0 = ducts_center_dist.front() * std::cos(M_PI / virtual_side_number) *
-                     main_background_bias_terms.front();
+      ring_radii_0 = mod_ducts_center_dist.front() * std::cos(M_PI / virtual_side_number) *
+                     mod_main_background_bias_terms[order - 1];
     else
-      ring_radii_0 = pitch / 2.0 * main_background_bias_terms.front();
+      ring_radii_0 = pitch / 2.0 * mod_main_background_bias_terms[order - 1];
     // If center_quad_factor is zero, default value (div_num - 1)/div_num  is used.
+    // We use div_num instead of mod_div_num because we are dealing wth elements here
+    // This approach ensures that the order = 2 mesh elements are consistent with the order = 1
     ring_radii_0 *=
         center_quad_factor == 0.0 ? (((Real)div_num - 1.0) / (Real)div_num) : center_quad_factor;
 
-    centerNodes(*mesh, virtual_side_number, div_num, ring_radii_0, nodes);
+    centerNodes(*mesh, virtual_side_number, mod_div_num, ring_radii_0, nodes);
   }
   else // pin-cell center
     mesh->add_point(Point(0.0, 0.0, 0.0));
@@ -267,86 +398,126 @@ PolygonMeshGeneratorBase::buildSlice(
   if (has_rings)
     ringNodes(*mesh,
               ring_radii,
-              total_ring_layers,
-              rings_bias_terms,
-              num_sectors_per_side,
+              mod_total_ring_layers,
+              mod_rings_bias_terms,
+              mod_num_sectors_per_side,
               corner_p,
               corner_to_corner,
               azimuthal_tangent);
 
-  // add nodes in background region; the background region is defined as the area between the
-  // outermost pin (if there is a pin; if no pin, the center) and the innermost hex/duct; if
-  // _has_ducts is false, the background region is the area between the pin and enclosing hexagon
-  Real background_corner_radial_interval_length;
-  Real background_corner_distance;
-  Real background_in;
-  Real background_out; // background outer frontier
-  if (has_rings)
-    background_in = ring_radii.back();
-  else
-    background_in = 0;
-
-  if (has_ducts)
+  if (has_background)
   {
-    background_out = ducts_center_dist.front();
-    background_corner_distance =
-        ducts_center_dist.front(); // it is the center to duct (innermost duct) corner distance
+    // add nodes in background region; the background region is defined as the area between the
+    // outermost pin (if there is a pin; if no pin, the center) and the innermost hex/duct; if
+    // _has_ducts is false, the background region is the area between the pin and enclosing hexagon
+    Real background_corner_radial_interval_length;
+    Real background_corner_distance;
+    Real background_in;
+    Real background_out; // background outer frontier
+    if (has_rings)
+      background_in = ring_radii.back();
+    else
+      background_in = 0;
+
+    if (has_ducts)
+    {
+      background_out = mod_ducts_center_dist.front();
+      background_corner_distance =
+          mod_ducts_center_dist
+              .front(); // it is the center to duct (innermost duct) corner distance
+    }
+    else
+    {
+      background_out = 0.5 * corner_to_corner;
+      background_corner_distance =
+          0.5 * corner_to_corner; // it is the center to hex corner distance
+    }
+
+    background_corner_radial_interval_length =
+        (background_out - background_in) / mod_background_intervals;
+
+    node_id_background_meta = mesh->n_nodes();
+
+    // create nodes for background region
+    backgroundNodes(*mesh,
+                    mod_num_sectors_per_side,
+                    mod_background_intervals,
+                    mod_main_background_bias_terms,
+                    background_corner_distance,
+                    background_corner_radial_interval_length,
+                    corner_p,
+                    corner_to_corner,
+                    background_in,
+                    azimuthal_tangent);
   }
-  else
-  {
-    background_out = 0.5 * corner_to_corner;
-    background_corner_distance = 0.5 * corner_to_corner; // it is the center to hex corner distance
-  }
-
-  background_corner_radial_interval_length =
-      (background_out - background_in) / background_intervals;
-
-  node_id_background_meta = mesh->n_nodes();
-
-  // create nodes for background region
-  backgroundNodes(*mesh,
-                  num_sectors_per_side,
-                  background_intervals,
-                  main_background_bias_terms,
-                  background_corner_distance,
-                  background_corner_radial_interval_length,
-                  corner_p,
-                  corner_to_corner,
-                  background_in,
-                  azimuthal_tangent);
 
   // create nodes for duct regions
   if (has_ducts)
     ductNodes(*mesh,
-              &ducts_center_dist,
-              total_ducts_layers,
-              duct_bias_terms,
-              num_sectors_per_side,
+              &mod_ducts_center_dist,
+              mod_total_ducts_layers,
+              mod_duct_bias_terms,
+              mod_num_sectors_per_side,
               corner_p,
               corner_to_corner,
               azimuthal_tangent);
 
+  // See if the central region is the only part of the innermost part
+  // The central region of the slice is special.
+  // Unlike the outer regions, which are layered quad elements,
+  // the central region is either a layer of tri elements or a specially-patterned quad elements.
+  // If there is at least one `ring` defined in the slice,
+  // the central region must belong to the innermost (first) ring.
+  // Otherwise the central region belongs to the `background`
+  // In either case, if the innermost ring or background has only one radial interval,
+  // the central region is an independent ring or background
+  // Otherwise, the central region and one or several quad element layers together form the
+  // innermost ring or background
+  bool is_central_region_independent;
+  if (ring_layers.empty())
+    is_central_region_independent = mod_background_inner_boundary_layer_params.intervals +
+                                        mod_background_intervals +
+                                        mod_background_outer_boundary_layer_params.intervals ==
+                                    1;
+  else
+    is_central_region_independent = mod_ring_layers[0] +
+                                        mod_ring_inner_boundary_layer_params.intervals[0] +
+                                        mod_ring_outer_boundary_layer_params.intervals[0] ==
+                                    1;
+
+  // From now on, we work on the elements, which need the none "mod_" parameters
   // Assign elements, boundaries, and subdomains;
-  // Add Tri3 or Quad4 mesh into innermost (central) region
+  // Add Tri3/Tri6/Tri7 or Quad4/Quad8/Quad9 mesh into innermost (central) region
   if (quad_center_elements)
     cenQuadElemDef(*mesh,
                    div_num,
                    block_id_shift,
-                   create_interface_boundaries,
+                   create_outward_interface_boundaries && is_central_region_independent,
                    boundary_id_shift,
                    nodes,
                    (!has_rings) && (!has_ducts) && (background_intervals == 1),
-                   side_index);
+                   // Note here, has_ring means either there are ring regions or background inner
+                   // boundary layer; has_ducts means either there are duct regions or background
+                   // outer boundary layer. Same in cenTriElemDef()
+                   side_index,
+                   generate_side_specific_boundaries,
+                   quad_elem_type);
   else
-    cenTriElemDef(*mesh,
-                  num_sectors_per_side,
-                  azimuthal_tangent,
-                  block_id_shift,
-                  create_interface_boundaries ||
-                      ((!has_rings) && (!has_ducts) && (background_intervals == 1)),
-                  boundary_id_shift,
-                  (!has_rings) && (!has_ducts) && (background_intervals == 1),
-                  side_index);
+    cenTriElemDef(
+        *mesh,
+        num_sectors_per_side,
+        azimuthal_tangent,
+        block_id_shift,
+        create_outward_interface_boundaries && is_central_region_independent,
+        boundary_id_shift,
+        ((!has_rings) && (!has_ducts) && (background_intervals == 1)) ||
+            ((!has_background) &&
+             (std::accumulate(total_ring_layers.begin(), total_ring_layers.end(), 0) == 1)),
+        // Only for ACCG, it is possible that the entire mesh is a single-layer ring.
+        // cenQuadElemDef() does not need this as it does not work for ACCG.
+        side_index,
+        generate_side_specific_boundaries,
+        tri_elem_type);
 
   // Add Quad4 mesh into outer circle
   // total number of mesh should be all the rings for pin regions + background regions;
@@ -354,16 +525,19 @@ PolygonMeshGeneratorBase::buildSlice(
   // tri/quad mesh has been added above)
 
   std::vector<unsigned int> subdomain_rings;
-
   if (has_rings) //  define the rings in each subdomain
   {
     subdomain_rings = total_ring_layers;
-    subdomain_rings.front() = subdomain_rings.front() - 1; // remove the inner TRI mesh subdomain
+    subdomain_rings.front() -= 1; // remove the inner TRI mesh subdomain
     if (background_inner_boundary_layer_params.intervals)
+    {
       subdomain_rings.back() =
           background_inner_boundary_layer_params.intervals + background_intervals +
           background_outer_boundary_layer_params.intervals; // add the background region
-    else
+      if (ring_radii.size() == 1)
+        subdomain_rings.back() -= 1; // remove the inner TRI mesh subdomain
+    }
+    else if (has_background)
       subdomain_rings.push_back(background_inner_boundary_layer_params.intervals +
                                 background_intervals +
                                 background_outer_boundary_layer_params.intervals);
@@ -373,7 +547,7 @@ PolygonMeshGeneratorBase::buildSlice(
     subdomain_rings.push_back(
         background_inner_boundary_layer_params.intervals + background_intervals +
         background_outer_boundary_layer_params.intervals); // add the background region
-    subdomain_rings[0] = subdomain_rings[0] - 1;           // remove the inner TRI mesh subdomain
+    subdomain_rings[0] -= 1;                               // remove the inner TRI mesh subdomain
   }
 
   if (has_ducts)
@@ -388,10 +562,14 @@ PolygonMeshGeneratorBase::buildSlice(
               side_index,
               azimuthal_tangent,
               block_id_shift,
-              quad_center_elements ? (div_num * div_num - 1) : 0,
-              create_interface_boundaries,
-              boundary_id_shift);
-
+              quad_center_elements ? (mod_div_num * mod_div_num - 1) : 0,
+              create_inward_interface_boundaries,
+              create_outward_interface_boundaries,
+              boundary_id_shift,
+              generate_side_specific_boundaries,
+              quad_elem_type);
+  if (tri_elem_type == TRI_ELEM_TYPE::TRI6 || quad_elem_type == QUAD_ELEM_TYPE::QUAD8)
+    mesh->remove_orphaned_nodes();
   return mesh;
 }
 
@@ -675,11 +853,13 @@ void
 PolygonMeshGeneratorBase::cenQuadElemDef(ReplicatedMesh & mesh,
                                          const unsigned int div_num,
                                          const subdomain_id_type block_id_shift,
-                                         const bool create_interface_boundaries,
+                                         const bool create_outward_interface_boundaries,
                                          const boundary_id_type boundary_id_shift,
                                          std::vector<std::vector<Node *>> & nodes,
                                          const bool assign_external_boundary,
-                                         const unsigned int side_index) const
+                                         const unsigned int side_index,
+                                         const bool generate_side_specific_boundaries,
+                                         const QUAD_ELEM_TYPE quad_elem_type) const
 {
 
   BoundaryInfo & boundary_info = mesh.get_boundary_info();
@@ -691,16 +871,40 @@ PolygonMeshGeneratorBase::cenQuadElemDef(ReplicatedMesh & mesh,
     unsigned int id_y = i;
     for (unsigned int j = 0; j < 2 * i + 1; j++)
     {
-      Elem * elem_Quad4 = mesh.add_elem(new Quad4);
-      elem_Quad4->set_node(0) = nodes[id_x][id_y];
-      elem_Quad4->set_node(3) = nodes[id_x][id_y + 1];
-      elem_Quad4->set_node(2) = nodes[id_x + 1][id_y + 1];
-      elem_Quad4->set_node(1) = nodes[id_x + 1][id_y];
-      elem_Quad4->subdomain_id() = 1 + block_id_shift;
+      std::unique_ptr<Elem> new_elem;
+      if (quad_elem_type == QUAD_ELEM_TYPE::QUAD4)
+      {
+        new_elem = std::make_unique<Quad4>();
+        new_elem->set_node(0) = nodes[id_x][id_y];
+        new_elem->set_node(3) = nodes[id_x][id_y + 1];
+        new_elem->set_node(2) = nodes[id_x + 1][id_y + 1];
+        new_elem->set_node(1) = nodes[id_x + 1][id_y];
+        new_elem->subdomain_id() = 1 + block_id_shift;
+      }
+      else // QUAD8/QUAD9
+      {
+        new_elem = std::make_unique<Quad8>();
+        if (quad_elem_type == QUAD_ELEM_TYPE::QUAD9)
+        {
+          new_elem = std::make_unique<Quad9>();
+          new_elem->set_node(8) = nodes[id_x * 2 + 1][id_y * 2 + 1];
+        }
+        new_elem->set_node(0) = nodes[id_x * 2][id_y * 2];
+        new_elem->set_node(3) = nodes[id_x * 2][id_y * 2 + 2];
+        new_elem->set_node(2) = nodes[id_x * 2 + 2][id_y * 2 + 2];
+        new_elem->set_node(1) = nodes[id_x * 2 + 2][id_y * 2];
+        new_elem->set_node(4) = nodes[id_x * 2 + 1][id_y * 2];
+        new_elem->set_node(5) = nodes[id_x * 2 + 2][id_y * 2 + 1];
+        new_elem->set_node(6) = nodes[id_x * 2 + 1][id_y * 2 + 2];
+        new_elem->set_node(7) = nodes[id_x * 2][id_y * 2 + 1];
+        new_elem->subdomain_id() = 1 + block_id_shift;
+      }
+      Elem * elem_Quad = mesh.add_elem(std::move(new_elem));
+
       if (id_x == 0)
-        boundary_info.add_side(elem_Quad4, 3, SLICE_BEGIN);
+        boundary_info.add_side(elem_Quad, 3, SLICE_BEGIN);
       if (id_y == 0)
-        boundary_info.add_side(elem_Quad4, 0, SLICE_END);
+        boundary_info.add_side(elem_Quad, 0, SLICE_END);
       if (j < i)
         id_x++;
       if (j >= i)
@@ -710,23 +914,65 @@ PolygonMeshGeneratorBase::cenQuadElemDef(ReplicatedMesh & mesh,
   // This loop defines the outermost layer quad elements of the central region
   for (unsigned int i = (div_num - 1) * (div_num - 1); i < div_num * div_num - 1; i++)
   {
-    Elem * elem_Quad4 = mesh.add_elem(new Quad4);
-    elem_Quad4->set_node(0) = mesh.node_ptr(i);
-    elem_Quad4->set_node(3) = mesh.node_ptr(i + 2 * div_num - 1);
-    elem_Quad4->set_node(2) = mesh.node_ptr(i + 2 * div_num);
-    elem_Quad4->set_node(1) = mesh.node_ptr(i + 1);
-    elem_Quad4->subdomain_id() = 1 + block_id_shift;
-    if (create_interface_boundaries)
-      boundary_info.add_side(elem_Quad4, 2, 1 + boundary_id_shift);
+    std::unique_ptr<Elem> new_elem;
+    if (quad_elem_type == QUAD_ELEM_TYPE::QUAD4)
+    {
+      new_elem = std::make_unique<Quad4>();
+      new_elem->set_node(0) = mesh.node_ptr(i);
+      new_elem->set_node(3) = mesh.node_ptr(i + 2 * div_num - 1);
+      new_elem->set_node(2) = mesh.node_ptr(i + 2 * div_num);
+      new_elem->set_node(1) = mesh.node_ptr(i + 1);
+    }
+    else // QUAD8/QUAD9
+    {
+      new_elem = std::make_unique<Quad8>();
+      if (quad_elem_type == QUAD_ELEM_TYPE::QUAD9)
+      {
+        new_elem = std::make_unique<Quad9>();
+        new_elem->set_node(8) =
+            mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                          (i - (div_num - 1) * (div_num - 1)) * 2 + 1 + ((div_num - 1) * 4 + 1));
+      }
+      new_elem->set_node(0) = mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                                            (i - (div_num - 1) * (div_num - 1)) * 2);
+      new_elem->set_node(3) =
+          mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                        (i - (div_num - 1) * (div_num - 1)) * 2 + ((div_num - 1) * 4 + 1) * 2);
+      new_elem->set_node(2) =
+          mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                        (i - (div_num - 1) * (div_num - 1)) * 2 + 2 + ((div_num - 1) * 4 + 1) * 2);
+      new_elem->set_node(1) = mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                                            (i - (div_num - 1) * (div_num - 1)) * 2 + 2);
+      new_elem->set_node(4) = mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                                            (i - (div_num - 1) * (div_num - 1)) * 2 + 1);
+      new_elem->set_node(5) =
+          mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                        (i - (div_num - 1) * (div_num - 1)) * 2 + 2 + ((div_num - 1) * 4 + 1));
+      new_elem->set_node(6) =
+          mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                        (i - (div_num - 1) * (div_num - 1)) * 2 + 1 + ((div_num - 1) * 4 + 1) * 2);
+      new_elem->set_node(7) =
+          mesh.node_ptr((div_num - 1) * (div_num - 1) * 4 +
+                        (i - (div_num - 1) * (div_num - 1)) * 2 + ((div_num - 1) * 4 + 1));
+    }
+
+    Elem * elem_Quad = mesh.add_elem(std::move(new_elem));
+    elem_Quad->subdomain_id() = 1 + block_id_shift;
+    if (create_outward_interface_boundaries)
+      boundary_info.add_side(elem_Quad, 2, 1 + boundary_id_shift);
     if (i == (div_num - 1) * (div_num - 1))
-      boundary_info.add_side(elem_Quad4, 3, SLICE_BEGIN);
+      boundary_info.add_side(elem_Quad, 3, SLICE_BEGIN);
     if (i == div_num * div_num - 2)
-      boundary_info.add_side(elem_Quad4, 1, SLICE_END);
+      boundary_info.add_side(elem_Quad, 1, SLICE_END);
     if (assign_external_boundary)
-      boundary_info.add_side(
-          elem_Quad4,
-          2,
-          (i < div_num * (div_num - 1) ? OUTER_SIDESET_ID : OUTER_SIDESET_ID_ALT) + side_index);
+    {
+      boundary_info.add_side(elem_Quad, 2, OUTER_SIDESET_ID);
+      if (generate_side_specific_boundaries)
+        boundary_info.add_side(
+            elem_Quad,
+            2,
+            (i < div_num * (div_num - 1) ? OUTER_SIDESET_ID : OUTER_SIDESET_ID_ALT) + side_index);
+    }
   }
 }
 
@@ -735,31 +981,62 @@ PolygonMeshGeneratorBase::cenTriElemDef(ReplicatedMesh & mesh,
                                         const unsigned int num_sectors_per_side,
                                         const std::vector<Real> azimuthal_tangent,
                                         const subdomain_id_type block_id_shift,
-                                        const bool create_interface_boundaries,
+                                        const bool create_outward_interface_boundaries,
                                         const boundary_id_type boundary_id_shift,
                                         const bool assign_external_boundary,
-                                        const unsigned int side_index) const
+                                        const unsigned int side_index,
+                                        const bool generate_side_specific_boundaries,
+                                        const TRI_ELEM_TYPE tri_elem_type) const
 {
-  unsigned int angle_number =
-      azimuthal_tangent.size() == 0 ? num_sectors_per_side : (azimuthal_tangent.size() - 1);
+  const unsigned short order = tri_elem_type == TRI_ELEM_TYPE::TRI3 ? 1 : 2;
+  unsigned int angle_number = azimuthal_tangent.size() == 0
+                                  ? num_sectors_per_side
+                                  : ((azimuthal_tangent.size() - 1) / order);
 
   BoundaryInfo & boundary_info = mesh.get_boundary_info();
   for (unsigned int i = 1; i <= angle_number; i++)
   {
-    Elem * elem = mesh.add_elem(new Tri3);
-    elem->set_node(0) = mesh.node_ptr(0);
-    elem->set_node(2) = mesh.node_ptr(i);
-    elem->set_node(1) = mesh.node_ptr(i + 1);
-    if (create_interface_boundaries)
+    std::unique_ptr<Elem> new_elem;
+    if (tri_elem_type == TRI_ELEM_TYPE::TRI3)
+    {
+      new_elem = std::make_unique<Tri3>();
+      new_elem->set_node(0) = mesh.node_ptr(0);
+      new_elem->set_node(2) = mesh.node_ptr(i);
+      new_elem->set_node(1) = mesh.node_ptr(i + 1);
+    }
+    else // TRI6/TRI7
+    {
+      new_elem = std::make_unique<Tri6>();
+      if (tri_elem_type == TRI_ELEM_TYPE::TRI7)
+      {
+        new_elem = std::make_unique<Tri7>();
+        new_elem->set_node(6) = mesh.node_ptr(i * 2);
+      }
+      new_elem->set_node(0) = mesh.node_ptr(0);
+      new_elem->set_node(2) = mesh.node_ptr(i * 2 + angle_number * order);
+      new_elem->set_node(1) = mesh.node_ptr((i + 1) * 2 + angle_number * order);
+      new_elem->set_node(3) = mesh.node_ptr(i * 2 + 1);
+      new_elem->set_node(5) = mesh.node_ptr(i * 2 - 1);
+      new_elem->set_node(4) = mesh.node_ptr(i * 2 + 1 + angle_number * order);
+    }
+
+    Elem * elem = mesh.add_elem(std::move(new_elem));
+    if (create_outward_interface_boundaries)
       boundary_info.add_side(elem, 1, 1 + boundary_id_shift);
     elem->subdomain_id() = 1 + block_id_shift;
     if (i == 1)
       boundary_info.add_side(elem, 2, SLICE_BEGIN);
-    else if (i == angle_number)
+    if (i == angle_number)
       boundary_info.add_side(elem, 0, SLICE_END);
     if (assign_external_boundary)
-      boundary_info.add_side(
-          elem, 1, (i <= angle_number / 2 ? OUTER_SIDESET_ID : OUTER_SIDESET_ID_ALT) + side_index);
+    {
+      boundary_info.add_side(elem, 1, OUTER_SIDESET_ID);
+      if (generate_side_specific_boundaries)
+        boundary_info.add_side(elem,
+                               1,
+                               (i <= angle_number / 2 ? OUTER_SIDESET_ID : OUTER_SIDESET_ID_ALT) +
+                                   side_index);
+    }
   }
 }
 
@@ -771,11 +1048,16 @@ PolygonMeshGeneratorBase::quadElemDef(ReplicatedMesh & mesh,
                                       const std::vector<Real> azimuthal_tangent,
                                       const subdomain_id_type block_id_shift,
                                       const dof_id_type nodeid_shift,
-                                      const bool create_interface_boundaries,
-                                      const boundary_id_type boundary_id_shift) const
+                                      const bool create_inward_interface_boundaries,
+                                      const bool create_outward_interface_boundaries,
+                                      const boundary_id_type boundary_id_shift,
+                                      const bool generate_side_specific_boundaries,
+                                      const QUAD_ELEM_TYPE quad_elem_type) const
 {
-  unsigned int angle_number =
-      azimuthal_tangent.size() == 0 ? num_sectors_per_side : (azimuthal_tangent.size() - 1);
+  const unsigned short order = quad_elem_type == QUAD_ELEM_TYPE::QUAD4 ? 1 : 2;
+  unsigned int angle_number = azimuthal_tangent.size() == 0
+                                  ? num_sectors_per_side
+                                  : ((azimuthal_tangent.size() - 1) / order);
 
   BoundaryInfo & boundary_info = mesh.get_boundary_info();
   unsigned int j = 0;
@@ -785,60 +1067,75 @@ PolygonMeshGeneratorBase::quadElemDef(ReplicatedMesh & mesh,
     {
       for (unsigned int i = 1; i <= angle_number; i++)
       {
-
-        Elem * elem_Quad4 = mesh.add_elem(new Quad4);
-        elem_Quad4->set_node(0) = mesh.node_ptr(nodeid_shift + i + (angle_number + 1) * j);
-        elem_Quad4->set_node(1) = mesh.node_ptr(nodeid_shift + i + 1 + (angle_number + 1) * j);
-        elem_Quad4->set_node(2) =
-            mesh.node_ptr(nodeid_shift + i + (angle_number + 1) * (j + 1) + 1);
-        elem_Quad4->set_node(3) = mesh.node_ptr(nodeid_shift + i + (angle_number + 1) * (j + 1));
+        std::unique_ptr<Elem> new_elem;
+        if (quad_elem_type == QUAD_ELEM_TYPE::QUAD4)
+        {
+          new_elem = std::make_unique<Quad4>();
+          new_elem->set_node(0) = mesh.node_ptr(nodeid_shift + i + (angle_number + 1) * j);
+          new_elem->set_node(1) = mesh.node_ptr(nodeid_shift + i + 1 + (angle_number + 1) * j);
+          new_elem->set_node(2) =
+              mesh.node_ptr(nodeid_shift + i + (angle_number + 1) * (j + 1) + 1);
+          new_elem->set_node(3) = mesh.node_ptr(nodeid_shift + i + (angle_number + 1) * (j + 1));
+        }
+        else // QUAD8/QUAD9
+        {
+          new_elem = std::make_unique<Quad8>();
+          if (quad_elem_type == QUAD_ELEM_TYPE::QUAD9)
+          {
+            new_elem = std::make_unique<Quad9>();
+            new_elem->set_node(8) =
+                mesh.node_ptr(nodeid_shift + i * 2 + (angle_number * 2 + 1) * (j * 2 + 2));
+          }
+          new_elem->set_node(0) =
+              mesh.node_ptr(nodeid_shift + (i - 1) * 2 + 1 + (angle_number * 2 + 1) * (j * 2 + 1));
+          new_elem->set_node(1) =
+              mesh.node_ptr(nodeid_shift + i * 2 + 1 + (angle_number * 2 + 1) * (j * 2 + 1));
+          new_elem->set_node(2) =
+              mesh.node_ptr(nodeid_shift + i * 2 + 1 + (angle_number * 2 + 1) * (j * 2 + 3));
+          new_elem->set_node(3) =
+              mesh.node_ptr(nodeid_shift + (i - 1) * 2 + 1 + (angle_number * 2 + 1) * (j * 2 + 3));
+          new_elem->set_node(4) =
+              mesh.node_ptr(nodeid_shift + i * 2 + (angle_number * 2 + 1) * (j * 2 + 1));
+          new_elem->set_node(5) =
+              mesh.node_ptr(nodeid_shift + i * 2 + 1 + (angle_number * 2 + 1) * (j * 2 + 2));
+          new_elem->set_node(6) =
+              mesh.node_ptr(nodeid_shift + i * 2 + (angle_number * 2 + 1) * (j * 2 + 3));
+          new_elem->set_node(7) =
+              mesh.node_ptr(nodeid_shift + (i - 1) * 2 + 1 + (angle_number * 2 + 1) * (j * 2 + 2));
+        }
+        Elem * elem = mesh.add_elem(std::move(new_elem));
         if (i == 1)
-          boundary_info.add_side(elem_Quad4, 3, SLICE_BEGIN);
-        else if (i == angle_number)
-          boundary_info.add_side(elem_Quad4, 1, SLICE_END);
+          boundary_info.add_side(elem, 3, SLICE_BEGIN);
+        if (i == angle_number)
+          boundary_info.add_side(elem, 1, SLICE_END);
 
         if (subdomain_rings[0] == 0)
-          elem_Quad4->subdomain_id() = k + 1 + block_id_shift;
+          elem->subdomain_id() = k + 1 + block_id_shift;
         else
-          elem_Quad4->subdomain_id() = k + 2 + block_id_shift;
+          elem->subdomain_id() = k + 2 + block_id_shift;
 
+        if (m == 0 && create_inward_interface_boundaries && k > 0)
+          boundary_info.add_side(elem, 0, k * 2 + boundary_id_shift);
         if (m == (subdomain_rings[k] - 1))
         {
           if (k == (subdomain_rings.size() - 1))
           {
-            boundary_info.add_side(elem_Quad4, 2, OUTER_SIDESET_ID);
-            if (i <= angle_number / 2)
-              boundary_info.add_side(elem_Quad4, 2, OUTER_SIDESET_ID + side_index);
-            else
-              boundary_info.add_side(elem_Quad4, 2, OUTER_SIDESET_ID_ALT + side_index);
+            boundary_info.add_side(elem, 2, OUTER_SIDESET_ID);
+            if (generate_side_specific_boundaries)
+            {
+              if (i <= angle_number / 2)
+                boundary_info.add_side(elem, 2, OUTER_SIDESET_ID + side_index);
+              else
+                boundary_info.add_side(elem, 2, OUTER_SIDESET_ID_ALT + side_index);
+            }
           }
-          else if (create_interface_boundaries)
-          {
-            if (subdomain_rings[0] == 0)
-              boundary_info.add_side(elem_Quad4, 2, k + 1 + boundary_id_shift);
-            else
-              boundary_info.add_side(elem_Quad4, 2, k + 2 + boundary_id_shift);
-          }
+          else if (create_outward_interface_boundaries)
+            boundary_info.add_side(elem, 2, k * 2 + 1 + boundary_id_shift);
         }
       }
       j++;
     }
   }
-}
-
-Real
-PolygonMeshGeneratorBase::radiusCorrectionFactor(const std::vector<Real> & azimuthal_list) const
-{
-  std::vector<Real> azimuthal_list_alt;
-  Real tmp_acc = 0.0;
-  azimuthal_list_alt.insert(azimuthal_list_alt.end(), azimuthal_list.begin(), azimuthal_list.end());
-  azimuthal_list_alt.push_back(azimuthal_list.front() + 360.0);
-  // summation of triangles S = 0.5 * r * r * Sigma_i [sin (azi_i)]
-  // Circle area S_c = pi * r_0 * r_0
-  // r = sqrt{2 * pi / Sigma_i [sin (azi_i)]} * r_0
-  for (unsigned int i = 1; i < azimuthal_list_alt.size(); i++)
-    tmp_acc += std::sin((azimuthal_list_alt[i] - azimuthal_list_alt[i - 1]) / 180.0 * M_PI);
-  return std::sqrt(2 * M_PI / tmp_acc);
 }
 
 std::unique_ptr<ReplicatedMesh>
@@ -848,11 +1145,14 @@ PolygonMeshGeneratorBase::buildSimplePeripheral(
     const std::vector<std::pair<Real, Real>> & positions_inner,
     const std::vector<std::pair<Real, Real>> & d_positions_outer,
     const subdomain_id_type id_shift,
-    const bool create_interface_boundaries)
+    const QUAD_ELEM_TYPE quad_elem_type,
+    const bool create_inward_interface_boundaries,
+    const bool create_outward_interface_boundaries)
 {
   auto mesh = buildReplicatedMesh(2);
   std::pair<Real, Real> positions_p;
 
+  // generate node positions
   for (unsigned int i = 0; i <= peripheral_invervals; i++)
   {
     for (unsigned int j = 0; j <= num_sectors_per_side / 2; j++)
@@ -896,32 +1196,86 @@ PolygonMeshGeneratorBase::buildSimplePeripheral(
   {
     for (unsigned int j = 0; j < num_sectors_per_side; j++)
     {
-      Elem * elem_Quad4 = mesh->add_elem(new Quad4);
-      elem_Quad4->set_node(0) = mesh->node_ptr(j + (num_sectors_per_side + 1) * i);
-      elem_Quad4->set_node(1) = mesh->node_ptr(j + 1 + (num_sectors_per_side + 1) * i);
-      elem_Quad4->set_node(2) = mesh->node_ptr(j + 1 + (num_sectors_per_side + 1) * (i + 1));
-      elem_Quad4->set_node(3) = mesh->node_ptr(j + (num_sectors_per_side + 1) * (i + 1));
-      elem_Quad4->subdomain_id() = PERIPHERAL_ID_SHIFT + id_shift;
+      std::unique_ptr<Elem> new_elem;
+
+      new_elem = std::make_unique<Quad4>();
+      new_elem->set_node(0) = mesh->node_ptr(j + (num_sectors_per_side + 1) * (i));
+      new_elem->set_node(1) = mesh->node_ptr(j + 1 + (num_sectors_per_side + 1) * (i));
+      new_elem->set_node(2) = mesh->node_ptr(j + 1 + (num_sectors_per_side + 1) * (i + 1));
+      new_elem->set_node(3) = mesh->node_ptr(j + (num_sectors_per_side + 1) * (i + 1));
+
+      Elem * elem = mesh->add_elem(std::move(new_elem));
+
+      // add subdoamin and boundary IDs
+      elem->subdomain_id() = PERIPHERAL_ID_SHIFT + id_shift;
       if (i == 0)
       {
-        boundary_info.add_side(elem_Quad4, 0, OUTER_SIDESET_ID);
-        if (create_interface_boundaries)
-          boundary_info.add_side(elem_Quad4, 0, SLICE_ALT + id_shift);
+        boundary_info.add_side(elem, 0, OUTER_SIDESET_ID);
+        if (create_inward_interface_boundaries)
+          boundary_info.add_side(elem, 0, SLICE_ALT + id_shift * 2);
       }
       if (i == peripheral_invervals - 1)
       {
-        boundary_info.add_side(elem_Quad4, 2, OUTER_SIDESET_ID);
-        if (create_interface_boundaries)
-          boundary_info.add_side(elem_Quad4, 2, SLICE_ALT + id_shift + 1);
+        boundary_info.add_side(elem, 2, OUTER_SIDESET_ID);
+        if (create_outward_interface_boundaries)
+          boundary_info.add_side(elem, 2, SLICE_ALT + id_shift * 2 + 1);
       }
       if (j == 0)
-        boundary_info.add_side(elem_Quad4, 3, OUTER_SIDESET_ID);
+        boundary_info.add_side(elem, 3, OUTER_SIDESET_ID);
       if (j == num_sectors_per_side - 1)
-        boundary_info.add_side(elem_Quad4, 1, OUTER_SIDESET_ID);
+        boundary_info.add_side(elem, 1, OUTER_SIDESET_ID);
     }
   }
 
+  // convert element to second order if needed
+  if (quad_elem_type != QUAD_ELEM_TYPE::QUAD4)
+  {
+    // full_ordered 2nd order element --> QUAD9, otherwise QUAD8
+    const bool full_ordered = (quad_elem_type == QUAD_ELEM_TYPE::QUAD9);
+    mesh->all_second_order(full_ordered);
+  }
+
   return mesh;
+}
+
+void
+PolygonMeshGeneratorBase::adjustPeripheralQuadraticElements(
+    MeshBase & out_mesh, const QUAD_ELEM_TYPE boundary_quad_elem_type) const
+{
+  const auto side_list = out_mesh.get_boundary_info().build_side_list();
+
+  // select out elements on outer boundary
+  // std::set used to filter duplicate elem_ids
+  std::set<dof_id_type> elem_set;
+  for (auto side_item : side_list)
+  {
+    boundary_id_type boundary_id = std::get<2>(side_item);
+    dof_id_type elem_id = std::get<0>(side_item);
+
+    if (boundary_id == OUTER_SIDESET_ID)
+      elem_set.insert(elem_id);
+  }
+
+  // adjust nodes for outer boundary elements
+  for (const auto elem_id : elem_set)
+  {
+    Elem * elem = out_mesh.elem_ptr(elem_id);
+
+    // adjust right side mid-edge node
+    Point pt_5 = (elem->point(1) + elem->point(2)) / 2.0;
+    out_mesh.add_point(pt_5, elem->node_ptr(5)->id());
+
+    // adjust left side mid-edge node
+    Point pt_7 = (elem->point(0) + elem->point(3)) / 2.0;
+    out_mesh.add_point(pt_7, elem->node_ptr(7)->id());
+
+    // adjust central node when using QUAD9
+    if (boundary_quad_elem_type == QUAD_ELEM_TYPE::QUAD9)
+    {
+      Point pt_8 = elem->true_centroid();
+      out_mesh.add_point(pt_8, elem->node_ptr(8)->id());
+    }
+  }
 }
 
 std::pair<Real, Real>
@@ -1332,4 +1686,119 @@ PolygonMeshGeneratorBase::setRingExtraIDs(MeshBase & mesh,
     for (unsigned i = 0; i < nelem; ++i, ++elem_it)
       (*elem_it)->set_extra_integer(extra_id_index, 0);
   }
+}
+
+void
+PolygonMeshGeneratorBase::reassignBoundaryIDs(MeshBase & mesh,
+                                              const boundary_id_type id_shift,
+                                              const std::set<boundary_id_type> & boundary_ids,
+                                              const bool reverse)
+{
+  const std::set<boundary_id_type> existing_boundary_ids =
+      mesh.get_boundary_info().get_boundary_ids();
+  for (const auto id : boundary_ids)
+  {
+
+    const boundary_id_type old_id = (!reverse) ? id : id + id_shift;
+    const boundary_id_type new_id = (!reverse) ? id + id_shift : id;
+    auto it = existing_boundary_ids.find(old_id);
+    if (it != existing_boundary_ids.end())
+      MooseMesh::changeBoundaryId(mesh, old_id, new_id, true);
+  }
+}
+
+std::set<boundary_id_type>
+PolygonMeshGeneratorBase::getInterfaceBoundaryIDs(
+    const std::vector<std::vector<unsigned int>> & pattern,
+    const std::vector<std::vector<boundary_id_type>> & interface_boundary_id_shift_pattern,
+    const std::set<boundary_id_type> & boundary_ids,
+    const std::vector<std::set<boundary_id_type>> & input_interface_boundary_ids,
+    const bool use_interface_boundary_id_shift,
+    const bool create_interface_boundary_id,
+    const unsigned int num_extra_layers) const
+{
+  std::set<boundary_id_type> interface_boundary_ids;
+  // add existing interface boundary ids from input meshes
+  if (use_interface_boundary_id_shift)
+  {
+    for (const auto i : make_range(pattern.size()))
+      for (const auto j : make_range(pattern[i].size()))
+      {
+        const auto & ids = input_interface_boundary_ids[pattern[i][j]];
+        for (const auto & id : ids)
+        {
+          const boundary_id_type new_id = id + interface_boundary_id_shift_pattern[i][j];
+          auto it = boundary_ids.find(new_id);
+          if (it != boundary_ids.end())
+            interface_boundary_ids.insert(new_id);
+        }
+      }
+  }
+  else
+  {
+    for (const auto & ids : input_interface_boundary_ids)
+      for (const auto & id : ids)
+      {
+        auto it = boundary_ids.find(id);
+        if (it != boundary_ids.end())
+          interface_boundary_ids.insert(id);
+      }
+  }
+  // add unshifted interface boundary ids for the duct & background regions
+  if (create_interface_boundary_id)
+    for (const auto i : make_range(num_extra_layers))
+    {
+      boundary_id_type id = SLICE_ALT + i * 2 + 1;
+      auto it = boundary_ids.find(id);
+      if (it != boundary_ids.end())
+        interface_boundary_ids.insert(id);
+      id = SLICE_ALT + i * 2;
+      it = boundary_ids.find(id);
+      if (it != boundary_ids.end())
+        interface_boundary_ids.insert(id);
+    }
+  return interface_boundary_ids;
+}
+
+PolygonMeshGeneratorBase::multiBdryLayerParams
+PolygonMeshGeneratorBase::modifiedMultiBdryLayerParamsCreator(
+    const multiBdryLayerParams & original_multi_bdry_layer_params, const unsigned int order) const
+{
+  multiBdryLayerParams mod_multi_bdry_layer_params(original_multi_bdry_layer_params);
+  std::for_each(mod_multi_bdry_layer_params.intervals.begin(),
+                mod_multi_bdry_layer_params.intervals.end(),
+                [&order](unsigned int & n) { n *= order; });
+  std::for_each(mod_multi_bdry_layer_params.biases.begin(),
+                mod_multi_bdry_layer_params.biases.end(),
+                [&order](Real & n) { n = std::pow(n, 1.0 / order); });
+  return mod_multi_bdry_layer_params;
+}
+
+PolygonMeshGeneratorBase::singleBdryLayerParams
+PolygonMeshGeneratorBase::modifiedSingleBdryLayerParamsCreator(
+    const singleBdryLayerParams & original_single_bdry_layer_params, const unsigned int order) const
+{
+  singleBdryLayerParams mod_single_bdry_layer_params(original_single_bdry_layer_params);
+  mod_single_bdry_layer_params.intervals *= order;
+  mod_single_bdry_layer_params.bias = std::pow(mod_single_bdry_layer_params.bias, 1.0 / order);
+  return mod_single_bdry_layer_params;
+}
+
+std::string
+PolygonMeshGeneratorBase::pitchMetaDataErrorGenerator(
+    const std::vector<MeshGeneratorName> & input_names,
+    const std::vector<Real> & metadata_vals,
+    const std::string & metadata_name) const
+{
+  FormattedTable table;
+  for (unsigned int i = 0; i < input_names.size(); i++)
+  {
+    table.addRow(i);
+    table.addData<std::string>("input name", (std::string)input_names[i]);
+    table.addData<Real>(metadata_name, metadata_vals[i]);
+  }
+  table.outputTimeColumn(false);
+  std::stringstream detailed_error;
+  table.printTable(detailed_error);
+  return "\n" + detailed_error.str();
 }

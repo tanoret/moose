@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,6 +24,8 @@ OneD3EqnMomentumFormLoss::validParams()
   params.addRequiredCoupledVar("A", "Cross-sectional area");
   params.addRequiredParam<MaterialPropertyName>("rho", "Density property");
   params.addRequiredParam<MaterialPropertyName>("vel", "Velocity property");
+  params.addClassDescription(
+      "Computes a form loss term for the momentum equation for 1-phase flow");
 
   return params;
 }

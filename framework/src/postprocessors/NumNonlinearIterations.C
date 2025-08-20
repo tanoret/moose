@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,7 @@
 
 #include "FEProblem.h"
 #include "SubProblem.h"
+#include "SystemBase.h"
 
 registerMooseObject("MooseApp", NumNonlinearIterations);
 
@@ -23,6 +24,9 @@ NumNonlinearIterations::validParams()
       false,
       "When set to true, accumulates to count the total over all Picard iterations for each step");
   params.addClassDescription("Outputs the number of nonlinear iterations");
+
+  // Not supported
+  params.suppressParameter<bool>("use_displaced_mesh");
   return params;
 }
 
@@ -47,13 +51,17 @@ NumNonlinearIterations::timestepSetup()
   }
 }
 
-Real
-NumNonlinearIterations::getValue()
+void
+NumNonlinearIterations::finalize()
 {
   if (_accumulate_over_step)
-    _num_iters += _subproblem.nNonlinearIterations();
+    _num_iters += _subproblem.nNonlinearIterations(_sys.number());
   else
-    _num_iters = _subproblem.nNonlinearIterations();
+    _num_iters = _subproblem.nNonlinearIterations(_sys.number());
+}
 
+Real
+NumNonlinearIterations::getValue() const
+{
   return _num_iters;
 }

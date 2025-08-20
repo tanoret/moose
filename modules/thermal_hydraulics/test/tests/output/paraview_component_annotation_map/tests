@@ -1,8 +1,10 @@
 [Tests]
+  issues = '#19839'
+  design = 'ParaviewComponentAnnotationMap.md'
   [test]
     type = JSONDiff
     input = 'test.i'
     jsondiff = 'test_map.json'
-    ad_indexing_type = 'global'
+    requirement = 'The system shall be able to create an annotation map for components to be read when visualizing output with Paraview.'
   []
 []

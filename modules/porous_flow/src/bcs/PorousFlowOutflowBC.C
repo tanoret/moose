@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -218,7 +218,6 @@ PorousFlowOutflowBC::jac(unsigned int jvar) const
   // of the residual at node _i from changing jvar at node _j is through
   // the derivative of Darcy or thermal_conductivity
 
-  Real advective_term = 0.0;
   Real advective_term_prime = 0.0;
   for (unsigned ph = 0; ph < _num_phases; ++ph)
   {
@@ -263,7 +262,6 @@ PorousFlowOutflowBC::jac(unsigned int jvar) const
           (_flux_type == FluxTypeChoiceEnum::FLUID ? (*_dmass_fractions_dvar)[_i][ph][_sp][pvar]
                                                    : (*_denthalpy_dvar)[_i][ph][pvar]);
 
-      advective_term -= pre * mob * dar;
       advective_term_prime -= preprime * mob * dar + pre * mobprime * dar + pre * mob * darcyprime;
     }
   }

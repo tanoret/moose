@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,6 +39,13 @@ class TestSQADocumentReport(unittest.TestCase):
 
         # WARNING with missing doc
         reporter = SQADocumentReport(required_documents=['rtm', 'google'], rtm='moose_rtm.md', log_google='WARNING')
+        r = reporter.getReport()
+        self.assertEqual(reporter.status, SQAReport.Status.WARNING)
+        self.assertIn('log_rtm: 0', r)
+        self.assertIn('log_google: 1', r)
+
+        # WARNING with deprecated doc
+        reporter = SQADocumentReport(required_documents=['rtm', 'google'], deprecated_documents={'goggle' : 'google'}, rtm='moose_rtm.md', goggle='https://www.google.com')
         r = reporter.getReport()
         self.assertEqual(reporter.status, SQAReport.Status.WARNING)
         self.assertIn('log_rtm: 0', r)

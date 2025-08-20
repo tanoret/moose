@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,5 +39,6 @@ protected:
 
 private:
   template <bool is_ad>
-  MooseADWrapper<Real, is_ad> sampleInternal(const MooseADWrapper<GridPoint, is_ad> pt) const;
+  Moose::GenericType<Real, is_ad>
+  sampleInternal(const Moose::GenericType<GridPoint, is_ad> pt) const;
 };

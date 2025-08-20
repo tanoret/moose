@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,12 +14,13 @@
 /**
  * Interface material calculates a variable's jump value across an interface
  */
-class InterfaceValueMaterial : public InterfaceMaterial
+template <bool is_ad>
+class InterfaceValueMaterialTempl : public InterfaceMaterial
 {
 public:
   static InputParameters validParams();
 
-  InterfaceValueMaterial(const InputParameters & parameters);
+  InterfaceValueMaterialTempl(const InputParameters & parameters);
 
 protected:
   virtual void computeQpProperties() override;
@@ -29,8 +30,8 @@ protected:
   const std::string _mp_secondary_name;
   const MaterialProperty<Real> & _mp_primary;
   const MaterialProperty<Real> & _mp_secondary;
-  const VariableValue & _var_primary;
-  const VariableValue & _var_secondary;
+  const GenericVariableValue<is_ad> & _var_primary;
+  const GenericVariableValue<is_ad> & _var_secondary;
   const VariableValue & _nl_var_primary;
   const VariableValue & _nl_var_secondary;
   /// old values
@@ -55,3 +56,6 @@ protected:
   // previous jump value
   MaterialProperty<Real> & _jump_prev;
 };
+
+typedef InterfaceValueMaterialTempl<false> InterfaceValueMaterial;
+typedef InterfaceValueMaterialTempl<true> ADInterfaceValueMaterial;

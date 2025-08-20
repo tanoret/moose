@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,9 @@
 #include <cstdlib>
 #include <tuple>
 #include <type_traits>
+
+// Used in numerous downstream classes without 'libMesh::' prefix
+using libMesh::demangle;
 
 namespace MetaPhysicL
 {
@@ -81,7 +84,7 @@ operator<<(std::ostream & os, const std::tuple<T...> & tup)
     if (err != MPI_SUCCESS)                                                                        \
     {                                                                                              \
       if (libMesh::global_n_processors() == 1)                                                     \
-        print_trace();                                                                             \
+        libMesh::print_trace();                                                                    \
       libmesh_here();                                                                              \
       MOOSE_ABORT;                                                                                 \
     }                                                                                              \
@@ -111,7 +114,7 @@ operator<<(std::ostream & os, const std::tuple<T...> & tup)
       {                                                                                            \
         Moose::err << _assert_oss_.str() << std::flush;                                            \
         if (libMesh::global_n_processors() == 1)                                                   \
-          print_trace();                                                                           \
+          libMesh::print_trace();                                                                  \
         else                                                                                       \
           libMesh::write_traceout();                                                               \
         libmesh_here();                                                                            \
@@ -131,7 +134,7 @@ namespace moose
 
 namespace internal
 {
-inline Threads::spin_mutex moose_stream_lock;
+inline libMesh::Threads::spin_mutex moose_stream_lock;
 
 /// Builds and returns a string of the form:
 ///
@@ -141,8 +144,23 @@ inline Threads::spin_mutex moose_stream_lock;
 /// need to report that variable types are incompatible (e.g. with residual save-in).
 std::string incompatVarMsg(MooseVariableFieldBase & var1, MooseVariableFieldBase & var2);
 
+/**
+ * Format a message for output with a title
+ * @param msg The message to print
+ * @param title The title that will go on a line before the message
+ * @param color The color to print the message in
+ * @return The formatted message
+ */
 std::string
 mooseMsgFmt(const std::string & msg, const std::string & title, const std::string & color);
+
+/**
+ * Format a message for output without a title
+ * @param msg The message to print
+ * @param color The color to print the message in
+ * @return The formatted message
+ */
+std::string mooseMsgFmt(const std::string & msg, const std::string & color);
 
 [[noreturn]] void mooseErrorRaw(std::string msg, const std::string prefix = "");
 
@@ -175,7 +193,7 @@ mooseWarningStream(S & oss, Args &&... args)
     throw std::runtime_error(msg);
 
   {
-    Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
+    libMesh::Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
     oss << msg << std::flush;
   }
 }
@@ -191,7 +209,7 @@ mooseUnusedStream(S & oss, Args &&... args)
     throw std::runtime_error(msg);
 
   {
-    Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
+    libMesh::Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
     oss << msg << std::flush;
   }
 }
@@ -204,7 +222,7 @@ mooseInfoStreamRepeated(S & oss, Args &&... args)
   mooseStreamAll(ss, args...);
   std::string msg = mooseMsgFmt(ss.str(), "*** Info ***", COLOR_CYAN);
   {
-    Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
+    libMesh::Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
     oss << msg << std::flush;
   }
 }
@@ -218,34 +236,55 @@ mooseInfoStream(S & oss, Args &&... args)
 
 template <typename S, typename... Args>
 void
-mooseDeprecatedStream(S & oss, bool expired, Args &&... args)
+mooseDeprecatedStream(S & oss, const bool expired, const bool print_title, Args &&... args)
 {
   if (Moose::_deprecated_is_error)
     mooseError("\n\nDeprecated code:\n", std::forward<Args>(args)...);
 
-  mooseDoOnce(std::ostringstream ss; mooseStreamAll(ss, args...);
-              std::string msg = mooseMsgFmt(
-                  ss.str(),
-                  "*** Warning, This code is deprecated and will be removed in future versions:",
-                  expired ? COLOR_RED : COLOR_YELLOW);
-              oss << msg;
-              ss.str("");
-              if (Moose::show_trace)
-              {
-                if (libMesh::global_n_processors() == 1)
-                  print_trace(ss);
-                else
-                  libMesh::write_traceout();
-                {
-                  Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
-                  oss << ss.str() << std::endl;
-                };
-              });
+  std::ostringstream ss;
+  mooseStreamAll(ss, args...);
+
+  const auto color = expired ? COLOR_RED : COLOR_YELLOW;
+  std::string msg =
+      print_title
+          ? mooseMsgFmt(
+                ss.str(),
+                "*** Warning, This code is deprecated and will be removed in future versions:",
+                color)
+          : mooseMsgFmt(ss.str(), color);
+  oss << msg;
+  ss.str("");
+  if (Moose::show_trace)
+  {
+    if (libMesh::global_n_processors() == 1)
+      libMesh::print_trace(ss);
+    else
+      libMesh::write_traceout();
+    {
+      libMesh::Threads::spin_mutex::scoped_lock lock(moose_stream_lock);
+      oss << ss.str() << std::endl;
+    };
+  };
 }
 /**
  * @}
  */
 
+/**
+ * Formats a documented error. A documented error is an error that has
+ * an issue associated with it.
+ *
+ * The repository name \p repo_name links a named repository to a URL
+ * and should be registered at the application level with registerRepository().
+ * See Moose.C for an example of the "moose" repository registration.
+ *
+ * @param repo_name The repository name where the issue resides
+ * @param issue_num The number of the issue
+ * @param msg The specific error message
+ */
+std::string formatMooseDocumentedError(const std::string & repo_name,
+                                       const unsigned int issue_num,
+                                       const std::string & msg);
 } // namespace internal
 
 /**
@@ -265,6 +304,28 @@ mooseError(Args &&... args)
   std::ostringstream oss;
   moose::internal::mooseStreamAll(oss, std::forward<Args>(args)...);
   moose::internal::mooseErrorRaw(oss.str());
+}
+
+/**
+ * Emit a documented error message with the given stringified, concatenated args
+ * and terminate the application.  Inside static functions, you will need to
+ * explicitly scope your mooseError call - i.e. do "::mooseError(arg1, ...);".
+ *
+ * Here, a documented error message is one with an associated issue. See
+ * formatMooseDocumentedError for more information.
+ *
+ * @param repo_name The repository name where the issue resides
+ * @param issue_num The number of the issue
+ * @param args The error message to stringify
+ **/
+template <typename... Args>
+[[noreturn]] void
+mooseDocumentedError(const std::string & repo_name, const unsigned int issue_num, Args &&... args)
+{
+  std::ostringstream oss;
+  moose::internal::mooseStreamAll(oss, std::forward<Args>(args)...);
+  moose::internal::mooseErrorRaw(
+      moose::internal::formatMooseDocumentedError(repo_name, issue_num, oss.str()));
 }
 
 /// Emit a warning message with the given stringified, concatenated args.
@@ -291,7 +352,7 @@ template <typename... Args>
 void
 mooseDeprecated(Args &&... args)
 {
-  moose::internal::mooseDeprecatedStream(Moose::out, false, std::forward<Args>(args)...);
+  moose::internal::mooseDeprecatedStream(Moose::out, false, true, std::forward<Args>(args)...);
 }
 
 /// Emit a deprecated code/feature message with the given stringified, concatenated args.
@@ -299,7 +360,7 @@ template <typename... Args>
 void
 mooseDeprecationExpired(Args &&... args)
 {
-  moose::internal::mooseDeprecatedStream(Moose::out, true, std::forward<Args>(args)...);
+  moose::internal::mooseDeprecatedStream(Moose::out, true, true, std::forward<Args>(args)...);
 }
 
 /// Emit an informational message with the given stringified, concatenated args.

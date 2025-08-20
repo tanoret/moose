@@ -8,11 +8,11 @@ they are coupled together.
 !equation
 -\nabla \cdot \frac{\mathbf{K}}{\mu} \nabla p  = 0
 \\
-C\left( \frac{\partial T}{\partial t} + \underbrace{\epsilon \vec{u}\cdot\nabla T}_{\textrm{DarcyAdvection}} \right) - \nabla \cdot k \nabla T = 0
+\rho c_p \frac{\partial T}{\partial t} + \underbrace{\rho c_p \epsilon \vec{u}\cdot\nabla T}_{\textrm{DarcyAdvection}} - \nabla \cdot k \nabla T = 0
 
 - Objects have been created for everything except the $\vec{u}\cdot\nabla T$ term; a `Kernel`,
   `DarcyAdvection`, will be developed for this term.
-- A more sophisticated `Material` object will be created that includes temperature dependence
+- A more sophisticated `Material` object will be created that includes temperature dependence.
 
 !---
 
@@ -25,6 +25,46 @@ C\left( \frac{\partial T}{\partial t} + \underbrace{\epsilon \vec{u}\cdot\nabla 
 ## DarcyAdvection.C
 
 !listing step06_coupled_darcy_heat_conduction/src/kernels/DarcyAdvection.C
+
+!---
+
+## LinearInterpolation
+
+MOOSE contains several utilities and classes to assist in performing calculations. One of these is
+the `LinearInterpolation` class.
+
+This class allows the construction of a linear interpolation of input data, and the sampling of that
+interpolation (values, derivatives, integral, etc.) within a MOOSE object. Linear extrapolation beyond
+the bounds of the interpolated function is also possible.
+
+This feature is used in this step to improve the manual interpolation performed previously.
+
+!---
+
+## LinearInterpolation
+
+This utility allows the manual permeability interpolation in `PackedColumn.C`:
+
+```c++
+  _permeability[_qp] =
+      (permeability[0] * (sphere_sizes[1] - value) + permeability[1] * (value - sphere_sizes[0])) /
+      (sphere_sizes[1] - sphere_sizes[0]);
+```
+
+to be performed automatically, being initialized once in the constructor:
+
+```c++
+  _permeability_interpolation.setData(sphere_sizes, permeability);
+```
+
+with sampling as necessary in `PackedColumn::computeQpProperties`:
+
+```c++
+  _permeability[_qp] = _permeability_interpolation.sample(value);
+```
+
+`LinearInterpolation` can be used extensively to interpolate manually entered data, as well as
+when using imported input data.
 
 !---
 
@@ -58,23 +98,26 @@ C\left( \frac{\partial T}{\partial t} + \underbrace{\epsilon \vec{u}\cdot\nabla 
 
 !---
 
-## Auto Variable Scaling
+## Variable Scaling
 
-To obtain an optimum numerical solution, the non-linear variables should be on the same
-scale.
+To make sure the convergence criterion is fairly applied to all equations, the non-linear variables
+should be on the same scale.
 
-MOOSE includes the ability to automatically scale non-linear variables
+Making equations non-dimensional is a common technique to achieve this. But this is not typically
+done in MOOSE, where modelers have direct access to dimensionalized quantities.
+
+MOOSE includes the ability to either manually or automatically scale non-linear variables.
 
 !---
 
 ### Condition Number +without+ Scaling
 
-The condition number can be used to determine if variable scaling is required.
+The condition number of the Jacobian can be used to determine if variable scaling is required.
 
 ```bash
-cd ~/projects/moose/tutorials/darcy-thermo_mech/step06_coupled_darcy_heat_conduction
+cd ~/projects/moose/tutorials/darcy_thermo_mech/step06_coupled_darcy_heat_conduction
 make -j 12
-../darcy_thermo_mech-opt -i step6a_coupled.i Mesh/nx=50 Mesh/ny=3 Executioner/num_steps=1 Executioner/automatic_scaling=0 -pc_type svd -pc_svd_monitor -ksp_view_pmat
+../darcy_thermo_mech-opt -i step6a_coupled.i Mesh/gmg/nx=50 Mesh/gmg/ny=3 Executioner/num_steps=1 Executioner/automatic_scaling=0 -pc_type svd -pc_svd_monitor -ksp_view_pmat
 ```
 
 ```bash
@@ -100,9 +143,9 @@ row 4: (0, 4.01973e-12)  (1, 0.)  (2, 3.97056e-14)  (3, 0.)  (4, -6.43156e-11)  
 ### Condition Number +with+ Scaling
 
 ```bash
-cd ~/projects/moose/tutorials/darcy-thermo_mech/step06_coupled_darcy_heat_conduction
+cd ~/projects/moose/tutorials/darcy_thermo_mech/step06_coupled_darcy_heat_conduction
 make -j 12
-../darcy_thermo_mech-opt -i step6a_coupled.i Mesh/nx=50 Mesh/ny=3 Executioner/num_steps=1 -pc_type svd -pc_svd_monitor -ksp_view_pmat
+../darcy_thermo_mech-opt -i step6a_coupled.i Mesh/gmg/nx=50 Mesh/gmg/ny=3 Executioner/num_steps=1 -pc_type svd -pc_svd_monitor -ksp_view_pmat
 ```
 
 ```bash
@@ -128,7 +171,7 @@ row 4: (0, 0.401973)  (1, 0.)  (2, 0.00397056)  (3, 0.)  (4, -6.43156)  (5, 0.) 
 ## Step 6a: Run
 
 ```bash
-cd ~/projects/moose/tutorials/darcy-thermo_mech/step06_coupled_darcy_heat_conduction
+cd ~/projects/moose/tutorials/darcy_thermo_mech/step06_coupled_darcy_heat_conduction
 make -j 12 # use number of processors for your system
 cd problems
 ../darcy_thermo_mech-opt -i step6a_coupled.i
@@ -164,7 +207,7 @@ as a function of temperature.
 ## Step 6b: Run
 
 ```bash
-cd ~/projects/moose/tutorials/darcy-thermo_mech/step06_coupled_darcy_heat_conduction
+cd ~/projects/moose/tutorials/darcy_thermo_mech/step06_coupled_darcy_heat_conduction
 make -j 12 # use number of processors for your system
 cd problems
 ../darcy_thermo_mech-opt -i step6b_transient_inflow.i
@@ -179,5 +222,7 @@ cd problems
 !---
 
 ## Decoupling Heat Equation
+
+Pressure is changed to a constant linearly varying auxiliary variable. We only solve for velocity
 
 !listing step06_coupled_darcy_heat_conduction/problems/step6c_decoupled.i

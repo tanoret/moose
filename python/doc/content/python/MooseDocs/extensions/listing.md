@@ -6,28 +6,29 @@ includes the ability to parse MOOSE input files and separate out blocks. The mai
 copying code or input syntax into the documentation to avoid out-of-date content.
 
 The extension provides the `!listing` command (see [command.md]), which allows for numbered captions
-to be applied, the [extensions/floats.md] provides additional details. The following table list the
+to be applied, the [extensions/floats.md] provides additional details. The following table lists the
 available configure options for the extension.
 
 !devel settings module=MooseDocs.extensions.listing object=ListingExtension
 
 The `!listing` command has the capability to include text from local content and arbitrary files
-(such as source code).  files. There is a wide range of settings that are available to specialize how
-the code is imported.  The complete list of available of settings are provided in [moose-listing] and
+(such as source code files). There is a wide range of settings that are available to specialize how
+the code is imported.  The complete list of available settings are provided in [moose-listing] and
 the sections below provide various examples of using some of these settings.
 
 ## Local Listing Content
 
 It is possible to create a listing using local content. This is done by using the `!listing` command
-without any agruments with the desired content following the command, see [command.md] for details
+without any arguments with the desired content following the command, see [command.md] for details
 to how content is defined. The available settings for this command are given in
 [listing-local-settings].
 
 !devel! example id=example-listing-local caption=Example listing with content from local markdown.
 !listing id=local caption=A function for adding 42. language=cpp
-double add_forty_two(const double y);
-y += 42;
-return y;
+double add_forty_two(const double y) {
+  y += 42;
+  return y;
+}
 !devel-end!
 
 !devel settings module=MooseDocs.extensions.listing
@@ -38,17 +39,17 @@ return y;
 ## File Content
 
 You can include complete files from the repository. For example, the following creates the code
-listing in [example-listing-complete].
+listing in [example-listing-complete]. The available settings for this command are given in
+[moose-listing].
+
+!devel! example id=example-listing-complete caption=Example for showing a complete file.
+!listing framework/src/kernels/Diffusion.C
+!devel-end!
 
 !devel settings module=MooseDocs.extensions.listing
                 object=FileListingCommand
                 id=moose-listing
                 caption=Settings available when capturing text from a file with the `listing` command.
-
-
-!devel! example id=example-listing-complete caption=Example for showing a complete file.
-!listing framework/src/kernels/Diffusion.C
-!devel-end!
 
 ### Regular Expression Match
 
@@ -106,9 +107,28 @@ specified. [example-listing-input] demonstrates proper use of the `block` and `r
 
 !alert note title=The "block" and "remove" settings apply to all HIT formatted files.
 The settings given in [hit-listing-settings] are available to all [!ac](HIT) formatted listings, including
-[test specification files](python/TestHarness.md).
+[test specification files](TestHarness.md).
 
 !devel settings module=MooseDocs.extensions.listing
                 object=InputListingCommand
                 id=hit-listing-settings
                 caption=Settings available for input file listings.
+
+## Diffing Content
+
+You can produce a diffed listing between two files using the "diff" setting.
+
+!devel! example id=example-listing-diff caption=Example listing using the "diff" setting.
+!listing framework/src/kernels/Diffusion.C
+         diff=framework/src/kernels/ADDiffusion.C
+!devel-end!
+
+The prefixes for the links after the listing (when using the "link" option, which defaults to true)
+can be modified using the "before_link_prefix" and "after_link_prefix" settings.
+
+!devel! example id=example-listing-diff-prefixed caption=Example listing using the "diff" setting with overridden link prefixes.
+!listing framework/src/kernels/Diffusion.C
+         diff=framework/src/kernels/ADDiffusion.C
+         before_link_prefix=Diffusion without AD:
+         after_link_prefix=Diffusion with AD:
+!devel-end!

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,9 +17,9 @@ class RealComponentParameterValuePostprocessor : public GeneralPostprocessor
 public:
   RealComponentParameterValuePostprocessor(const InputParameters & parameters);
 
-  virtual void initialize();
-  virtual Real getValue();
-  virtual void execute();
+  virtual void initialize() override;
+  virtual Real getValue() const override;
+  virtual void execute() override;
 
 protected:
   FEProblemBase & _fe_problem;

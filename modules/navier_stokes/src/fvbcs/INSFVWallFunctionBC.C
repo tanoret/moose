@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,9 +19,9 @@ INSFVWallFunctionBC::validParams()
   InputParameters params = INSFVNaturalFreeSlipBC::validParams();
   params.addClassDescription("Implements a wall shear BC for the momentum equation based on "
                              "algebraic standard velocity wall functions.");
-  params.addRequiredCoupledVar("u", "The velocity in the x direction.");
-  params.addCoupledVar("v", "The velocity in the y direction.");
-  params.addCoupledVar("w", "The velocity in the z direction.");
+  params.addRequiredParam<MooseFunctorName>("u", "The velocity in the x direction.");
+  params.addParam<MooseFunctorName>("v", "The velocity in the y direction.");
+  params.addParam<MooseFunctorName>("w", "The velocity in the z direction.");
   params.addRequiredParam<MooseFunctorName>(NS::density, "fluid density");
   params.addRequiredParam<MooseFunctorName>("mu", "Dynamic viscosity");
   return params;
@@ -30,16 +30,22 @@ INSFVWallFunctionBC::validParams()
 INSFVWallFunctionBC::INSFVWallFunctionBC(const InputParameters & params)
   : INSFVNaturalFreeSlipBC(params),
     _dim(_subproblem.mesh().dimension()),
-    _u_var(dynamic_cast<const INSFVVelocityVariable *>(getFieldVar("u", 0))),
-    _v_var(params.isParamValid("v")
-               ? dynamic_cast<const INSFVVelocityVariable *>(getFieldVar("v", 0))
-               : nullptr),
-    _w_var(params.isParamValid("w")
-               ? dynamic_cast<const INSFVVelocityVariable *>(getFieldVar("w", 0))
-               : nullptr),
+    _u(getFunctor<ADReal>("u")),
+    _v(isParamValid("v") ? &getFunctor<ADReal>("v") : nullptr),
+    _w(isParamValid("w") ? &getFunctor<ADReal>("w") : nullptr),
     _rho(getFunctor<ADReal>(NS::density)),
     _mu(getFunctor<ADReal>("mu"))
 {
+  if (_rc_uo.segregated())
+    mooseError("Wall sheer stress enforcement based wall functions are not supported with "
+               "segregated solution approaches!");
+}
+
+ADReal
+INSFVWallFunctionBC::computeSegregatedContribution()
+{
+  mooseError("Sheer-stress-based wall function enforcement not supported for segregated solvers.");
+  return 0.0;
 }
 
 ADReal
@@ -48,11 +54,13 @@ INSFVWallFunctionBC::computeStrongResidual()
   // Get the velocity vector
   const FaceInfo & fi = *_face_info;
   const Elem & elem = fi.elem();
-  ADRealVectorValue velocity(_u_var->getElemValue(&elem));
-  if (_v_var)
-    velocity(1) = _v_var->getElemValue(&elem);
-  if (_w_var)
-    velocity(2) = _w_var->getElemValue(&elem);
+  const Moose::ElemArg elem_arg{&elem, false};
+  const auto state = determineState();
+  ADRealVectorValue velocity(_u(elem_arg, state));
+  if (_v)
+    velocity(1) = (*_v)(elem_arg, state);
+  if (_w)
+    velocity(2) = (*_w)(elem_arg, state);
 
   // Compute the velocity magnitude (parallel_speed) and
   // direction of the tangential velocity component (parallel_dir)
@@ -69,8 +77,8 @@ INSFVWallFunctionBC::computeStrongResidual()
     return parallel_speed;
 
   // Compute the friction velocity and the wall shear stress
-  const auto rho = _rho(makeElemArg(&elem));
-  ADReal u_star = NS::findUStar(_mu(makeElemArg(&elem)), rho, parallel_speed, dist.value());
+  const auto rho = _rho(makeElemArg(&elem), state);
+  ADReal u_star = NS::findUStar(_mu(makeElemArg(&elem), state), rho, parallel_speed, dist.value());
   ADReal tau = u_star * u_star * rho;
   _a *= tau;
 
@@ -87,7 +95,7 @@ void
 INSFVWallFunctionBC::gatherRCData(const FaceInfo & fi)
 {
   _face_info = &fi;
-  _face_type = fi.faceType(_var.name());
+  _face_type = fi.faceType(std::make_pair(_var.number(), _var.sys().number()));
   _normal = fi.normal();
 
   // Fill-in the coefficient _a (but without multiplication by A)
@@ -97,5 +105,5 @@ INSFVWallFunctionBC::gatherRCData(const FaceInfo & fi)
                 _index,
                 _a * (fi.faceArea() * fi.faceCoord()));
 
-  processResidualAndJacobian(strong_resid * (fi.faceArea() * fi.faceCoord()));
+  addResidualAndJacobian(strong_resid * (fi.faceArea() * fi.faceCoord()));
 }

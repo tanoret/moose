@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,7 +46,7 @@ Receiver::Receiver(const InputParameters & params)
 }
 
 Real
-Receiver::getValue()
+Receiver::getValue() const
 {
   // Return the stored value (references stored value in getPostprocessorData)
   return _my_value;

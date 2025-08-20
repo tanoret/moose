@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,7 +28,7 @@ VectorCurlBC::VectorCurlBC(const InputParameters & parameters)
 Real
 VectorCurlBC::computeQpResidual()
 {
-  return _test[_i][_qp] * _normals[_qp].cross(_curl_value.vectorCurl(_t, _q_point[_qp]));
+  return _test[_i][_qp] * _normals[_qp].cross(_curl_value.curl(_t, _q_point[_qp]));
 }
 
 Real

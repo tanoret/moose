@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -54,7 +54,7 @@ NumDOFs::NumDOFs(const InputParameters & parameters)
 }
 
 Real
-NumDOFs::getValue()
+NumDOFs::getValue() const
 {
   switch (_system_enum)
   {

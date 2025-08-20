@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,7 @@
 #include "MooseVariableScalar.h"
 #include "SubProblem.h"
 #include "NonlinearSystem.h"
+#include "FEProblemBase.h"
 
 #include "libmesh/threads.h"
 #include "libmesh/quadrature.h"
@@ -31,7 +32,7 @@ ArrayKernel::ArrayKernel(const InputParameters & parameters)
     MooseVariableInterface<RealEigenVector>(this,
                                             false,
                                             "variable",
-                                            Moose::VarKindType::VAR_NONLINEAR,
+                                            Moose::VarKindType::VAR_SOLVER,
                                             Moose::VarFieldType::VAR_FIELD_ARRAY),
     _var(*mooseVariable()),
     _test(_var.phi()),
@@ -53,7 +54,7 @@ ArrayKernel::ArrayKernel(const InputParameters & parameters)
   {
     ArrayMooseVariable * var = &_subproblem.getArrayVariable(_tid, _save_in_strings[i]);
 
-    if (_fe_problem.getNonlinearSystemBase().hasVariable(_save_in_strings[i]))
+    if (_fe_problem.getNonlinearSystemBase(_sys.number()).hasVariable(_save_in_strings[i]))
       paramError("save_in", "cannot use solution variable as save-in variable");
 
     if (var->feType() != _var.feType())
@@ -73,7 +74,7 @@ ArrayKernel::ArrayKernel(const InputParameters & parameters)
   {
     ArrayMooseVariable * var = &_subproblem.getArrayVariable(_tid, _diag_save_in_strings[i]);
 
-    if (_fe_problem.getNonlinearSystemBase().hasVariable(_diag_save_in_strings[i]))
+    if (_fe_problem.getNonlinearSystemBase(_sys.number()).hasVariable(_diag_save_in_strings[i]))
       paramError("diag_save_in", "cannot use solution variable as diag save-in variable");
 
     if (var->feType() != _var.feType())
@@ -114,7 +115,7 @@ ArrayKernel::computeResidual()
 
   if (_has_save_in)
   {
-    Threads::spin_mutex::scoped_lock lock(Threads::spin_mtx);
+    libMesh::Threads::spin_mutex::scoped_lock lock(libMesh::Threads::spin_mtx);
     for (const auto & var : _save_in)
     {
       auto * avar = dynamic_cast<ArrayMooseVariable *>(var);
@@ -149,7 +150,7 @@ ArrayKernel::computeJacobian()
   if (_has_diag_save_in)
   {
     DenseVector<Number> diag = _assembly.getJacobianDiagonal(_local_ke);
-    Threads::spin_mutex::scoped_lock lock(Threads::spin_mtx);
+    libMesh::Threads::spin_mutex::scoped_lock lock(libMesh::Threads::spin_mtx);
     for (const auto & var : _diag_save_in)
     {
       auto * avar = dynamic_cast<ArrayMooseVariable *>(var);
@@ -198,7 +199,7 @@ ArrayKernel::computeOffDiagJacobian(const unsigned int jvar_num)
   if (_has_diag_save_in && same_var)
   {
     DenseVector<Number> diag = _assembly.getJacobianDiagonal(_local_ke);
-    Threads::spin_mutex::scoped_lock lock(Threads::spin_mtx);
+    libMesh::Threads::spin_mutex::scoped_lock lock(libMesh::Threads::spin_mtx);
     for (const auto & var : _diag_save_in)
     {
       auto * avar = dynamic_cast<ArrayMooseVariable *>(var);

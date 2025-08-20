@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,7 +8,6 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowBroadbridgeWhite.h"
-#include "libmesh/utility.h"
 
 namespace PorousFlowBroadbridgeWhite
 {
@@ -119,21 +118,6 @@ d2EffectiveSaturation(Real pressure, Real c, Real sn, Real ss, Real las)
   const Real lamw = LambertW(x);
   return -(ss - sn) * Utility::pow<3>(c) / Utility::pow<2>(las) * lamw * (1.0 - 2.0 * lamw) /
          Utility::pow<5>(1.0 + lamw);
-}
-
-Real
-relativePermeability(Real s, Real c, Real sn, Real ss, Real kn, Real ks)
-{
-  if (s <= sn)
-    return kn;
-
-  if (s >= ss)
-    return ks;
-
-  const Real coef = (ks - kn) * (c - 1.0);
-  const Real th = (s - sn) / (ss - sn);
-  const Real krel = kn + coef * Utility::pow<2>(th) / (c - th);
-  return krel;
 }
 
 Real

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -59,6 +59,9 @@ ReadExecutorParamsAction::setupAutoPreconditioning()
     // Action Parameters
     InputParameters params = _action_factory.getValidParams("SetupPreconditionerAction");
     params.set<std::string>("type") = "SMP";
+
+    // Associate errors with "solve_type"
+    associateWithParameter(_moose_object_pars, "solve_type", params);
 
     // Create the Action that will build the Preconditioner object
     std::shared_ptr<Action> ptr =

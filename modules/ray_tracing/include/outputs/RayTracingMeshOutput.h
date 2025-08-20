@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,7 +39,7 @@ public:
 
   virtual std::string filename() override;
 
-  void output(const ExecFlagType & type) override;
+  void output() override;
 
 protected:
   /**
@@ -50,19 +50,23 @@ protected:
   /// The RayTracingStudy
   const RayTracingStudy & _study;
 
-  /// Whether or not to output the Ray's data
+  /// Whether or not to output all of the Ray's data
   const bool _output_data;
-  /// Whether or not to output the Ray's aux data
-  const bool _output_aux_data;
+  /// Specific Ray data to output
+  const std::vector<std::string> * const _output_data_names;
   /// Whether or not to output the Ray's data in a nodal, linear sense
   const bool _output_data_nodal;
+  /// Whether or not to output the Ray's aux data
+  const bool _output_aux_data;
+  /// Specific Ray Aux data to output
+  const std::vector<std::string> * const _output_aux_data_names;
 
   /// The mesh that contains the segments
   std::unique_ptr<MeshBase> _segment_mesh;
   /// The EquationSystems
-  std::unique_ptr<EquationSystems> _es;
+  std::unique_ptr<libMesh::EquationSystems> _es;
   /// The system that stores the field data
-  ExplicitSystem * _sys;
+  libMesh::ExplicitSystem * _sys;
 
 private:
   /**
@@ -109,10 +113,10 @@ private:
   unsigned int _processor_crossings_var;
   /// The variable index in _sys for the Ray's trajectory changes  (if any)
   unsigned int _trajectory_changes_var;
-  /// The first variable index in _sys for the Ray's data (if any)
-  unsigned int _data_start_var;
-  /// The first variable index in _sys for the Ray's aux data  (if any)
-  unsigned int _aux_data_start_var;
+  /// The ray data index -> variable index map
+  std::vector<std::pair<RayDataIndex, unsigned int>> _data_vars;
+  /// The ray aux data index -> variable index map
+  std::vector<std::pair<RayDataIndex, unsigned int>> _aux_data_vars;
 
   /// The bounding box for this processor
   BoundingBox _bbox;
@@ -125,4 +129,6 @@ private:
   std::unordered_map<RayID, std::pair<dof_id_type, dof_id_type>> _ray_starting_id_map;
   /// The max node ID for the ray tracing mesh for creating unique elem IDs
   dof_id_type _max_node_id;
+  /// Whether or not we have segmented rays
+  bool _segmented_rays;
 };

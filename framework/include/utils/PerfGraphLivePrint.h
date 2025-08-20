@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -62,6 +62,9 @@ private:
   /// Number of columns before wrapping
   const unsigned int WRAP_LENGTH = 90;
 
+  /// The app performing this print
+  const MooseApp & _app;
+
   /// Reference to the PerfGraph to work with
   PerfGraph & _perf_graph;
 
@@ -79,11 +82,6 @@ private:
    */
   std::atomic<bool> _currently_destructing;
 
-  /// Whether or not printing is currently turned on
-  /// This shadows PerfGraph._live_print_active so that we have consistency
-  /// during a single printing
-  bool _should_print;
-
   /// Limit (in seconds) before printing
   std::atomic<Real> & _time_limit;
 
@@ -94,7 +92,7 @@ private:
   unsigned int _stack_level;
 
   /// The current stack for what the print thread has seen
-  std::array<PerfGraph::SectionIncrement, MAX_STACK_SIZE> _print_thread_stack;
+  std::array<PerfGraph::SectionIncrement, MOOSE_MAX_STACK_SIZE> _print_thread_stack;
 
   /// The end of the execution list
   /// This is (safely) copied from PerfGraph so that it is consistent for an
@@ -118,9 +116,6 @@ private:
 
   /// The current output count from the console
   unsigned long long int _console_num_printed;
-
-  /// Whether or not printing happened in this iteration
-  bool _printed;
 
   /// Whether or not the top thing on the stack is set to print dots
   bool _stack_top_print_dots;

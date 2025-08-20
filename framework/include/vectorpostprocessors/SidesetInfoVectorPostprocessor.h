@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,9 @@
 
 #include "SideVectorPostprocessor.h"
 
+/**
+ * Computes and outputs information (area, centroid, bounding box) about sidesets
+ */
 class SidesetInfoVectorPostprocessor : public SideVectorPostprocessor
 {
 public:
@@ -21,6 +24,7 @@ public:
   virtual void initialize() override;
   virtual void execute() override;
   virtual void finalize() override;
+  virtual void meshChanged() override { initialize(); }
 
   virtual void threadJoin(const UserObject & y) override;
 

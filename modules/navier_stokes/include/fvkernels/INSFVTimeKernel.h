@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "FVTimeKernel.h"
+#include "FVFunctorTimeKernel.h"
 #include "INSFVMomentumResidualObject.h"
 
 /**
  * All navier-stokes momentum time derivative terms should inherit from this class
  */
-class INSFVTimeKernel : public FVTimeKernel, public INSFVMomentumResidualObject
+class INSFVTimeKernel : public FVFunctorTimeKernel, public INSFVMomentumResidualObject
 {
 public:
   static InputParameters validParams();
@@ -28,7 +28,7 @@ public:
 
   void computeResidual() override final {}
   void computeJacobian() override final {}
-  using FVTimeKernel::computeOffDiagJacobian;
+  using FVFunctorTimeKernel::computeOffDiagJacobian;
   void computeOffDiagJacobian() override final {}
   void computeResidualAndJacobian() override final {}
 
@@ -41,8 +41,11 @@ protected:
   /**
    * Process into either the system residual or Jacobian
    */
-  void processResidualAndJacobian(const ADReal & residual, dof_id_type dof);
+  void addResidualAndJacobian(const ADReal & residual, dof_id_type dof);
+
+  /// Whether to contribute to RC coefficients
+  const bool _contribute_to_rc_coeffs;
 
 private:
-  using FVTimeKernel::_current_elem;
+  using FVFunctorTimeKernel::_current_elem;
 };

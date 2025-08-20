@@ -11,31 +11,28 @@
   [./createNewSidesetOne]
     type = SideSetsFromBoundingBoxGenerator
     input = gmg
-    boundaries_old = 'bottom back left'
+    included_boundaries = 'bottom back left'
     boundary_new = 10
     bottom_left = '-1.1 -1.1 -1.1'
     top_right = '1.1 1.1 1.1'
-    block_id = 0
     boundary_id_overlap = true
   []
   [./createNewSidesetTwo]
     type = SideSetsFromBoundingBoxGenerator
     input = createNewSidesetOne
-    boundaries_old = 'right bottom'
+    included_boundaries = 'right bottom'
     boundary_new = 11
     bottom_left = '-1.1 -1.1 -1.1'
     top_right = '1.1 1.1 1.1'
-    block_id = 0
     boundary_id_overlap = true
   []
   [./createNewSidesetThree]
     type = SideSetsFromBoundingBoxGenerator
     input = createNewSidesetTwo
-    boundaries_old = 'top front'
+    included_boundaries = 'top front'
     boundary_new = 12
     bottom_left = '-1.1 -1.1 -1.1'
     top_right = '1.1 1.1 1.1'
-    block_id = 0
     boundary_id_overlap = true
   [../]
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,12 +12,15 @@
 #include "MooseUtils.h"
 #include "Moose.h"
 #include "MooseApp.h"
-#include "RestartableDataIO.h"
+#include "FileMeshGenerator.h"
 
 #include "libmesh/exodusII_io.h"
 #include "libmesh/mesh_tools.h"
 #include "libmesh/nemesis_io.h"
 #include "libmesh/parallel_mesh.h"
+
+using libMesh::ExodusII_IO;
+using libMesh::Nemesis_IO;
 
 registerMooseObject("MooseApp", FileMesh);
 
@@ -26,6 +29,13 @@ FileMesh::validParams()
 {
   InputParameters params = MooseMesh::validParams();
   params.addRequiredParam<MeshFileName>("file", "The name of the mesh file to read");
+  MooseEnum dims("1=1 2 3", "1");
+  params.addParam<MooseEnum>("dim",
+                             dims,
+                             "This is only required for certain mesh formats where "
+                             "the dimension of the mesh cannot be autodetected. "
+                             "In particular you must supply this for GMSH meshes. "
+                             "Note: This is completely ignored for ExodusII meshes!");
   params.addParam<bool>("clear_spline_nodes",
                         false,
                         "If clear_spline_nodes=true, IsoGeometric Analyis spline nodes "
@@ -36,14 +46,12 @@ FileMesh::validParams()
 }
 
 FileMesh::FileMesh(const InputParameters & parameters)
-  : MooseMesh(parameters),
-    _file_name(getParam<MeshFileName>("file")),
-    _dim(getParam<MooseEnum>("dim"))
+  : MooseMesh(parameters), _file_name(getParam<MeshFileName>("file"))
 {
 }
 
 FileMesh::FileMesh(const FileMesh & other_mesh)
-  : MooseMesh(other_mesh), _file_name(other_mesh._file_name), _dim(other_mesh._dim)
+  : MooseMesh(other_mesh), _file_name(other_mesh._file_name)
 {
 }
 
@@ -52,7 +60,7 @@ FileMesh::~FileMesh() {}
 std::unique_ptr<MooseMesh>
 FileMesh::safeClone() const
 {
-  return std::make_unique<FileMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 void
@@ -60,6 +68,7 @@ FileMesh::buildMesh()
 {
   TIME_SECTION("buildMesh", 2, "Reading Mesh");
 
+  // This dimension should get overridden if the mesh reader can determine the dimension
   getMesh().set_mesh_dimension(getParam<MooseEnum>("dim"));
 
   if (_is_nemesis)
@@ -98,13 +107,13 @@ FileMesh::buildMesh()
     }
     else
     {
+      _file_name = FileMeshGenerator::deduceCheckpointPath(*this, _file_name);
+
       // If we are reading a mesh while restarting, then we might have
       // a solution file that relies on that mesh partitioning and/or
       // numbering.  In that case, we need to turn off repartitioning
       // and renumbering, at least at first.
-      _file_name = MooseUtils::convertLatestCheckpoint(_file_name, false);
-      bool restarting = _file_name.rfind(".cpa") < _file_name.size() ||
-                        _file_name.rfind(".cpr") < _file_name.size();
+      bool restarting = _file_name.rfind(".cpa.gz") < _file_name.size();
 
       const bool skip_partitioning_later = restarting && getMesh().skip_partitioning();
       const bool allow_renumbering_later = restarting && getMesh().allow_renumbering();
@@ -121,17 +130,7 @@ FileMesh::buildMesh()
       if (getParam<bool>("clear_spline_nodes"))
         MeshTools::clear_spline_nodes(getMesh());
 
-      // we also read declared mesh meta data here if there is meta data file
-      RestartableDataIO restartable(_app);
-      std::string fname = _file_name + "/meta_data_mesh" + restartable.getRestartableDataExt();
-      if (MooseUtils::pathExists(fname))
-      {
-        restartable.setErrorOnLoadWithDifferentNumberOfProcessors(false);
-        // get reference to mesh meta data (created by MooseApp)
-        auto & meta_data = _app.getRestartableDataMap(MooseApp::MESH_META_DATA);
-        if (restartable.readRestartableDataHeaderFromFile(fname, false))
-          restartable.readRestartableData(meta_data, DataNames());
-      }
+      _app.possiblyLoadRestartableMetaData(MooseApp::MESH_META_DATA, _file_name);
 
       if (restarting)
       {

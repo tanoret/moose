@@ -36,7 +36,7 @@ temperature is imposed on the bottom boundary.
 
 ## Simulation
 
-The heat conduction module of [!ac](MOOSE) is capable of performing the desired simulation.
+The heat transfer module of [!ac](MOOSE) is capable of performing the desired simulation.
 The values in [tutorial03-snow-values] provide the numeric values to be used for the simulation,
 which will solve for nine hours of simulation time.
 
@@ -118,12 +118,12 @@ Finally, the output method is defined. In this case the ExodusII format is enabl
 
 ### Simulation Execution
 
-Executing the simulation is straightforward, simply execute the heat conduction module executable
+Executing the simulation is straightforward, simply execute the heat transfer module executable
 with the input file included using the "-i" option as follows.
 
 ```
 cd ~/projects/problems/verification
-../../moose/modules/heat_conduction/heat_conduction-opt -i 2d_main.i
+../../moose/modules/heat_transfer/heat_conduction-opt -i 2d_main.i
 ```
 
 When complete an output file will be produced with the name "2d_main_out.e", this file
@@ -195,7 +195,7 @@ first-order [!ac](FEM) shape functions and the first-order time integration can 
 portion of the equation and not result in temporal error accumulation.
 
 The `mms` package, as shown in [tutorial03_step04_function], is used to compute the necessary
-forcing function. The package can directly output the the input file format for the computed
+forcing function. The package can directly output the input file format for the computed
 forcing function and the assumed solution, making adding it to the input file trivial.
 
 !listing tutorial03_verification/app/test/tests/step04_mms/step04_function.py id=tutorial03_step04_function link=false start=MooseDocs:start:spatial end=MooseDocs:end:spatial include-start=0
@@ -282,7 +282,7 @@ has minimal changes in time and tends to an easy-to-recognize solution of `xy`.
 T = x\cdot y\cdot\textrm{exp}(-1/32400 t)
 
 Again, the `mms` package, as shown in [tutorial03_temporal_function], is used to compute the necessary
-forcing function. The package can directly output the the input file format of the computed
+forcing function. The package can directly output the input file format of the computed
 forcing function and the assumed solution, making adding it to the input file trivial.
 
 !listing tutorial03_verification/app/test/tests/step04_mms/step04_function.py id=tutorial03_temporal_function link=false start=MooseDocs:start:temporal end=MooseDocs:end:temporal include-start=0

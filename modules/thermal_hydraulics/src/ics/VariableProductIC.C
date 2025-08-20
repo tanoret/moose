@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,7 @@ InputParameters
 VariableProductIC::validParams()
 {
   InputParameters params = InitialCondition::validParams();
+  params.addClassDescription("Sets the initial condition as the product of several variables");
   params.addRequiredCoupledVar("values", "The values being multiplied");
   return params;
 }

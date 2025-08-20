@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -44,7 +44,7 @@ RelativeDifferencePostprocessor::execute()
 }
 
 PostprocessorValue
-RelativeDifferencePostprocessor::getValue()
+RelativeDifferencePostprocessor::getValue() const
 {
   if (MooseUtils::absoluteFuzzyEqual(_value2, 0))
     return std::abs(_value1 - _value2);

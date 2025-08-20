@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -138,8 +138,7 @@ SidesetInfoVectorPostprocessor::finalize()
 void
 SidesetInfoVectorPostprocessor::threadJoin(const UserObject & y)
 {
-  const SidesetInfoVectorPostprocessor & vpp =
-      static_cast<const SidesetInfoVectorPostprocessor &>(y);
+  const auto & vpp = static_cast<const SidesetInfoVectorPostprocessor &>(y);
 
   for (auto & e : _boundary_data)
   {

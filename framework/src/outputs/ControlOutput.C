@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -41,9 +41,9 @@ ControlOutput::ControlOutput(const InputParameters & parameters)
 }
 
 void
-ControlOutput::output(const ExecFlagType & type)
+ControlOutput::output()
 {
-  if (type == EXEC_INITIAL)
+  if (_current_execute_flag == EXEC_INITIAL)
     outputControls();
   else
     outputChangedControls();

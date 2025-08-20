@@ -1,11 +1,17 @@
-Begin by performing the following external instructions:
+## Peacock prereqs (skip if not interested in Peacock)
 
-- Install [VcXsrv](https://sourceforge.net/projects/vcxsrv/reviews/) (Only needed for Peacock)
+!alert warning title=Windows 11
+Windows 11 users need not follow the VcXsrv instructions below. OpenGL is natively supported on
+Windows 11.
 
-## Launch VcXsrv
+- Install [VcXsrv](https://sourceforge.net/projects/vcxsrv/reviews/) (Windows 10 only).
+- Install video card drivers applicative to your graphics card hardware (All versions of Windows).
 
-Each time you reboot, or basically each time VcXsrv is *not* running, and you wish to use the graphical
-capabilities of MOOSE (Peacock), you should start VcXsrv before launching your WSL terminal.
+!style! halign=left
+Each time you reboot, or basically each time VcXsrv is *not* running, and you wish to use the
+graphical capabilities of MOOSE (Peacock), you should start VcXsrv before launching your WSL
+terminal.
+!style-end!
 
 When starting VcXsrv, options for the server can be adjusted. In general, the default options are
 adequate, except for the following:
@@ -17,8 +23,8 @@ Again, all other options for VcXsrv can remain the default.
 
 !alert tip title=VcXsrv network connections
 In some cases, the system firewall may block connections to the X window server. If errors or window
-rendering stalls are experienced after adopting the VcXsrv settings above, check to make sure that all
-network connections to VcXsrv are allowed.
+rendering stalls are experienced after adopting the VcXsrv settings above, check to make sure that
+all network connections to VcXsrv are allowed.
 
 ## Install WSL
 
@@ -51,32 +57,40 @@ Downloading: Ubuntu
 The requested operation is successful. Changes will not be effective until the system is rebooted.
 ```
 
-## Setup Linux and Enable GUI Dependencies
+### Setup Linux and Enable GUI Dependencies
 
+!style! halign=left
 Once the restart is complete, a prompt will appear on next boot continuing the Ubuntu Linux
 installation and requesting a username for the new UNIX user account.
+!style-end!
 
 ```
 Installing, this may take a few minutes....
-Please create a default UNIX user account. The username does not need to match your Windows username.
-For more information visit: https://aka.ms/wslusers
+Please create a default UNIX user account. The username does not need to match your Windows
+username. For more information visit: https://aka.ms/wslusers
 Enter new UNIX username:
 ```
 
 After entering a username and a new password, a standard Linux bash prompt will appear. An update
-should be performed to check for any out-of-date packages. To enable usage of Peacock, OpenGL libraries
-must also be installed.
+should be performed to check for any out-of-date packages. To enable usage of Peacock, OpenGL
+libraries must also be installed (all versions of Windows).
 
 ```bash
 sudo apt update
 sudo apt upgrade
-sudo apt install x11-apps libglu1-mesa
+sudo apt install x11-apps libglu1-mesa libxcb-*
 ```
 
-## Configure WSL to use VcXsrv
+### Configure WSL to connect to Windows GUI
 
-Modify the bash profile to allow WSL to connect to VcXsrv.
+!style! halign=left
+Modify the bash profile to allow WSL to connect to the Windows GUI.
+!style-end!
 
 ```bash
 echo "export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0.0" >> ~/.bashrc
 ```
+
+!alert note
+The above sometimes needs to be run again after a Windows update. If you receive errors about the
+server not accepting connections, chances are it is this.

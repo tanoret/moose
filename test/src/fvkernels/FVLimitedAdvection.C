@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,7 +42,7 @@ FVLimitedAdvection::computeQpResidual()
   const bool elem_is_upwind = _velocity * _normal >= 0;
   const auto face =
       makeFace(*_face_info, LimiterType(int(getParam<MooseEnum>("limiter"))), elem_is_upwind);
-  ADReal phi_f = _var(face);
+  ADReal phi_f = _var(face, Moose::currentState());
 
   return _normal * _velocity * phi_f;
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -115,11 +115,8 @@ InputParameters
 JvarMapInterfaceBase<T>::validParams()
 {
   auto params = T::validParams();
-  params.addDeprecatedCoupledVar("args",
-                                 "Vector of nonlinear variable arguments this object depends on",
-                                 "args is deprecated, use 'coupled_variables' instead");
-  params.addCoupledVar("coupled_variables",
-                       "Vector of nonlinear variable arguments this object depends on");
+  params.addCoupledVar("args", "Vector of nonlinear variable arguments this object depends on");
+  params.deprecateCoupledVar("args", "coupled_variables", "02/07/2024");
 
   return params;
 }
@@ -128,7 +125,7 @@ template <class T>
 JvarMapInterfaceBase<T>::JvarMapInterfaceBase(const InputParameters & parameters)
   : T(parameters),
     _n_args(this->_coupled_standard_moose_vars.size()),
-    _jvar_max_size(this->_fe_problem.getNonlinearSystemBase().nVariables()),
+    _jvar_max_size(this->_sys.nVariables()),
     _jvar_map(_jvar_max_size, -1)
 {
   // populate map

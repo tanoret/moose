@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,7 +13,7 @@
 #include "MooseEnum.h"
 #include "MultiMooseEnum.h"
 #include "ExecFlagEnum.h"
-#include "Parser.h"
+#include "Builder.h"
 #include "pcrecpp.h"
 #include "Action.h"
 #include "AppFactory.h"
@@ -33,25 +33,12 @@ JsonSyntaxTree::JsonSyntaxTree(const std::string & search_string) : _search(sear
   auto & actmap = Registry::allActions();
   for (auto & entry : actmap)
     for (auto & act : entry.second)
-      _action_label_map[act._classname] = std::make_pair(entry.first, act._file);
+      _action_label_map[act->_classname] = std::make_pair(entry.first, act->_file);
 
   auto & objmap = Registry::allObjects();
   for (auto & entry : objmap)
     for (auto & obj : entry.second)
-    {
-      std::string name = obj._name;
-      if (name.empty())
-        name = obj._alias;
-      if (name.empty())
-        name = obj._classname;
-
-      // Skip <JACOBIAN> instances and remove <RESIDUAL> from name
-      if (name.find("<JACOBIAN>") == std::string::npos)
-      {
-        name = name.substr(0, name.find("<RESIDUAL>"));
-        _object_label_map[name] = std::make_pair(entry.first, obj._file);
-      }
-    }
+      _object_label_map[obj->name()] = std::make_pair(entry.first, obj->_file);
 }
 
 std::vector<std::string>
@@ -157,6 +144,9 @@ JsonSyntaxTree::setParams(InputParameters * params, bool search_match, nlohmann:
     std::string doc = params->getDocString(iter.first);
     MooseUtils::escape(doc);
     param_json["description"] = doc;
+
+    param_json["doc_unit"] = params->getDocUnit(iter.first);
+
     param_json["controllable"] = params->isControllable(iter.first);
     param_json["deprecated"] = params->isParamDeprecated(iter.first);
     all_params[iter.first] = param_json;
@@ -170,16 +160,16 @@ JsonSyntaxTree::addGlobal()
   // If they are doing a search they probably don't want to see this
   if (_search.empty())
   {
-    auto params = Action::validParams();
+    auto params = Moose::Builder::validParams();
     nlohmann::json jparams;
     setParams(&params, true, jparams);
     _root["global"]["parameters"] = jparams;
 
     // Just create a list of registered app names
     nlohmann::json apps;
-    auto factory = AppFactory::instance();
-    for (auto app = factory.registeredObjectsBegin(); app != factory.registeredObjectsEnd(); ++app)
-      apps.push_back(app->first);
+    auto & factory = AppFactory::instance();
+    for (const auto & name_bi_pair : factory.registeredObjects())
+      apps.push_back(name_bi_pair.first);
 
     _root["global"]["registered_apps"] = apps;
   }
@@ -229,9 +219,20 @@ JsonSyntaxTree::addParameters(const std::string & parent,
     json["syntax_path"] = path;
     json["parent_syntax"] = parent;
     json["description"] = params->getClassDescription();
-    auto label_pair = getObjectLabel(path);
-    json["label"] = label_pair.first;
-    json["register_file"] = label_pair.second;
+    // We do this for ActionComponents which are registered as Actions but
+    // dumped to the syntax tree as Objects
+    if (params->isParamValid("_moose_base") && json["moose_base"] == "Action")
+    {
+      auto label_pair = getActionLabel(classname);
+      json["label"] = label_pair.first;
+      json["register_file"] = label_pair.second;
+    }
+    else
+    {
+      auto label_pair = getObjectLabel(path);
+      json["label"] = label_pair.first;
+      json["register_file"] = label_pair.second;
+    }
     if (lineinfo.isValid())
     {
       json["file_info"][lineinfo.file()] = lineinfo.line();
@@ -279,6 +280,15 @@ JsonSyntaxTree::buildOptions(const std::iterator_traits<InputParameters::iterato
   }
   {
     auto * enum_type = dynamic_cast<InputParameters::Parameter<std::vector<MooseEnum>> *>(val);
+    if (enum_type)
+    {
+      out_of_range_allowed = (enum_type->get())[0].isOutOfRangeAllowed();
+      options = (enum_type->get())[0].getRawNames();
+      docs = enum_type->get()[0].getItemDocumentation();
+    }
+  }
+  {
+    auto * enum_type = dynamic_cast<InputParameters::Parameter<std::vector<MultiMooseEnum>> *>(val);
     if (enum_type)
     {
       out_of_range_allowed = (enum_type->get())[0].isOutOfRangeAllowed();
@@ -358,23 +368,31 @@ JsonSyntaxTree::basicCppType(const std::string & cpp_type)
   std::string s = "String";
   if (cpp_type.find("std::vector") != std::string::npos ||
       cpp_type.find("libMesh::VectorValue") != std::string::npos ||
-      cpp_type.find("libMesh::TensorValue") != std::string::npos)
+      cpp_type.find("libMesh::TensorValue") != std::string::npos ||
+      cpp_type.find("Eigen::Matrix") != std::string::npos)
   {
     // Get the template type and use its basic type for the array type
     pcrecpp::RE r("^[^<]+<\\s*(.*)\\s*>$");
     std::string t;
     r.FullMatch(cpp_type, &t);
+
+    // Capture type just to the first comma for Eigen::Matrix<type,V,W,X,Y,Z>
+    if (cpp_type.find("Eigen::Matrix") != std::string::npos)
+      t = t.substr(0, t.find(","));
+
     s = "Array:" + basicCppType(t);
   }
   else if (cpp_type.find("MultiMooseEnum") != std::string::npos ||
            cpp_type.find("ExecFlagEnum") != std::string::npos ||
-           cpp_type.find("VectorPostprocessorName") != std::string::npos)
+           cpp_type.find("VectorPostprocessorName") != std::string::npos ||
+           cpp_type.find("std::map") != std::string::npos)
     s = "Array:String";
   else if (cpp_type.find("libMesh::Point") != std::string::npos)
     s = "Array:Real";
   else if (cpp_type == "int" || cpp_type == "unsigned int" || cpp_type == "short" ||
            cpp_type == "unsigned short" || cpp_type == "char" || cpp_type == "unsigned char" ||
-           cpp_type == "long" || cpp_type == "unsigned long")
+           cpp_type == "long" || cpp_type == "unsigned long" || cpp_type == "long long" ||
+           cpp_type == "unsigned long long")
     s = "Integer";
   else if (cpp_type == "double" || cpp_type == "float")
     s = "Real";

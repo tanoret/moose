@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,7 @@
 #include "MooseTypes.h"
 #include "MooseConfig.h"
 
+class SubProblem;
 class SystemBase;
 namespace libMesh
 {
@@ -27,11 +28,7 @@ namespace Moose
 inline bool
 globalADIndexing()
 {
-#ifdef MOOSE_GLOBAL_AD_INDEXING
   return true;
-#else
-  return false;
-#endif
 }
 
 /**
@@ -152,4 +149,8 @@ globalDofIndexToDerivative(const T & ad_real_container,
   return ret_val;
 }
 
+/**
+ * @returns whether we should be doing derivatives
+ */
+bool doDerivatives(const SubProblem & subproblem, const SystemBase & sys);
 }

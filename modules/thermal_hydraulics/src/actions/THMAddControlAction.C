@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,12 +14,13 @@
 #include "Control.h"
 #include "THMControl.h"
 
-registerMooseAction("ThermalHydraulicsApp", THMAddControlAction, "add_control");
+registerMooseAction("ThermalHydraulicsApp", THMAddControlAction, "THM:add_control_logic");
 
 InputParameters
 THMAddControlAction::validParams()
 {
   InputParameters params = AddControlAction::validParams();
+  params.addClassDescription("Adds Controls from the ControlLogic block.");
   return params;
 }
 

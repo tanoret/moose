@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,7 +29,7 @@ AreaPostprocessor::AreaPostprocessor(const InputParameters & parameters)
 void
 AreaPostprocessor::threadJoin(const UserObject & y)
 {
-  const AreaPostprocessor & pps = static_cast<const AreaPostprocessor &>(y);
+  const auto & pps = static_cast<const AreaPostprocessor &>(y);
   _integral_value += pps._integral_value;
 }
 

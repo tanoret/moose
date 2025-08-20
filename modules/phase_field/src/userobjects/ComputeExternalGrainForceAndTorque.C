@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,7 +30,7 @@ ComputeExternalGrainForceAndTorque::ComputeExternalGrainForceAndTorque(
     const InputParameters & parameters)
   : DerivativeMaterialInterface<ShapeElementUserObject>(parameters),
     GrainForceAndTorqueInterface(),
-    _c_name(getVar("c", 0)->name()),
+    _c_name(coupledName("c", 0)),
     _c_var(coupled("c")),
     _dF_name(getParam<MaterialPropertyName>("force_density")),
     _dF(getMaterialPropertyByName<std::vector<RealGradient>>(_dF_name)),
@@ -45,7 +45,7 @@ ComputeExternalGrainForceAndTorque::ComputeExternalGrainForceAndTorque(
   for (unsigned int i = 0; i < _op_num; ++i)
   {
     _vals_var[i] = coupled("etas", i);
-    _vals_name[i] = getVar("etas", i)->name();
+    _vals_name[i] = coupledName("etas", i);
     _dFdeta[i] = &getMaterialPropertyByName<std::vector<RealGradient>>(
         derivativePropertyNameFirst(_dF_name, _vals_name[i]));
   }
@@ -186,8 +186,7 @@ ComputeExternalGrainForceAndTorque::finalize()
 void
 ComputeExternalGrainForceAndTorque::threadJoin(const UserObject & y)
 {
-  const ComputeExternalGrainForceAndTorque & pps =
-      static_cast<const ComputeExternalGrainForceAndTorque &>(y);
+  const auto & pps = static_cast<const ComputeExternalGrainForceAndTorque &>(y);
   for (unsigned int i = 0; i < _ncomp; ++i)
     _force_torque_store[i] += pps._force_torque_store[i];
   if (_fe_problem.currentlyComputingJacobian())

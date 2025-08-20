@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,8 +31,18 @@ public:
   void thermophysicalProperties(Real pressure,
                                 Real enthalpy,
                                 unsigned int qp,
-                                FluidStatePhaseEnum & phase_state,
                                 std::vector<FluidStateProperties> & fsp) const override;
+
+  void thermophysicalProperties(const ADReal & pressure,
+                                const ADReal & enthalpy,
+                                unsigned int qp,
+                                std::vector<FluidStateProperties> & fsp) const override;
+
+  void thermophysicalProperties(const ADReal & pressure,
+                                const ADReal & enthalpy,
+                                unsigned int qp,
+                                FluidStatePhaseEnum & phase_state,
+                                std::vector<FluidStateProperties> & fsp) const;
 
 protected:
   /// Fluid properties UserObject for water

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,7 @@
 #include "PerfGuard.h"
 #include "MooseError.h"
 #include "PerfGraphLivePrint.h"
+#include "PerfGraphRegistry.h"
 #include "MooseApp.h"
 
 // Note: do everything we can to make sure this only gets #included
@@ -42,22 +43,25 @@ PerfGraph::PerfGraph(const std::string & root_name,
     _execution_list_begin(0),
     _execution_list_end(0),
     _active(true),
-    _live_print_active(true),
     _destructing(false),
     _live_print_time_limit(5.0),
     _live_print_mem_limit(100),
     _live_print(std::make_unique<PerfGraphLivePrint>(*this, app))
+{
+  push(_root_node_id);
+}
+
+PerfGraph::~PerfGraph() { disableLivePrint(); }
+
+void
+PerfGraph::enableLivePrint()
 {
   if (_pid == 0 && !_disable_live_print)
   {
     // Start the printing thread
     _print_thread = std::thread([this] { this->_live_print->start(); });
   }
-
-  push(_root_node_id);
 }
-
-PerfGraph::~PerfGraph() { disableLivePrint(); }
 
 void
 PerfGraph::disableLivePrint()
@@ -180,7 +184,7 @@ PerfGraph::addToExecutionList(const PerfID id,
 void
 PerfGraph::push(const PerfID id)
 {
-  if (!_active && !_live_print_active)
+  if (!_active)
     return;
 
   PerfNode * new_node = nullptr;
@@ -212,13 +216,13 @@ PerfGraph::push(const PerfID id)
 
   _current_position++;
 
-  if (_current_position >= MAX_STACK_SIZE)
+  if (_current_position >= MOOSE_MAX_STACK_SIZE)
     mooseError("PerfGraph is out of stack space!");
 
   _stack[_current_position] = new_node;
 
   // Add this to the execution list unless the message is empty - but pre-emted by live_print_all
-  if ((_live_print_active || _live_print_all) && (_pid == 0 && !_disable_live_print) &&
+  if ((_pid == 0 && !_disable_live_print) &&
       (!_perf_graph_registry.readSectionInfo(id)._live_message.empty() || _live_print_all))
     addToExecutionList(id, IncrementState::STARTED, current_time, start_memory);
 }
@@ -226,7 +230,7 @@ PerfGraph::push(const PerfID id)
 void
 PerfGraph::pop()
 {
-  if (!_active && !_live_print_active)
+  if (!_active)
     return;
 
   auto current_time = std::chrono::steady_clock::now();
@@ -250,7 +254,7 @@ PerfGraph::pop()
   _current_position--;
 
   // Add this to the exection list
-  if ((_live_print_active || _live_print_all) && (_pid == 0 && !_disable_live_print) &&
+  if ((_pid == 0 && !_disable_live_print) &&
       (!_perf_graph_registry.readSectionInfo(current_node->id())._live_message.empty() ||
        _live_print_all))
   {
@@ -379,7 +383,7 @@ PerfGraph::treeTable(const unsigned int level, const bool heaviest /* = false */
   });
 
   auto act = [this, &vtable](const PerfNode & node,
-                             const PerfGraphSectionInfo & section_info,
+                             const moose::internal::PerfGraphSectionInfo & section_info,
                              const unsigned int depth)
   {
     vtable.addRow(std::string(depth * 2, ' ') + section_info._name,        // Section Name
@@ -409,7 +413,7 @@ void
 PerfGraph::printHeaviestBranch(const ConsoleStream & console)
 {
   console << "\nHeaviest Branch:\n";
-  treeTable(MAX_STACK_SIZE, /* heaviest = */ true).print(console);
+  treeTable(MOOSE_MAX_STACK_SIZE, /* heaviest = */ true).print(console);
 }
 
 void
@@ -487,7 +491,7 @@ dataStore(std::ostream & stream, PerfGraph & perf_graph, void *)
 {
   // We need to store the registry id -> section info map so that we can add
   // registered sections that may not be added yet during recover
-  dataStore(stream, perf_graph._perf_graph_registry._id_to_section_info, nullptr);
+  dataStore(stream, perf_graph._perf_graph_registry._id_to_item, nullptr);
 
   // Update before serializing the nodes so that the time/memory/calls are correct
   perf_graph.update();

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -55,7 +55,7 @@ EigenExecutionerBase::eigenvalueOld()
 EigenExecutionerBase::EigenExecutionerBase(const InputParameters & parameters)
   : Executioner(parameters),
     _problem(_fe_problem),
-    _eigen_sys(static_cast<MooseEigenSystem &>(_problem.getNonlinearSystemBase())),
+    _eigen_sys(static_cast<MooseEigenSystem &>(_problem.getNonlinearSystemBase(/*nl_sys=*/0))),
     _feproblem_solve(*this),
     _eigenvalue(addAttributeReporter("eigenvalue", getParam<Real>("k0"))),
     _source_integral(getPostprocessorValue("bx_norm")),
@@ -67,7 +67,7 @@ EigenExecutionerBase::EigenExecutionerBase(const InputParameters & parameters)
   // FIXME: currently we have to use old and older solution vectors for power iteration.
   //       We will need 'step' in the future.
   _problem.transient(true);
-  _problem.getNonlinearSystemBase().needSolutionState(2);
+  _eigen_sys.needSolutionState(2);
   _fe_problem.getAuxiliarySystem().needSolutionState(2);
 
   // we want to tell the App about what our system time is (in case anyone else is interested).
@@ -101,7 +101,7 @@ EigenExecutionerBase::init()
   // check when the postprocessors are evaluated
   const ExecFlagEnum & bx_exec =
       _problem.getUserObject<UserObject>(getParam<PostprocessorName>("bx_norm")).getExecuteOnEnum();
-  if (!bx_exec.contains(EXEC_LINEAR))
+  if (!bx_exec.isValueSet(EXEC_LINEAR))
     mooseError("Postprocessor " + getParam<PostprocessorName>("bx_norm") +
                " requires execute_on = 'linear'");
 
@@ -112,7 +112,7 @@ EigenExecutionerBase::init()
     _norm_exec = bx_exec;
 
   // check if _source_integral has been evaluated during initialSetup()
-  if (!bx_exec.contains(EXEC_INITIAL))
+  if (!bx_exec.isValueSet(EXEC_INITIAL))
     _problem.execute(EXEC_LINEAR);
 
   if (_source_integral == 0.0)
@@ -185,7 +185,7 @@ EigenExecutionerBase::inversePowerIteration(unsigned int min_iter,
   {
     solution_diff = &_problem.getPostprocessorValueByName(xdiff);
     const ExecFlagEnum & xdiff_exec = _problem.getUserObject<UserObject>(xdiff).getExecuteOnEnum();
-    if (!xdiff_exec.contains(EXEC_LINEAR))
+    if (!xdiff_exec.isValueSet(EXEC_LINEAR))
       mooseError("Postprocessor " + xdiff + " requires execute_on = 'linear'");
   }
 
@@ -243,11 +243,11 @@ EigenExecutionerBase::inversePowerIteration(unsigned int min_iter,
     // Important: we do not call _problem.advanceState() because we do not
     // want to overwrite the old postprocessor values and old material
     // properties in stateful materials.
-    _problem.getNonlinearSystemBase().copyOldSolutions();
+    _eigen_sys.copyOldSolutions();
     _problem.getAuxiliarySystem().copyOldSolutions();
     if (_problem.getDisplacedProblem() != NULL)
     {
-      _problem.getDisplacedProblem()->nlSys().copyOldSolutions();
+      _problem.getDisplacedProblem()->solverSys(_eigen_sys.number()).copyOldSolutions();
       _problem.getDisplacedProblem()->auxSys().copyOldSolutions();
     }
 
@@ -255,15 +255,15 @@ EigenExecutionerBase::inversePowerIteration(unsigned int min_iter,
     _source_integral_old = _source_integral;
 
     preIteration();
-    _problem.solve();
-    converged = _problem.converged();
+    _problem.solve(_eigen_sys.number());
+    converged = _problem.converged(_eigen_sys.number());
     if (!converged)
       break;
     postIteration();
 
     // save the initial residual
     if (iter == 0)
-      initial_res = _eigen_sys._initial_residual_before_preset_bcs;
+      initial_res = _eigen_sys.referenceResidual();
 
     // update eigenvalue
     k = k_old * _source_integral / _source_integral_old;
@@ -391,14 +391,14 @@ EigenExecutionerBase::postExecute()
   }
 
   Real s = 1.0;
-  if (_norm_exec.contains(EXEC_CUSTOM))
+  if (_norm_exec.isValueSet(EXEC_CUSTOM))
   {
     _console << " Cannot let the normalization postprocessor on custom.\n";
     _console << " Normalization is abandoned!" << std::endl;
   }
   else
   {
-    bool force = _norm_exec.contains(EXEC_TIMESTEP_END) || _norm_exec.contains(EXEC_LINEAR);
+    bool force = _norm_exec.isValueSet(EXEC_TIMESTEP_END) || _norm_exec.isValueSet(EXEC_LINEAR);
     s = normalizeSolution(force);
     if (!MooseUtils::absoluteFuzzyEqual(s, 1.0))
       _console << " Solution is rescaled with factor " << s << " for normalization!" << std::endl;
@@ -584,7 +584,7 @@ EigenExecutionerBase::nonlinearSolve(Real nl_rtol, Real nl_atol, Real l_rtol, Re
   _problem.es().parameters.set<Real>("linear solver tolerance") = l_rtol;
 
   // call nonlinear solve
-  _problem.solve();
+  _problem.solve(_eigen_sys.number());
 
   k = _source_integral;
   _eigenvalue = k;
@@ -593,5 +593,5 @@ EigenExecutionerBase::nonlinearSolve(Real nl_rtol, Real nl_atol, Real l_rtol, Re
   _problem.es().parameters.set<Real>("linear solver tolerance") = tol2;
   _problem.es().parameters.set<Real>("nonlinear solver relative residual tolerance") = tol3;
 
-  return _problem.converged();
+  return _problem.converged(_eigen_sys.number());
 }

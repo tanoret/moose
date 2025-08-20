@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,16 +39,15 @@ AverageElementSize::execute()
 }
 
 Real
-AverageElementSize::getValue()
+AverageElementSize::getValue() const
 {
-
   return _total_size / _elems;
 }
 
 void
 AverageElementSize::threadJoin(const UserObject & y)
 {
-  const AverageElementSize & pps = static_cast<const AverageElementSize &>(y);
+  const auto & pps = static_cast<const AverageElementSize &>(y);
   _total_size += pps._total_size;
   _elems += pps._elems;
 }

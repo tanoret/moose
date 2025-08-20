@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,7 +15,6 @@
 // MOOSE Includes
 #include "MooseVariableInterface.h"
 #include "TaggingInterface.h"
-#include "DualRealOps.h"
 
 // Forward declarations
 template <typename>

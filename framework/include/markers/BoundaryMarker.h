@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,5 +34,5 @@ protected:
   const MarkerValue _mark;
 
   /// boundary near which to mark elements
-  const BoundaryID _boundary;
+  const std::vector<BoundaryID> _boundary_ids;
 };

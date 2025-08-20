@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -82,8 +82,9 @@ WCNSFVInletTemperatureBC::WCNSFVInletTemperatureBC(const InputParameters & param
 }
 
 ADReal
-WCNSFVInletTemperatureBC::boundaryValue(const FaceInfo & fi) const
+WCNSFVInletTemperatureBC::boundaryValue(const FaceInfo & fi, const Moose::StateArg & state) const
 {
+
   if (_area_pp)
     if (MooseUtils::absoluteFuzzyEqual(*_area_pp, 0))
       mooseError("Surface area is 0");
@@ -92,14 +93,14 @@ WCNSFVInletTemperatureBC::boundaryValue(const FaceInfo & fi) const
     return *_temperature_pp;
   else if (_velocity_pp)
   {
-    ADReal rho = (*_rho)(singleSidedFaceArg(&fi));
-    ADReal cp = (*_cp)(singleSidedFaceArg(&fi));
+    ADReal rho = (*_rho)(singleSidedFaceArg(&fi), state);
+    ADReal cp = (*_cp)(singleSidedFaceArg(&fi), state);
 
     return _scaling_factor * (*_energy_pp) / (*_area_pp * rho * *_velocity_pp * cp);
   }
   else
   {
-    ADReal cp = (*_cp)(singleSidedFaceArg(&fi));
+    ADReal cp = (*_cp)(singleSidedFaceArg(&fi), state);
 
     return _scaling_factor * (*_energy_pp) / (*_mdot_pp * cp);
   }

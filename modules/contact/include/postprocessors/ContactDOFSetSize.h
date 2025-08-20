@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,10 +25,10 @@ public:
 
   ContactDOFSetSize(const InputParameters & parameters);
 
-  void initialize() override;
-  void execute() override;
+  virtual void initialize() override;
+  virtual void execute() override;
 
-  PostprocessorValue getValue() override;
+  virtual PostprocessorValue getValue() const override;
 
 private:
   /// MOOSE variable we compute the contact set from

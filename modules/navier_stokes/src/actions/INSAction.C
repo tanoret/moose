@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,6 +23,8 @@
 #include "libmesh/vector_value.h"
 #include "libmesh/string_to_enum.h"
 
+using namespace libMesh;
+
 registerMooseAction("NavierStokesApp", INSAction, "append_mesh_generator");
 registerMooseAction("NavierStokesApp", INSAction, "add_navier_stokes_variables");
 registerMooseAction("NavierStokesApp", INSAction, "add_navier_stokes_ics");
@@ -41,7 +43,7 @@ INSAction::validParams()
   params.addParam<MooseEnum>("equation_type", type, "Navier-Stokes equation type");
 
   params.addParam<std::vector<SubdomainName>>(
-      "block", "The list of block ids (SubdomainID) on which NS equation is defined on");
+      "block", {}, "The list of block ids (SubdomainID) on which NS equation is defined on");
 
   // temperature equation parameters
   params.addParam<bool>("boussinesq_approximation", false, "True to have Boussinesq approximation");
@@ -140,6 +142,8 @@ INSAction::validParams()
   params.addParam<std::string>("pressure_variable_name",
                                "A name for the pressure variable. If this is not provided, a "
                                "sensible default will be used.");
+  params.addParam<NonlinearSystemName>(
+      "nl_sys", "nl0", "The nonlinear system that this action belongs to.");
 
   params.addParamNamesToGroup(
       "equation_type block gravity dynamic_viscosity_name density_name boussinesq_approximation "
@@ -332,7 +336,9 @@ INSAction::act()
     }
 
     if (getParam<bool>("add_temperature_equation") &&
-        !_problem->getNonlinearSystemBase().hasVariable(_temperature_variable_name))
+        !_problem
+             ->getNonlinearSystemBase(_problem->nlSysNum(getParam<NonlinearSystemName>("nl_sys")))
+             .hasVariable(_temperature_variable_name))
     {
       params.set<std::vector<Real>>("scaling") = {getParam<Real>("temperature_scaling")};
       _problem->addVariable(var_type, _temperature_variable_name, params);

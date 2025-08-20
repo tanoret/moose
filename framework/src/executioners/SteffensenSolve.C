@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -60,8 +60,8 @@ SteffensenSolve::allocateStorage(const bool primary)
   }
 
   // Store a copy of the previous solution here
-  _nl.addVector(xn_m1_tagid, false, PARALLEL);
-  _nl.addVector(fxn_m1_tagid, false, PARALLEL);
+  _solver_sys.addVector(xn_m1_tagid, false, PARALLEL);
+  _solver_sys.addVector(fxn_m1_tagid, false, PARALLEL);
 
   // Allocate storage for the previous postprocessor values
   (*transformed_pps_values).resize((*transformed_pps).size());
@@ -89,9 +89,9 @@ SteffensenSolve::saveVariableValues(const bool primary)
   }
 
   // Save previous variable values
-  NumericVector<Number> & solution = _nl.solution();
-  NumericVector<Number> & fxn_m1 = _nl.getVector(fxn_m1_tagid);
-  NumericVector<Number> & xn_m1 = _nl.getVector(xn_m1_tagid);
+  NumericVector<Number> & solution = _solver_sys.solution();
+  NumericVector<Number> & fxn_m1 = _solver_sys.getVector(fxn_m1_tagid);
+  NumericVector<Number> & xn_m1 = _solver_sys.getVector(xn_m1_tagid);
 
   // What 'solution' is with regards to the Steffensen solve depends on the step
   if (iteration % 2 == 1)
@@ -200,9 +200,9 @@ SteffensenSolve::transformVariables(const std::set<dof_id_type> & transformed_do
     xn_m1_tagid = _secondary_xn_m1_tagid;
   }
 
-  NumericVector<Number> & solution = _nl.solution();
-  NumericVector<Number> & fxn_m1 = _nl.getVector(fxn_m1_tagid);
-  NumericVector<Number> & xn_m1 = _nl.getVector(xn_m1_tagid);
+  NumericVector<Number> & solution = _solver_sys.solution();
+  NumericVector<Number> & fxn_m1 = _solver_sys.getVector(fxn_m1_tagid);
+  NumericVector<Number> & xn_m1 = _solver_sys.getVector(xn_m1_tagid);
 
   for (const auto & dof : transformed_dofs)
   {
@@ -218,7 +218,7 @@ SteffensenSolve::transformVariables(const std::set<dof_id_type> & transformed_do
     solution.set(dof, new_value);
   }
   solution.close();
-  _nl.update();
+  _solver_sys.update();
 }
 
 void
@@ -228,6 +228,7 @@ SteffensenSolve::printFixedPointConvergenceHistory()
            << Console::outputNorm(std::numeric_limits<Real>::max(), _fixed_point_initial_norm)
            << '\n';
 
+  Real max_norm_old = _fixed_point_initial_norm;
   for (unsigned int i = 0; i <= _fixed_point_it; ++i)
   {
     Real max_norm =
@@ -241,6 +242,8 @@ SteffensenSolve::printFixedPointConvergenceHistory()
       steffensen_prefix << " Steffensen step           |R| = ";
 
     _console << std::setw(2) << i + 1 << steffensen_prefix.str()
-             << Console::outputNorm(_fixed_point_initial_norm, max_norm) << '\n';
+             << Console::outputNorm(max_norm_old, max_norm) << '\n';
+
+    max_norm_old = max_norm;
   }
 }

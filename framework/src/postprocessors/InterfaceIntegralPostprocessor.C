@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,9 +42,8 @@ InterfaceIntegralPostprocessor::execute()
 }
 
 Real
-InterfaceIntegralPostprocessor::getValue()
+InterfaceIntegralPostprocessor::getValue() const
 {
-  InterfacePostprocessor::getValue();
   return _integral_value;
 }
 
@@ -52,8 +51,7 @@ void
 InterfaceIntegralPostprocessor::threadJoin(const UserObject & y)
 {
   InterfacePostprocessor::threadJoin(y);
-  const InterfaceIntegralPostprocessor & pps =
-      static_cast<const InterfaceIntegralPostprocessor &>(y);
+  const auto & pps = static_cast<const InterfaceIntegralPostprocessor &>(y);
   _integral_value += pps._integral_value;
 }
 
@@ -69,5 +67,6 @@ InterfaceIntegralPostprocessor::computeIntegral()
 void
 InterfaceIntegralPostprocessor::finalize()
 {
+  InterfacePostprocessor::finalize();
   gatherSum(_integral_value);
 }

@@ -41,20 +41,24 @@ inlet_v = 0.001
 
     inlet_boundaries = 'left'
     momentum_inlet_types = 'fixed-velocity'
-    momentum_inlet_function = '${inlet_v} 0'
+    momentum_inlet_functors = '${inlet_v} 0'
     energy_inlet_types = 'fixed-temperature'
-    energy_inlet_function = '${inlet_temp}'
+    energy_inlet_functors = '${inlet_temp}'
 
     wall_boundaries = 'top bottom'
     momentum_wall_types = 'noslip noslip'
     energy_wall_types = 'heatflux heatflux'
-    energy_wall_function = '0 0'
+    energy_wall_functors = '0 0'
 
     outlet_boundaries = 'right'
     momentum_outlet_types = 'fixed-pressure'
-    pressure_function = '${outlet_pressure}'
+    pressure_functors = '${outlet_pressure}'
 
     external_heat_source = 'power_density'
+
+    mass_advection_interpolation = 'average'
+    momentum_advection_interpolation = 'average'
+    energy_advection_interpolation = 'average'
   []
 []
 
@@ -71,7 +75,7 @@ inlet_v = 0.001
   []
 []
 
-[Materials]
+[FunctorMaterials]
   [const_functor]
     type = ADGenericFunctorMaterial
     prop_names = 'cp k mu'

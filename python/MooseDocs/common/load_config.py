@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -55,7 +55,9 @@ DEFAULT_EXTENSIONS = ['MooseDocs.extensions.core',
                       'MooseDocs.extensions.pysyntax',
                       'MooseDocs.extensions.modal',
                       'MooseDocs.extensions.datetime',
-                      'MooseDocs.extensions.gitutils']
+                      'MooseDocs.extensions.algorithm',
+                      'MooseDocs.extensions.gitutils',
+                      'MooseDocs.extensions.versioner']
 
 DEFAULT_READER = 'MooseDocs.base.MarkdownReader'
 DEFAULT_RENDERER = 'MooseDocs.base.MarkdownReader'

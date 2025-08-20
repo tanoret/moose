@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,7 +10,7 @@
 #include "FullSolveMultiApp.h"
 #include "LayeredSideDiffusiveFluxAverage.h"
 #include "Executioner.h"
-#include "Transient.h"
+#include "TransientBase.h"
 #include "Console.h"
 
 // libMesh
@@ -24,12 +24,6 @@ FullSolveMultiApp::validParams()
   InputParameters params = MultiApp::validParams();
   params.addClassDescription("Performs a complete simulation during each execution.");
   params.addParam<bool>(
-      "no_backup_and_restore",
-      false,
-      "True to turn off backup/restore for this multiapp. This is useful when doing steady-state "
-      "Picard iterations where we want to use the solution of previous Picard iteration as the "
-      "initial guess of the current Picard iteration");
-  params.addParam<bool>(
       "keep_full_output_history",
       false,
       "Whether or not to keep the full output history when this multiapp has multiple entries");
@@ -42,24 +36,18 @@ FullSolveMultiApp::validParams()
 FullSolveMultiApp::FullSolveMultiApp(const InputParameters & parameters)
   : MultiApp(parameters), _ignore_diverge(getParam<bool>("ignore_solve_not_converge"))
 {
+  // You could end up with some dirty hidden behavior if you do this. We could remove this check,
+  // but I don't think that it's sane to do so.
+  if (_no_restore && (_app.isRecovering() || _app.isRestarting()))
+    paramError("no_restore",
+               "The parent app is restarting or recovering, restoration cannot be disabled");
 }
 
 void
-FullSolveMultiApp::backup()
+FullSolveMultiApp::restore(bool force)
 {
-  if (getParam<bool>("no_backup_and_restore"))
-    return;
-  else
-    MultiApp::backup();
-}
-
-void
-FullSolveMultiApp::restore(bool /*force*/)
-{
-  if (getParam<bool>("no_backup_and_restore"))
-    return;
-  else
-    MultiApp::restore();
+  if (!_no_restore)
+    MultiApp::restore(force);
 }
 
 void
@@ -84,7 +72,7 @@ FullSolveMultiApp::initialSetup()
 
       if (_ignore_diverge)
       {
-        Transient * tex = dynamic_cast<Transient *>(ex);
+        TransientBase * tex = dynamic_cast<TransientBase *>(ex);
         if (tex && tex->parameters().get<bool>("error_on_dtmin"))
           mooseError("Requesting to ignore failed solutions, but 'Executioner/error_on_dtmin' is "
                      "true in sub-application. Set this parameter to false in sub-application to "
@@ -123,22 +111,27 @@ FullSolveMultiApp::solveStep(Real /*dt*/, Real /*target_time*/, bool auto_advanc
     if (!getParam<bool>("keep_full_output_history"))
       _apps[i]->getOutputWarehouse().reset();
 
-    bool show = (_fe_problem.verboseMultiApps() ||
-                 _apps[i]->getOutputWarehouse().getOutputs<Console>().size() == 0);
-
     Executioner * ex = _executioners[i];
     ex->execute();
-    if (!ex->lastSolveConverged())
-    {
-      last_solve_converged = false;
-      if (show)
-        _console << COLOR_RED << "Subapp " << _apps[i]->name() << " solve Did NOT Converge!"
-                 << COLOR_DEFAULT << std::endl;
-    }
-    else if (show)
-      _console << COLOR_GREEN << "Subapp " << _apps[i]->name() << " solve converged!"
-               << COLOR_DEFAULT << std::endl;
+
+    last_solve_converged = last_solve_converged && ex->lastSolveConverged();
+
+    showStatusMessage(i);
   }
 
   return last_solve_converged || _ignore_diverge;
+}
+
+void
+FullSolveMultiApp::showStatusMessage(unsigned int i) const
+{
+  if (!_fe_problem.verboseMultiApps() &&
+      _apps[i]->getOutputWarehouse().getOutputs<Console>().size() > 0)
+    return;
+  else if (!_executioners[i]->lastSolveConverged())
+    _console << COLOR_RED << "Subapp " << _apps[i]->name() << " solve Did NOT Converge!"
+             << COLOR_DEFAULT << std::endl;
+  else
+    _console << COLOR_GREEN << "Subapp " << _apps[i]->name() << " solve converged!" << COLOR_DEFAULT
+             << std::endl;
 }

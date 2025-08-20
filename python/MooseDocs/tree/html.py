@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -101,7 +101,7 @@ class String(NodeBase):
     """
     def __init__(self, parent=None, **kwargs):
         kwargs.setdefault('content', '')
-        kwargs.setdefault('escape', '')
+        kwargs.setdefault('escape', False)
         super(String, self).__init__('String', parent, **kwargs)
 
         if self.get('content') is None:

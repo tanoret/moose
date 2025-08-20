@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,9 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MeshGeneratorMesh.h"
+
+#include "MeshGeneratorSystem.h"
+#include "MooseApp.h"
 
 #include "libmesh/face_quad4.h"
 #include "libmesh/face_tri3.h"
@@ -22,25 +25,25 @@ MeshGeneratorMesh::validParams()
 
   params.addParam<std::string>("final_generator",
                                "The name of the mesh generator output to use for the final Mesh");
+  params.addParam<std::string>(MeshGeneratorSystem::data_driven_generator_param,
+                               "Set to make all dependencies of this mesh generator run in data "
+                               "driven mode, where a mesh is not generated");
+
   params.addClassDescription("Mesh generated using mesh generators");
   return params;
 }
 
-MeshGeneratorMesh::MeshGeneratorMesh(const InputParameters & parameters) : MooseMesh(parameters)
-{
-  if (isParamValid("final_generator"))
-    _app.setFinalMeshGeneratorName(getParam<std::string>("final_generator"));
-}
+MeshGeneratorMesh::MeshGeneratorMesh(const InputParameters & parameters) : MooseMesh(parameters) {}
 
 std::unique_ptr<MooseMesh>
 MeshGeneratorMesh::safeClone() const
 {
-  return std::make_unique<MeshGeneratorMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 void
 MeshGeneratorMesh::buildMesh()
 {
   if (!hasMeshBase())
-    _mesh = _app.getMeshGeneratorMesh();
+    mooseError("The mesh base has not been set");
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -64,6 +64,9 @@ SolutionTimeAdaptiveDT::step()
     auto solve_end = std::chrono::system_clock::now();
     auto elapsed_time =
         std::chrono::duration_cast<std::chrono::milliseconds>(solve_end - solve_start).count();
+
+    // Take the maximum time over all processors so all processors compute and use the same dt
+    TimeStepper::_communicator.max(elapsed_time);
 
     _older_sol_time_vs_dt = _old_sol_time_vs_dt;
     _old_sol_time_vs_dt = _sol_time_vs_dt;

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "FVFunctionDirichletBC.h"
+#include "FVFunctorDirichletBC.h"
 #include "INSFVFlowBC.h"
 
 /**
  * A class for velocity inlet boundary conditions
  */
-class INSFVInletVelocityBC : public FVFunctionDirichletBC, public INSFVFlowBC
+class INSFVInletVelocityBC : public FVADFunctorDirichletBC, public INSFVFlowBC
 {
 public:
   static InputParameters validParams();

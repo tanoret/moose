@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,7 +12,6 @@
 #include "MooseVariable.h"
 #include "InputParameters.h"
 #include "MooseArray.h"
-#include "DualRealOps.h"
 #include "SystemBase.h"
 
 #include "libmesh/quadrature.h"
@@ -38,9 +37,6 @@ LMKernel::LMKernel(const InputParameters & parameters)
     _lm_test(_lm_var.phi()),
     _lm_sign(getParam<bool>("lm_sign_positive") ? 1. : -1)
 {
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  mooseError("LMKernel requires global AD indexing");
-#endif
 }
 
 void

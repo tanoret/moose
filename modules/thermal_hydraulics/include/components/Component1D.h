@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "GeometricalComponent.h"
+#include "GeneratedMeshComponent.h"
 #include "Component1DConnection.h"
 
 /**
  * Base class for 1D components
  */
-class Component1D : public GeometricalComponent
+class Component1D : public GeneratedMeshComponent
 {
 public:
   Component1D(const InputParameters & parameters);
@@ -25,15 +25,28 @@ public:
   {
     /// Physical position of the connecting point
     Point _position;
+    /// Boundary element
+    const Elem * const _elem;
+    /// Boundary side
+    unsigned short int _side;
     /// Boundary node of connection (used by other components for connecting)
-    Node * _node;
+    const Node * const _node;
     /// Boundary id of this connection
     unsigned int _boundary_id;
     /// Outward norm (either 1 or -1) on boundaries
     Real _normal;
 
-    Connection(const Point & pt, Node * node, unsigned int bc_id, Real normal)
-      : _position(pt), _node(node), _boundary_id(bc_id), _normal(normal)
+    Connection(const Point & pt,
+               const Elem * elem,
+               unsigned short int side,
+               boundary_id_type bc_id,
+               Real normal)
+      : _position(pt),
+        _elem(elem),
+        _side(side),
+        _node(_elem->node_ptr(side)),
+        _boundary_id(bc_id),
+        _normal(normal)
     {
     }
   };

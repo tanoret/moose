@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -48,18 +48,21 @@ CheckOutputAction::checkVariableOutput(const std::string & task)
 
   if (task == "add_variable")
   {
-    const auto & field_vars = _problem->getNonlinearSystemBase().getVariables(/*tid =*/0);
-    for (const auto & var : field_vars)
+    for (const auto i : make_range(_problem->numNonlinearSystems()))
     {
-      std::set<OutputName> outputs = var->getOutputs();
-      _app.getOutputWarehouse().checkOutputs(outputs);
-    }
+      const auto & field_vars = _problem->getNonlinearSystemBase(i).getVariables(/*tid =*/0);
+      for (const auto & var : field_vars)
+      {
+        std::set<OutputName> outputs = var->getOutputs();
+        _app.getOutputWarehouse().checkOutputs(outputs);
+      }
 
-    const auto & scalar_vars = _problem->getNonlinearSystemBase().getScalarVariables(/*tid =*/0);
-    for (const auto & var : scalar_vars)
-    {
-      std::set<OutputName> outputs = var->getOutputs();
-      _app.getOutputWarehouse().checkOutputs(outputs);
+      const auto & scalar_vars = _problem->getNonlinearSystemBase(i).getScalarVariables(/*tid =*/0);
+      for (const auto & var : scalar_vars)
+      {
+        std::set<OutputName> outputs = var->getOutputs();
+        _app.getOutputWarehouse().checkOutputs(outputs);
+      }
     }
   }
 
@@ -100,8 +103,8 @@ CheckOutputAction::checkMaterialOutput()
     // Extract the names of the output objects to which the material properties will be exported
     std::set<OutputName> outputs = mat->getOutputs();
 
-    // Check that the outputs exist
-    _app.getOutputWarehouse().checkOutputs(outputs);
+    // Check that the outputs exist, and that the output types support material output
+    _app.getOutputWarehouse().checkOutputs(outputs, /* supports_material_output = */ true);
   }
 }
 
@@ -140,8 +143,5 @@ CheckOutputAction::checkPerfLogOutput()
   // If a Console outputter is found then all the correct handling of performance logs are
   // handled within the object(s), so do nothing
   if (!has_console)
-  {
-    Moose::perf_log.disable_logging();
     libMesh::perflog.disable_logging();
-  }
 }

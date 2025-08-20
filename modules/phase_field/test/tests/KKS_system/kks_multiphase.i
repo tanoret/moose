@@ -149,7 +149,7 @@
     eta_i = eta1
     eta_j = eta2
     eta_k = eta3
-    f_name = h1
+    property_name = h1
   [../]
   # h2(eta1, eta2, eta3)
   [./h2]
@@ -157,7 +157,7 @@
     eta_i = eta2
     eta_j = eta3
     eta_k = eta1
-    f_name = h2
+    property_name = h2
   [../]
   # h3(eta1, eta2, eta3)
   [./h3]
@@ -165,7 +165,7 @@
     eta_i = eta3
     eta_j = eta1
     eta_k = eta2
-    f_name = h3
+    property_name = h3
   [../]
 
   # Coefficients for diffusion equation
@@ -274,7 +274,7 @@
     type = MatReaction
     variable = eta1
     v = lambda
-    mob_name = L
+    reaction_rate = L
   [../]
 
   # Kernels for Allen-Cahn equation for eta2
@@ -310,14 +310,14 @@
     type = MatReaction
     variable = eta2
     v = lambda
-    mob_name = L
+    reaction_rate = L
   [../]
 
   # Kernels for the Lagrange multiplier equation
   [./mult_lambda]
     type = MatReaction
     variable = lambda
-    mob_name = 3
+    reaction_rate = 3
   [../]
   [./mult_ACBulkF_1]
     type = KKSMultiACBulkF
@@ -409,19 +409,19 @@
   [./eta3reaction]
     type = MatReaction
     variable = eta3
-    mob_name = 1
+    reaction_rate = 1
   [../]
   [./eta1reaction]
     type = MatReaction
     variable = eta3
     v = eta1
-    mob_name = 1
+    reaction_rate = 1
   [../]
   [./eta2reaction]
     type = MatReaction
     variable = eta3
     v = eta2
-    mob_name = 1
+    reaction_rate = 1
   [../]
   [./one]
     type = BodyForce

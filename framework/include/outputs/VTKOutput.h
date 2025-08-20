@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,11 +26,13 @@ public:
    */
   VTKOutput(const InputParameters & parameters);
 
+  bool supportsMaterialPropertyOutput() const override { return true; }
+
 protected:
   /**
    * Perform the output of VTKOutput
    */
-  virtual void output(const ExecFlagType & type) override;
+  virtual void output() override;
 
   /**
    * Return the file name with the *.vtk extension

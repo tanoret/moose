@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,8 +29,8 @@ public:
   void join(const ComputeJacobianThread & /*y*/) {}
 
 protected:
-  virtual void computeJacobian() override;
-  virtual void computeFaceJacobian(BoundaryID bnd_id, const Elem * lower_d_elem) override;
-  virtual void computeInternalFaceJacobian(const Elem * neighbor) override;
-  virtual void computeInternalInterFaceJacobian(BoundaryID bnd_id) override;
+  virtual void computeOnElement() override;
+  virtual void computeOnBoundary(BoundaryID bnd_id, const Elem * lower_d_elem) override;
+  virtual void computeOnInternalFace(const Elem * neighbor) override;
+  virtual void computeOnInterface(BoundaryID bnd_id) override;
 };

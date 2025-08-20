@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,5 +32,6 @@ FVTwoVarContinuityConstraint::FVTwoVarContinuityConstraint(const InputParameters
 ADReal
 FVTwoVarContinuityConstraint::computeQpResidual()
 {
-  return var1().getBoundaryFaceValue(*_face_info) - var2().getBoundaryFaceValue(*_face_info);
+  return var1().getBoundaryFaceValue(*_face_info, determineState()) -
+         var2().getBoundaryFaceValue(*_face_info, determineState());
 }

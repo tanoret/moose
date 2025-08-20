@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -33,7 +33,4 @@ public:
 
 private:
   ADReal computeQpResidual() override final;
-
-  /// The value that we want the average of the primal variable to be equal to
-  const Real _phi0;
 };

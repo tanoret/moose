@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,7 +8,7 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SolidPropertiesApp.h"
-#include "HeatConductionApp.h"
+#include "HeatTransferApp.h"
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
@@ -18,6 +18,7 @@ SolidPropertiesApp::validParams()
 {
   InputParameters params = MooseApp::validParams();
   params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
   return params;
 }
 
@@ -32,6 +33,8 @@ void
 SolidPropertiesApp::registerApps()
 {
   registerApp(SolidPropertiesApp);
+
+  HeatTransferApp::registerApps();
 }
 
 static void
@@ -49,7 +52,7 @@ associateSyntaxInner(Syntax & syntax, ActionFactory & /*action_factory*/)
 void
 SolidPropertiesApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  HeatConductionApp::registerAll(f, af, s);
+  HeatTransferApp::registerAll(f, af, s);
   Registry::registerObjectsTo(f, {"SolidPropertiesApp"});
   Registry::registerActionsTo(af, {"SolidPropertiesApp"});
   associateSyntaxInner(s, af);

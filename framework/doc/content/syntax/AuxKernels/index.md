@@ -1,7 +1,7 @@
 # AuxKernels System
 
 The AuxKernel system mimics the [syntax/Kernels/index.md] but compute values that can be defined
-explicitly with a known function. There are two main use cases for AuxKerenel system: computing
+explicitly with a known function. There are two main use cases for the AuxKernel system: computing
 a quantity that varies with space and time for postprocessing purposes or for decoupling systems
 of equations. Examples for both of these use cases shall be discussed further in the following
 sections.
@@ -9,7 +9,7 @@ sections.
 Creating a custom AuxKernel object is done by creating a new C++ object that inherits from
 `AuxKernel`, `VectorAuxKernel` or `ArrayAuxKernel` and overriding the `computeValue` method,
 which returns a scalar (`Real`), vector (`RealVectorValue`) or a Eigen vector (`RealEigenVector`)
-for the two types respectively. A forth type (`AuxScalarKernel`) also exists, but the syntax for
+for the three types respectively. A forth type (`AuxScalarKernel`) also exists, but the syntax for
 these objects is different and detailed in the [syntax/AuxScalarKernels/index.md].
 
 AuxKernel objects, like Kernel objects, must operate on a variable. Thus, there is a required
@@ -26,7 +26,7 @@ file snippet creates an auxiliary variable suitable for use with an `VectorAuxKe
 There are two flavors of AuxKernel objects: nodal and elemental. The distinction is based on the
 type of variable that is being operated on by the object. If the variable family is `LAGRANGE` or
 `LAGRANGE_VEC` then the AuxKernel will behave as nodal. If the variable family is `MONOMIAL` then
-the AuxKernel will behave as an elemental.
+the AuxKernel will behave as elemental.
 
 The difference is based on how the `computeValue` method of the object is called when the kernel
 is executed. In the nodal case the `computeValue` method will be executed on each +node+ within the
@@ -35,8 +35,10 @@ of the shape function at that node.
 
 In the elemental case the `computeValue` method will be executed on each quadrature point of an
 +element+ of the finite element mesh. The values computed at the quadrature points are used to
-perform the correct finite element interpolation automatically and set the values for the degrees
-of freedom. Typically, in the elemental case the order of the monomial finite element is set to
+perform the correct finite element projection automatically and set the values for the degrees
+of freedom. This is achieved by assembling and solving a *local* finite element projection
+problem for each and every element in the domain (or blocks) of interest.
+Typically, in the elemental case the order of the monomial finite element is set to
 constant so there is a single DOF per element, but higher monomials are also supported.
 
 As is evident by the functionality detailed, the distinction between the two arises from the nature
@@ -67,12 +69,12 @@ is done to allow the syntax to be consistent regardless of the AuxKernel flavor:
 
 In order to compute properties in the mortar sense, it is necessary to loop over the mortar segment
 mesh to spatially integrate variables. `MortarNodalAuxKernel`s offer this functionality where these "weighted" variables,
-which intervene in the computation of contact constraints and their residuals, can be coupled to generate the desired ouput value. 
-Therefore, if postprocessing of mortar quantities is required, nodal mortar auxiliary kernels can be employed. 
+which intervene in the computation of contact constraints and their residuals, can be coupled to generate the desired output value.
+Therefore, if postprocessing of mortar quantities is required, nodal mortar auxiliary kernels can be employed.
 Objects inheriting from `MortarNodalAuxKernel` allow for said operations on the mortar lower-dimensional domains featuring similar
 functionality to other nodal auxiliary kernels, including the possibility of computing quantities in an
 `incremental` manner.
- 
+
 ## Execute Flags
 
 AuxKernel objects inherit from the [SetupInterface.md] so they include the "execute_on" variable.
@@ -87,6 +89,16 @@ residual evaluating the AuxKernel on each linear iteration is not necessary and 
 execution of a simulation. In this case, the `EXEC_LINEAR` flag should be removed. Likely the
 `EXEC_INITIAL` flag should be added to perform the auxiliary variable calculation during the initial
 setup phase as well.
+
+## Populating lower-dimensional auxiliary variables
+
+Lower-dimensional auxiliary variables may be populated using boundary restricted
+auxiliary kernels. The boundary restriction of the aux kernel should be
+coincident with (a subset of) the lower-dimensional blocks that the
+lower-dimensional variable lives on. Using a boundary restricted auxiliary
+kernel as opposed to a lower-d block-restricted auxiliary kernel allows pulling
+in coincident face evaluations of higher-dimensional variables and material
+properties as well as evaluations of coupled lower-dimensional variables.
 
 ## Example A: Post processing with AuxKernel
 

@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,5 +13,6 @@ if sys.version_info < (3, 6):
     sys.exit(1)
 
 from .TestHarness import TestHarness
+from .OutputInterface import OutputInterface
 from .TestHarness import findDepApps
 __all__=['TestHarness', 'findDepApps']

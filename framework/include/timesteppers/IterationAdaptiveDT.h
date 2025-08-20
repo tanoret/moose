@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -112,4 +112,6 @@ protected:
   bool _reject_large_step;
   /// Threshold used to detect whether we need to reject a step
   double _large_step_rejection_threshold;
+  /// Timestep used to reject a timestep, used to constrain the next attempt
+  mutable std::optional<Real> _dt_from_reject;
 };

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,7 +34,8 @@ enum class Interfaces
   BlockRestrictable = 1 << 13,
   BoundaryRestrictable = 1 << 14,
   Reporter = 1 << 15,
-  DomainUserObject = 1 << 16
+  DomainUserObject = 1 << 16,
+  MortarUserObject = 1 << 17
 };
 
 template <>
@@ -247,6 +248,27 @@ private:
   THREAD_ID _val = 0;
 };
 
+class AttribExecutionOrderGroup : public Attribute
+{
+public:
+  typedef int Key;
+  void setFrom(Key k) { _val = k; }
+
+  AttribExecutionOrderGroup(TheWarehouse & w) : Attribute(w, "execution_order_group") {}
+  AttribExecutionOrderGroup(TheWarehouse & w, Key p)
+    : Attribute(w, "execution_order_group"), _val(p)
+  {
+  }
+  virtual void initFrom(const MooseObject * obj) override;
+  virtual bool isMatch(const Attribute & other) const override;
+  virtual bool isEqual(const Attribute & other) const override;
+  hashfunc(_val);
+  clonefunc(AttribExecutionOrderGroup);
+
+private:
+  int _val = 0;
+};
+
 /**
  * Tracks the libmesh system number that a \p MooseObject is associated with
  */
@@ -451,6 +473,27 @@ public:
 
 private:
   uint64_t _val = 0;
+};
+
+/**
+ * Tracks whether the object is on the displaced mesh
+ */
+class AttribDisplaced : public Attribute
+{
+public:
+  typedef signed char Key;
+  void setFrom(Key k) { _val = k; }
+
+  AttribDisplaced(TheWarehouse & w) : Attribute(w, "displaced") {}
+  AttribDisplaced(TheWarehouse & w, Key t) : Attribute(w, "displaced"), _val(t) {}
+  virtual void initFrom(const MooseObject * obj) override;
+  virtual bool isMatch(const Attribute & other) const override;
+  virtual bool isEqual(const Attribute & other) const override;
+  hashfunc(_val);
+  clonefunc(AttribDisplaced);
+
+private:
+  Key _val = -1;
 };
 
 #undef clonefunc

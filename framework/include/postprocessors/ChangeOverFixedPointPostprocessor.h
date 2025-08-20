@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,7 +24,8 @@ public:
 
   virtual void initialize() override;
   virtual void execute() override;
-  virtual Real getValue() override;
+  virtual void finalize() override;
+  virtual Real getValue() const override;
 
 private:
   /// option to compute change with respect to initial value instead of previous time value
@@ -47,4 +48,7 @@ private:
 
   /// the previous time step
   int _t_step_old;
+
+  /// The value of this post-processor
+  Real _value;
 };

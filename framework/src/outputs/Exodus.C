@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,8 @@
 
 #include "libmesh/exodusII_io.h"
 #include "libmesh/libmesh_config.h" // LIBMESH_HAVE_HDF5
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", Exodus);
 
@@ -55,7 +57,7 @@ Exodus::validParams()
   params.set<unsigned int>("padding") = 3;
 
   // Add description for the Exodus class
-  params.addClassDescription("Object for output data in the Exodus II format");
+  params.addClassDescription("Object for output data in the Exodus format");
 
   // Flag for overwriting at each timestep
   params.addParam<bool>("overwrite",
@@ -83,7 +85,7 @@ Exodus::validParams()
   params.addParam<bool>("write_hdf5", false, "Enables HDF5 output format for Exodus files.");
 
   // Need a layer of geometric ghosting for mesh serialization
-  params.addRelationshipManager("MooseGhostPointNeighbors",
+  params.addRelationshipManager("ElementPointNeighborLayers",
                                 Moose::RelationshipManagerType::GEOMETRIC);
 
   // Return the InputParameters
@@ -93,12 +95,12 @@ Exodus::validParams()
 Exodus::Exodus(const InputParameters & parameters)
   : OversampleOutput(parameters),
     _exodus_initialized(false),
-    _exodus_num(declareRestartableData<unsigned int>("exodus_num", 0)),
-    _recovering(_app.isRecovering()),
     _exodus_mesh_changed(declareRestartableData<bool>("exodus_mesh_changed", true)),
     _sequence(isParamValid("sequence") ? getParam<bool>("sequence")
               : _use_displaced         ? true
                                        : false),
+    _exodus_num(declareRestartableData<unsigned int>("exodus_num", 0)),
+    _recovering(_app.isRecovering()),
     _overwrite(getParam<bool>("overwrite")),
     _output_dimension(getParam<MooseEnum>("output_dimension").getEnum<OutputDimension>()),
     _discontinuous(getParam<bool>("discontinuous")),
@@ -202,7 +204,7 @@ Exodus::outputSetup()
     // This makes the face information out-of-date on process 0 for distributed meshes, e.g.
     // elements will have neighbors that they didn't previously have
     if ((this->processor_id() == 0) && !lm_mesh.is_replicated())
-      moose_mesh.finiteVolumeInfoDirty();
+      moose_mesh.markFiniteVolumeInfoDirty();
   };
   serialize(_problem_ptr->mesh());
 
@@ -244,7 +246,9 @@ Exodus::outputSetup()
   //   (2) The mesh has NOT changed
   //   (3) An existing Exodus file exists for appending (_exodus_num > 0)
   //   (4) Sequential output is NOT desired
-  if (_recovering && !_exodus_mesh_changed && _exodus_num > 0 && !_sequence)
+  //   (5) Exodus is NOT being output only on FINAL
+  if (_recovering && !_exodus_mesh_changed && _exodus_num > 0 && !_sequence &&
+      (getExecuteOnEnum().size() != 1 || !getExecuteOnEnum().contains(EXEC_FINAL)))
   {
     // Set the recovering flag to false so that this special case is not triggered again
     _recovering = false;
@@ -254,16 +258,23 @@ Exodus::outputSetup()
   }
   else
   {
-    // Increment file counter
-    if (_exodus_mesh_changed || _sequence)
-      _file_num++;
-
     // Disable file appending and reset exodus file number count
     _exodus_io_ptr->append(false);
-    _exodus_num = 1;
+
+    // Customize file output
+    customizeFileOutput();
   }
 
   setOutputDimensionInExodusWriter(*_exodus_io_ptr, *_mesh_ptr, _output_dimension);
+}
+
+void
+Exodus::customizeFileOutput()
+{
+  if (_exodus_mesh_changed || _sequence)
+    _file_num++;
+
+  _exodus_num = 1;
 }
 
 void
@@ -309,10 +320,10 @@ Exodus::outputNodalVariables()
   // Write the data via libMesh::ExodusII_IO
   if (_discontinuous)
     _exodus_io_ptr->write_timestep_discontinuous(
-        filename(), *_es_ptr, _exodus_num, time() + _app.getGlobalTimeOffset());
+        filename(), *_es_ptr, _exodus_num, getOutputTime() + _app.getGlobalTimeOffset());
   else
     _exodus_io_ptr->write_timestep(
-        filename(), *_es_ptr, _exodus_num, time() + _app.getGlobalTimeOffset());
+        filename(), *_es_ptr, _exodus_num, getOutputTime() + _app.getGlobalTimeOffset());
 
   if (!_overwrite)
     _exodus_num++;
@@ -429,7 +440,7 @@ Exodus::outputInput()
 }
 
 void
-Exodus::output(const ExecFlagType & type)
+Exodus::output()
 {
   // Prepare the ExodusII_IO object
   outputSetup();
@@ -444,7 +455,7 @@ Exodus::output(const ExecFlagType & type)
   _global_values.clear();
 
   // Call the individual output methods
-  AdvancedOutput::output(type);
+  AdvancedOutput::output();
 
   // Write the global variables (populated by the output methods)
   if (!_global_values.empty())
@@ -466,10 +477,10 @@ Exodus::output(const ExecFlagType & type)
 
   // It is possible to have an empty file created with the following scenario. By default the
   // 'execute_on_input' flag is setup to run on INITIAL. If the 'execute_on' is set to FINAL
-  // but the simulation stops early (e.g., --half-transient) the Exodus file is created but there
-  // is no data in it, because of the initial call to write the input data seems to create the file
-  // but doesn't actually write the data into the solution/mesh is also supplied to the IO object.
-  // Then if --recover is used this empty file fails to open for appending.
+  // but the simulation stops early (e.g., --test-checkpoint-half-transient) the Exodus file is
+  // created but there is no data in it, because of the initial call to write the input data seems
+  // to create the file but doesn't actually write the data into the solution/mesh is also supplied
+  // to the IO object. Then if --recover is used this empty file fails to open for appending.
   //
   // The code below will delete any empty files that exist. Another solution is to set the
   // 'execute_on_input' flag to NONE.
@@ -495,7 +506,6 @@ Exodus::filename()
     output << "-s" << std::setw(_padding) << std::setprecision(0) << std::setfill('0') << std::right
            << _file_num;
 
-  // Return the filename
   return output.str();
 }
 
@@ -505,7 +515,7 @@ Exodus::outputEmptyTimestep()
   // Write a timestep with no variables
   _exodus_io_ptr->set_output_variables(std::vector<std::string>());
   _exodus_io_ptr->write_timestep(
-      filename(), *_es_ptr, _exodus_num, time() + _app.getGlobalTimeOffset());
+      filename(), *_es_ptr, _exodus_num, getOutputTime() + _app.getGlobalTimeOffset());
 
   if (!_overwrite)
     _exodus_num++;
@@ -526,6 +536,14 @@ Exodus::handleExodusIOMeshRenumbering()
   // We know exodus_io renumbered on the first write_timestep()
   if (!_exodus_initialized && !_mesh_contiguous_numbering)
   {
+    // We renumbered our mesh, so we need to allow the other mesh to do the same
+    if (auto * const disp_problem = _problem_ptr->getDisplacedProblem().get(); disp_problem)
+    {
+      auto & disp_eq = disp_problem->es();
+      auto & other_mesh = &disp_eq == _es_ptr ? _problem_ptr->mesh().getMesh() : disp_eq.get_mesh();
+      other_mesh.allow_renumbering(true);
+    }
+
     // Objects that depend on element/node ids are no longer valid
     _problem_ptr->meshChanged();
     _mesh_contiguous_numbering = true;

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,11 +17,21 @@
 #include "FEProblem.h"
 #include "MooseApp.h"
 #include "MooseMesh.h"
+#include "MooseObject.h"
 #include "NonlinearSystem.h"
 #include "OutputWarehouse.h"
 #include "SystemInfo.h"
+#include "Checkpoint.h"
+#include "InputParameterWarehouse.h"
+#include "Registry.h"
+#include "CommandLine.h"
+
+#include <filesystem>
 
 #include "libmesh/string_to_enum.h"
+#include "libmesh/simple_range.h"
+
+using namespace libMesh;
 
 namespace ConsoleUtils
 {
@@ -40,6 +50,38 @@ outputFrameworkInformation(const MooseApp & app)
 
   if (app.getSystemInfo() != NULL)
     oss << app.getSystemInfo()->getInfo();
+
+  oss << "Input File(s):\n";
+  for (const auto & entry : app.getInputFileNames())
+    oss << "  " << std::filesystem::absolute(entry).c_str() << "\n";
+  oss << "\n";
+
+  const auto & cl = std::as_const(*app.commandLine());
+  // We skip the 0th argument of the main app, i.e., the name used to invoke the program
+  const auto cl_range =
+      as_range(std::next(cl.getEntries().begin(), app.multiAppLevel() == 0), cl.getEntries().end());
+
+  std::stringstream args_oss;
+  for (const auto & entry : cl_range)
+    if (!entry.hit_param && !entry.subapp_name && entry.name != "-i")
+      args_oss << "  " << cl.formatEntry(entry) << "\n";
+  if (args_oss.str().size())
+    oss << "Command Line Argument(s):\n" << args_oss.str() << "\n";
+
+  std::stringstream input_args_oss;
+  for (const auto & entry : cl_range)
+    if (entry.hit_param && !entry.subapp_name)
+      input_args_oss << "  " << cl.formatEntry(entry) << "\n";
+  if (input_args_oss.str().size())
+    oss << "Command Line Input Argument(s):\n" << input_args_oss.str() << "\n";
+
+  const auto checkpoints = app.getOutputWarehouse().getOutputs<Checkpoint>();
+  if (checkpoints.size())
+  {
+    oss << std::left << "Checkpoint:\n";
+    oss << checkpoints[0]->checkpointInfo().str();
+    oss << std::endl;
+  }
 
   oss << std::left << "Parallelism:\n"
       << std::setw(console_field_width)
@@ -62,7 +104,7 @@ outputMeshInformation(FEProblemBase & problem, bool verbose)
   if (verbose)
   {
     bool forced = moose_mesh.isParallelTypeForced();
-    bool pre_split = problem.getMooseApp().isUseSplit();
+    bool pre_split = moose_mesh.isSplit();
 
     // clang-format off
     oss << "\nMesh: " << '\n'
@@ -113,6 +155,12 @@ outputMeshInformation(FEProblemBase & problem, bool verbose)
   }
   else
     oss << std::setw(console_field_width) << "  Elems:" << mesh.n_active_elem() << '\n';
+  if (moose_mesh.maxPLevel() > 0)
+    oss << std::setw(console_field_width)
+        << "  Max p-Refinement Level: " << static_cast<std::size_t>(moose_mesh.maxPLevel()) << '\n';
+  if (moose_mesh.maxHLevel() > 0)
+    oss << std::setw(console_field_width)
+        << "  Max h-Refinement Level: " << static_cast<std::size_t>(moose_mesh.maxHLevel()) << '\n';
 
   if (verbose)
   {
@@ -275,20 +323,12 @@ outputSystemInformationHelper(std::stringstream & oss, System & system)
 }
 
 std::string
-outputNonlinearSystemInformation(FEProblemBase & problem)
+outputNonlinearSystemInformation(FEProblemBase & problem, const unsigned int nl_sys_num)
 {
   std::stringstream oss;
   oss << std::left;
 
-#ifndef MOOSE_SPARSE_AD
-  if (problem.haveADObjects())
-  {
-    oss << std::setw(console_field_width)
-        << "  AD size required: " << problem.getNonlinearSystemBase().requiredDerivativeSize()
-        << std::endl;
-  }
-#endif
-  return outputSystemInformationHelper(oss, problem.getNonlinearSystemBase().system());
+  return outputSystemInformationHelper(oss, problem.getNonlinearSystemBase(nl_sys_num).system());
 }
 
 std::string
@@ -329,29 +369,42 @@ outputExecutionInformation(const MooseApp & app, FEProblemBase & problem)
   Executioner * exec = app.getExecutioner();
 
   oss << "Execution Information:\n"
-      << std::setw(console_field_width) << "  Executioner: " << demangle(typeid(*exec).name())
-      << '\n';
+      << std::setw(console_field_width) << "  Executioner: " << exec->type() << '\n';
 
   std::string time_stepper = exec->getTimeStepperName();
   if (time_stepper != "")
     oss << std::setw(console_field_width) << "  TimeStepper: " << time_stepper << '\n';
+  const auto time_integrator_names = exec->getTimeIntegratorNames();
+  if (!time_integrator_names.empty())
+    oss << std::setw(console_field_width)
+        << "  TimeIntegrator(s): " << MooseUtils::join(time_integrator_names, ", ") << '\n';
 
-  oss << std::setw(console_field_width) << "  Solver Mode: " << problem.solverTypeString() << '\n';
+  for (const std::size_t i : make_range(problem.numSolverSystems()))
+    oss << std::setw(console_field_width)
+        << "  Solver Mode" +
+               (problem.numSolverSystems() > 1 ? " - system " + std::to_string(i) : "") + ": "
+        << problem.solverTypeString(i) << '\n';
 
   const std::string & pc_desc = problem.getPetscOptions().pc_description;
   if (!pc_desc.empty())
     oss << std::setw(console_field_width) << "  PETSc Preconditioner: " << pc_desc << '\n';
 
-  MoosePreconditioner const * mpc = problem.getNonlinearSystemBase().getPreconditioner();
-  if (mpc)
+  for (const std::size_t i : make_range(problem.numNonlinearSystems()))
   {
-    oss << std::setw(console_field_width)
-        << "  MOOSE Preconditioner: " << mpc->getParam<std::string>("_type");
-    if (mpc->name() == "_moose_auto")
-      oss << " (auto)";
-    oss << '\n';
+    MoosePreconditioner const * mpc = problem.getNonlinearSystemBase(i).getPreconditioner();
+    if (mpc)
+    {
+      oss << std::setw(console_field_width)
+          << "  MOOSE Preconditioner" +
+                 (problem.numNonlinearSystems() > 1 ? (" " + std::to_string(i)) : "") + ": "
+          << mpc->getParam<std::string>("_type");
+      if (mpc->name().find("_moose_auto") != std::string::npos)
+        oss << " (auto)";
+      oss << '\n';
+    }
+    if (i == cast_int<std::size_t>(problem.numNonlinearSystems() - 1))
+      oss << std::endl;
   }
-  oss << std::endl;
 
   return oss.str();
 }
@@ -386,6 +439,23 @@ outputOutputInformation(MooseApp & app)
 }
 
 std::string
+outputPreSMOResidualInformation()
+{
+  std::stringstream oss;
+  oss << std::left;
+
+  oss << COLOR_BLUE;
+  oss << "Executioner/use_pre_smo_residual is set to true. The pre-SMO residual will be evaluated "
+         "at the beginning of each time step before executing objects that could modify the "
+         "solution, such as preset BCs, predictors, correctors, constraints, and certain user "
+         "objects. The pre-SMO residuals will be prefixed with * and will be used in the relative "
+         "convergence check.\n";
+  oss << COLOR_DEFAULT;
+
+  return oss.str();
+}
+
+std::string
 outputLegacyInformation(MooseApp & app)
 {
   std::stringstream oss;
@@ -403,7 +473,55 @@ outputLegacyInformation(MooseApp & app)
         << COLOR_DEFAULT << std::endl;
   }
 
+  if (app.parameters().get<bool>("use_legacy_initial_residual_evaluation_behavior"))
+  {
+    oss << COLOR_RED << "LEGACY MODES ENABLED:" << COLOR_DEFAULT << '\n';
+    oss << " This application uses the legacy initial residual evaluation behavior. The legacy "
+           "behavior performs an often times redundant residual evaluation before the solution "
+           "modifying objects are executed prior to the initial (0th nonlinear iteration) residual "
+           "evaluation. The new behavior skips that redundant residual evaluation unless the "
+           "parameter Executioner/use_pre_smo_residual is set to true. To remove this message and "
+           "enable the new behavior, set the parameter "
+           "'use_legacy_initial_residual_evaluation_behavior' to false in *App.C. Some tests that "
+           "rely on the side effects of the legacy behavior may fail/diff and should be "
+           "re-golded.\n"
+        << COLOR_DEFAULT << std::endl;
+  }
+
   return oss.str();
+}
+
+std::string
+outputDataFilePaths()
+{
+  std::stringstream oss;
+  oss << "Data File Paths:\n";
+  for (const auto & [name, path] : Registry::getDataFilePaths())
+    oss << "  " << name << ": " << path << "\n";
+  return oss.str() + "\n";
+}
+
+std::string
+outputDataFileParams(MooseApp & app)
+{
+  std::map<std::string, std::string> values; // for A-Z sort
+  for (const auto & object_name_params_pair : app.getInputParameterWarehouse().getInputParameters())
+  {
+    const auto & params = object_name_params_pair.second;
+    for (const auto & name_value_pair : *params)
+    {
+      const auto & name = name_value_pair.first;
+      if (const auto path = params->queryDataFileNamePath(name))
+        if (params->getHitNode(name))
+          values.emplace(params->paramFullpath(name), path->path);
+    }
+  }
+
+  std::stringstream oss;
+  oss << "Data File Parameters:\n";
+  for (const auto & [param, value] : values)
+    oss << "  " << param << " = " << value << "\n";
+  return oss.str() + '\n';
 }
 
 void
@@ -415,6 +533,42 @@ insertNewline(std::stringstream & oss, std::streampos & begin, std::streampos & 
     begin = oss.tellp();
     oss << std::setw(console_field_width + 2) << ""; // "{ "
   }
+}
+
+std::string
+formatString(std::string message, const std::string & prefix)
+{
+  MooseUtils::indentMessage(prefix, message, COLOR_DEFAULT, true, " ");
+  std::stringstream stream;
+  std::streampos start = stream.tellp();
+  stream << message;
+  std::streampos end = stream.tellp();
+  insertNewline(stream, start, end);
+  auto formatted_string = stream.str();
+  // no need to end with a line break
+  if (formatted_string.back() == '\n')
+    formatted_string.pop_back();
+  return formatted_string;
+}
+
+std::string
+mooseObjectVectorToString(const std::vector<MooseObject *> & objs, const std::string & sep /*=""*/)
+{
+  std::string object_names = "";
+  if (objs.size())
+  {
+    // Gather all the object names
+    std::vector<std::string> names;
+    names.reserve(objs.size());
+    for (const auto & obj : objs)
+    {
+      mooseAssert(obj, "Trying to print a null object");
+      names.push_back(obj->name());
+    }
+
+    object_names = MooseUtils::join(names, sep);
+  }
+  return object_names;
 }
 
 } // ConsoleUtils namespace

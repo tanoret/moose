@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,12 +16,15 @@
 #include "ExternalPETScProblem.h"
 #include "Executioner.h"
 
+#include "libmesh/petsc_solver_exception.h"
+
 InputParameters
 ExternalPetscSolverApp::validParams()
 {
   InputParameters params = MooseApp::validParams();
 
   params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
   return params;
 }
 
@@ -37,7 +40,7 @@ ExternalPetscSolverApp::getPetscTS()
   if (!_ts)
   {
     // Create an external PETSc solver
-    PETScExternalSolverCreate(_comm->get(), &_ts);
+    LibmeshPetscCall(PETScExternalSolverCreate(_comm->get(), &_ts));
     _is_petsc_app = true;
   }
   return _ts;
@@ -46,7 +49,8 @@ ExternalPetscSolverApp::getPetscTS()
 ExternalPetscSolverApp::~ExternalPetscSolverApp()
 {
   // Destroy PETSc solver
-  PETScExternalSolverDestroy(_ts);
+  auto ierr = PETScExternalSolverDestroy(_ts);
+  libmesh_ignore(ierr);
 }
 
 void
@@ -56,52 +60,6 @@ ExternalPetscSolverApp::registerAll(Factory & f, ActionFactory & af, Syntax & /*
   Registry::registerActionsTo(af, {"ExternalPetscSolverApp"});
 
   /* register custom execute flags, action syntax, etc. here */
-}
-
-std::shared_ptr<Backup>
-ExternalPetscSolverApp::backup()
-{
-  auto backup = MooseApp::backup();
-
-  // We only need to do these backups when external petsc solver is used
-  if (_is_petsc_app)
-  {
-    ExternalPETScProblem & external_petsc_problem =
-        static_cast<ExternalPETScProblem &>(_executioner->feProblem());
-
-    // Backup current solution
-    dataStore(backup->_system_data, external_petsc_problem.currentSolution(), nullptr);
-
-    // Backup the old solution
-    dataStore(backup->_system_data, external_petsc_problem.solutionOld(), nullptr);
-
-    // Backup Udot
-    dataStore(backup->_system_data, external_petsc_problem.udot(), nullptr);
-  }
-
-  return backup;
-}
-
-void
-ExternalPetscSolverApp::restore(std::shared_ptr<Backup> backup, bool for_restart)
-{
-  MooseApp::restore(backup, for_restart);
-
-  // We only need to do these backups when external petsc solver is used
-  if (_is_petsc_app)
-  {
-    ExternalPETScProblem & external_petsc_problem =
-        static_cast<ExternalPETScProblem &>(_executioner->feProblem());
-
-    // Restore previous solution
-    dataLoad(backup->_system_data, external_petsc_problem.currentSolution(), nullptr);
-
-    // Restore the solution at the previous time step
-    dataLoad(backup->_system_data, external_petsc_problem.solutionOld(), nullptr);
-
-    // Restore udot
-    dataLoad(backup->_system_data, external_petsc_problem.udot(), nullptr);
-  }
 }
 
 void

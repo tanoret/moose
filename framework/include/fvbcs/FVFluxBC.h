@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,7 @@
 #include "TwoMaterialPropertyInterface.h"
 #include "MathFVUtils.h"
 #include "FVFaceResidualObject.h"
+#include "SideFVFluxBCIntegral.h"
 
 /**
  * Provides an interface for computing residual contributions from finite
@@ -32,6 +33,9 @@ public:
   void computeResidual(const FaceInfo & fi) override;
   void computeJacobian(const FaceInfo & fi) override;
   void computeResidualAndJacobian(const FaceInfo & fi) override;
+
+  /// Update internal structures (normal, face type, etc) for the given face
+  void updateCurrentFace(const FaceInfo & fi);
 
 protected:
   virtual ADReal computeQpResidual() = 0;
@@ -68,14 +72,7 @@ protected:
   /// The variable face type
   FaceInfo::VarFaceNeighbors _face_type;
 
-private:
-  /// Computes the Jacobian contribution for every coupled variable.
-  ///
-  /// @param type Either ElementElement, ElementNeighbor, NeighborElement, or NeighborNeighbor. As an
-  /// example ElementNeighbor means the derivatives of the elemental residual with respect to the
-  /// neighbor degrees of freedom
-  ///
-  /// @param residual The already computed residual (probably done with \p computeQpResidual) that
-  /// also holds derivative information for filling in the Jacobians
-  void computeJacobian(Moose::DGJacobianType type, const ADReal & residual);
+  // This class will want to call computeQpResidual from here considering that
+  // it will directly use the boundary conditions to compute the flux.
+  friend class SideFVFluxBCIntegral;
 };

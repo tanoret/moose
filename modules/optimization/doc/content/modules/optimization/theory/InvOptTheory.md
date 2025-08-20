@@ -6,12 +6,12 @@ This page provides a practical overview of the theory and equations needed to so
 - [Adjoint Equation and Boundary Conditions:](#sec:adjoint) Derivation of the Adjoint equation using Lagrange multipliers and its boundary conditions.
 - [Parameter Derivatives of PDE:](#sec:PDEDerivs) Derivatives of the PDE with respect to the optimization parameters for force and material inversion.  Force inversion examples where PDE constrained optimization is used to parameterize boundary conditions and body loads is provided in this [section](#sec:forceInvExample).  Material inversion examples are provided in this [section](#sec:forceInvExample) where PDE constrained optimization is used to control material properties.
 
-The overall flow of the optimization algorithm implemented in the MOOSE optimization module is shown in [fig:optCycle].  In this example, the internal heat source, $q_v$, is being parameterized to match the simulated and experimental steady state temperature fields, $T$ and $\widetilde{T}$, respectively.  Step one of the optimization cycle consists of adjusting the internal heat source, $q_v$.  In step two, the physics model is solved with the current $q_v$ to obtain a simulated temperature field, $T$.  Step two is often referred to as the forward solve.  In step three, the simulated and experimental temperature fields are compared via the objective function, $f$.  If $f$ is below the user defined threshold, the optimization cycle stops and the best fit parameterization of $q_v$ is found.  If $f$ is above the user defined threshold, the optimization algorithm determines a new $q_v$ and the process is repeated.  In the next section, methods for determining the next iteration of the parameterized value, in this case $q_v$, will be presented.  Problems solved using the optimization module are available on the [Examples page](examples/index.md).
+The overall flow of the optimization algorithm implemented in the MOOSE optimization module is shown in [fig:optCycle].  In this example, the internal heat source, $q_v$, is being parameterized to match the simulated and experimental steady state temperature fields, $T$ and $\widetilde{T}$, respectively.  Step one of the optimization cycle consists of adjusting the internal heat source, $q_v$.  In step two, the physics model is solved with the current $q_v$ to obtain a simulated temperature field, $T$.  Step two is often referred to as the forward solve.  In step three, the simulated and experimental temperature fields are compared via the objective function, $f$.  If $f$ is below the user defined threshold, the optimization cycle stops and the best fit parameterization of $q_v$ is found.  If $f$ is above the user defined threshold, the optimization algorithm determines a new $q_v$ and the process is repeated.  In the next section, methods for determining the next iteration of the parameterized value, in this case $q_v$, will be presented.  Problems solved using the optimization module are available on the [Examples page](optimization/examples/index.md).
 
 !media large_media/optimization/fig_optCycle.png
        style=width:80%;margin:auto;padding-top:2.5%;
        id=fig:optCycle
-       caption=Optimization cycle example for parameterizaing an internal heat source distribution $q_v$ to match the simulated and experimental temperature field, $T$ and $\widetilde{T}$, respectively.
+       caption=Optimization cycle example for parameterizing an internal heat source distribution $q_v$ to match the simulated and experimental temperature field, $T$ and $\widetilde{T}$, respectively.
 
 [comment0]: <> (% ----------------------------------------------------------------------------------------------------------%)
 
@@ -203,7 +203,7 @@ Solving [eqn:adjoint_problem] comes down to adjusting the boundary conditions an
 
 In this section we will present derivatives for steady state heat conduction [eqn:optimization_problem] with respect to the force or material parameters.  For all of these examples, measurement data is taken at specific locations where the objective function can be represented by [eqn:objective_integral].  We will present the discrete forms of our PDE and its derivative which most closely matches the implementation that will be used in MOOSE.
 
-The discrete form of the PDE constraint for steady state heat conduction in [eqn:optimization_problem] is given by the the residual, $\hat{\text R}$, as
+The discrete form of the PDE constraint for steady state heat conduction in [eqn:optimization_problem] is given by the residual, $\hat{\text R}$, as
 
 \begin{equation}\label{eq:discretePDE}
 \hat{\text R}=\textbf{J}\hat{\text T} - \hat{\text g}=0,

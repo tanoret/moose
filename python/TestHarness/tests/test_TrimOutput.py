@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,14 +16,14 @@ class TestHarnessTester(TestHarnessTestCase):
         Verify output exceeded buffer, and is therfore trimmed
         """
         output = self.runTests('--no-color', '-i', 'trimmed_output', '-v')
-        self.assertIn('Output trimmed', output.decode('utf-8'))
+        self.assertIn('Output trimmed', output)
 
     def testNoTrimOutput(self):
         """
         Verify trimming did not take place
         """
         output = self.runTests('--no-color', '-i', 'always_ok', '-v')
-        self.assertNotIn('Output trimmed', output.decode('utf-8'))
+        self.assertNotIn('Output trimmed', output)
 
     def testNoTrimmedOutputOnError(self):
         """
@@ -34,4 +34,4 @@ class TestHarnessTester(TestHarnessTestCase):
             self.runTests('--no-color', '-i', 'no_trim_on_error', '--no-trimmed-output-on-error', '-v')
 
         e = cm.exception
-        self.assertNotIn('Output trimmed', e.output.decode('utf-8'))
+        self.assertNotIn('Output trimmed', e.output)

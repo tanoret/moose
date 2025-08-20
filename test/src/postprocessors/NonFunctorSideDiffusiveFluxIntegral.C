@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -60,7 +60,8 @@ NonFunctorSideDiffusiveFluxIntegralTempl<is_ad>::computeQpIntegral()
     mooseAssert(fi, "We should have a face info");
 
     // Get the gradient of the variable on the face
-    const auto & grad_u = MetaPhysicL::raw_value(_fv_variable->adGradSln(*fi));
+    const auto & grad_u =
+        MetaPhysicL::raw_value(_fv_variable->adGradSln(*fi, Moose::currentState()));
 
     // FIXME Get the diffusion coefficient on the face, see #16809
     return -diffusivityGradientProduct(grad_u, MetaPhysicL::raw_value(_diffusion_coef[_qp])) *

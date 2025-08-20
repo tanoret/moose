@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,7 +15,6 @@ InputParameters
 FEFVCouplingMaterial::validParams()
 {
   InputParameters params = FunctorMaterial::validParams();
-  params += SetupInterface::validParams();
   params.set<ExecFlagEnum>("execute_on") = {EXEC_LINEAR, EXEC_NONLINEAR};
   params.addParam<MooseFunctorName>("fe_var", 1., "A coupled finite element variable.");
   params.addParam<MooseFunctorName>("fv_var", 1., "A coupled finite volume variable.");

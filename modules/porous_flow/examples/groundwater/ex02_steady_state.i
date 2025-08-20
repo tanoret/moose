@@ -14,13 +14,14 @@
   [zmax]
     type = SideSetsFromNormalsGenerator
     input = name_blocks
+    normal_tol = 0.1
     new_boundary = zmax
     normals = '0 0 1'
   []
   [xmin_bot_aquifer]
     type = ParsedGenerateSideset
     input = zmax
-    included_subdomain_ids = 2
+    included_subdomains = 2
     normal = '-1 0 0'
     combinatorial_geometry = 'x <= -500.0'
     new_sideset_name = xmin_bot_aquifer

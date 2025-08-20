@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,6 +21,7 @@
 class FaceArgInterface
 {
 public:
+  virtual ~FaceArgInterface() = default;
   virtual bool hasFaceSide(const FaceInfo & fi, const bool fi_elem_side) const = 0;
 };
 
@@ -43,7 +44,8 @@ public:
   Moose::FaceArg makeFace(const FaceInfo & fi,
                           const Moose::FV::LimiterType limiter_type,
                           const bool elem_is_upwind,
-                          const bool correct_skewness = false) const;
+                          const bool correct_skewness = false,
+                          const Moose::StateArg * state_limiter = nullptr) const;
 
   /**
    * Make a functor face argument with a central differencing limiter, e.g. compose a face

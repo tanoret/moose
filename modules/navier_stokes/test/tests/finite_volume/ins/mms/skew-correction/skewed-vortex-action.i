@@ -18,7 +18,8 @@ rho = 1.0
     wall_boundaries = 'top left right bottom'
     momentum_wall_types = 'noslip noslip noslip noslip'
 
-    initial_velocity = '1 1 0'
+    initial_velocity = 'exact_u exact_v 0'
+    initial_pressure = 0
 
     pin_pressure = true
     pinned_pressure_type = average
@@ -49,7 +50,7 @@ rho = 1.0
   []
 []
 
-[Materials]
+[FunctorMaterials]
   [const]
     type = ADGenericFunctorMaterial
     prop_names = 'rho mu'
@@ -71,14 +72,14 @@ rho = 1.0
     expression = 'x*(1-x)-2/12'
   []
   [forcing_u]
-    type = ADParsedFunction
+    type = ParsedFunction
     expression = '-4*mu/rho*(-1+2*y)*(y^2-6*x*y^2+6*x^2*y^2-y+6*x*y-6*x^2*y+3*x^2-6*x^3+3*x^4)+1-2*x+4*x^3'
             '*y^2*(2*y^2-2*y+1)*(y-1)^2*(-1+2*x)*(x-1)^3'
     symbol_names = 'mu rho'
     symbol_values = '${mu} ${rho}'
   []
   [forcing_v]
-    type = ADParsedFunction
+    type = ParsedFunction
     expression = '4*mu/rho*(-1+2*x)*(x^2-6*y*x^2+6*x^2*y^2-x+6*x*y-6*x*y^2+3*y^2-6*y^3+3*y^4)+4*y^3*x^2*(2'
             '*x^2-2*x+1)*(x-1)^2*(-1+2*y)*(y-1)^3'
     symbol_names = 'mu rho'

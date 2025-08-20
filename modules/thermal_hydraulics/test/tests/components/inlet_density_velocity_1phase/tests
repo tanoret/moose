@@ -1,11 +1,14 @@
 [Tests]
+  # relap-7#636
+  issues = '#19868 #26336'
+  design = 'InletDensityVelocity1Phase.md'
   # physics
   [phy:densityvelocity_3eqn]
     type = 'Exodiff'
     input = 'phy.densityvelocity_3eqn.i'
     exodiff = 'phy.densityvelocity_3eqn_out.e'
     recover = false
-    ad_indexing_type = 'global'
+    requirement = 'The system shall be able to set an inlet boundary condition for 1D single phase flow by setting the fluid density and its velocity at the boundary.'
   []
 
   # control logic
@@ -14,7 +17,7 @@
     input = 'clg.densityvelocity_3eqn.i'
     csvdiff = 'clg.densityvelocity_3eqn_out.csv'
     rel_err = 1e-5
-    ad_indexing_type = 'global'
+    requirement = 'The system shall be able to control both the density and the velocity at an inlet with single phase flow.'
   []
 
   [jacobian]
@@ -25,6 +28,6 @@
     max_parallel = 1
     max_threads = 1
     cli_args = 'Debug/check_jacobian=true'
-    ad_indexing_type = 'global'
+    requirement = 'The system shall be able to set an inlet boundary condition for 1D single phase flow by setting the fluid density and its velocity at the boundary, and show numerically accurate Jacobians.'
   []
 []

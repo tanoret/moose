@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -47,6 +47,9 @@ private:
 
   /// Adaptive Importance Sampler
   AdaptiveImportanceSampler & _ais;
+
+  /// Flag for GP utilization
+  const std::vector<bool> * _gp_flag;
 
   /// Ensure that the MCMC algorithm proceeds in a sequential fashion
   int _check_step;

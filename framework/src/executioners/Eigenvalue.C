@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,8 +13,14 @@
 #include "Factory.h"
 #include "MooseApp.h"
 #include "NonlinearEigenSystem.h"
+#include "PetscSupport.h"
 #include "SlepcSupport.h"
 #include "UserObject.h"
+
+#include "libmesh/petsc_solver_exception.h"
+
+// Needed for LIBMESH_CHECK_ERR
+using libMesh::PetscSolverException;
 
 registerMooseObject("MooseApp", Eigenvalue);
 
@@ -69,6 +75,13 @@ Eigenvalue::validParams()
                         "If true, we will set an initial eigen vector in moose, otherwise EPS "
                         "solver will initial eigen vector");
 
+  params.addParamNamesToGroup("matrix_free precond_matrix_free constant_matrices "
+                              "precond_matrix_includes_eigen",
+                              "Matrix and Matrix-Free");
+  params.addParamNamesToGroup("initial_eigenvalue auto_initialization",
+                              "Eigenvector and eigenvalue initialization");
+  params.addParamNamesToGroup("normalization normal_factor", "Solution normalization");
+
   // If Newton and Inverse Power is combined in SLEPc side
   params.addPrivateParam<bool>("_newton_inverse_power", false);
 
@@ -95,15 +108,19 @@ Eigenvalue::Eigenvalue(const InputParameters & parameters)
 {
 // Extract and store SLEPc options
 #ifdef LIBMESH_HAVE_SLEPC
+  mooseAssert(_fe_problem.numSolverSystems() == 1,
+              "The Eigenvalue executioner only currently supports a single solver system.");
+
   Moose::SlepcSupport::storeSolveType(_eigen_problem, parameters);
 
   Moose::SlepcSupport::setEigenProblemSolverParams(_eigen_problem, parameters);
-  _eigen_problem.setEigenproblemType(_eigen_problem.solverParams()._eigen_problem_type);
+  _eigen_problem.setEigenproblemType(
+      _eigen_problem.solverParams(/*solver_sys_num=*/0)._eigen_problem_type);
 
   // pass two control parameters to eigen problem
-  _eigen_problem.solverParams()._free_power_iterations =
+  _eigen_problem.solverParams(/*solver_sys_num=*/0)._free_power_iterations =
       getParam<unsigned int>("free_power_iterations");
-  _eigen_problem.solverParams()._extra_power_iterations =
+  _eigen_problem.solverParams(/*solver_sys_num=*/0)._extra_power_iterations =
       getParam<unsigned int>("extra_power_iterations");
 
   if (!isParamValid("normalization") && isParamValid("normal_factor"))
@@ -125,8 +142,8 @@ Eigenvalue::Eigenvalue(const InputParameters & parameters)
   _eigen_problem.setInitialEigenvalue(getParam<Real>("initial_eigenvalue"));
 
   // Set a flag to nonlinear eigen system
-  _eigen_problem.getNonlinearEigenSystem().precondMatrixIncludesEigenKernels(
-      getParam<bool>("precond_matrix_includes_eigen"));
+  _eigen_problem.getNonlinearEigenSystem(/*nl_sys_num=*/0)
+      .precondMatrixIncludesEigenKernels(getParam<bool>("precond_matrix_includes_eigen"));
 #else
   mooseError("SLEPc is required to use Eigenvalue executioner, please use '--download-slepc in "
              "PETSc configuration'");
@@ -137,6 +154,16 @@ Eigenvalue::Eigenvalue(const InputParameters & parameters)
   mooseDeprecated(
       "Please use SLEPc-3.13.0 or higher. Old versions of SLEPc likely produce bad convergence");
 #endif
+
+  // To avoid petsc unused option warnings, ensure we do not set irrelevant options.
+  Moose::PetscSupport::dontAddLinearConvergedReason(_fe_problem);
+  Moose::PetscSupport::dontAddNonlinearConvergedReason(_fe_problem);
+  Moose::PetscSupport::dontAddPetscFlag("-mat_mffd_type", _fe_problem.getPetscOptions());
+  Moose::PetscSupport::dontAddPetscFlag("-st_ksp_atol", _fe_problem.getPetscOptions());
+  Moose::PetscSupport::dontAddPetscFlag("-st_ksp_max_it", _fe_problem.getPetscOptions());
+  Moose::PetscSupport::dontAddPetscFlag("-st_ksp_rtol", _fe_problem.getPetscOptions());
+  if (!_eigen_problem.solverParams()._eigen_matrix_free)
+    Moose::PetscSupport::dontAddPetscFlag("-snes_mf_operator", _fe_problem.getPetscOptions());
 }
 
 #ifdef LIBMESH_HAVE_SLEPC
@@ -147,7 +174,7 @@ Eigenvalue::init()
   {
     const auto & normpp = getParam<PostprocessorName>("normalization");
     const auto & exec = _eigen_problem.getUserObject<UserObject>(normpp).getExecuteOnEnum();
-    if (!exec.contains(EXEC_LINEAR))
+    if (!exec.isValueSet(EXEC_LINEAR))
       mooseError("Normalization postprocessor ", normpp, " requires execute_on = 'linear'");
   }
 
@@ -162,7 +189,7 @@ Eigenvalue::init()
   // a random vector as the initial guess. The motivation to offer this option is
   // that we have to initialize ONLY eigen variables in multiphysics simulation.
   // auto_initialization can be overriden by initial conditions.
-  if (getParam<bool>("auto_initialization"))
+  if (getParam<bool>("auto_initialization") && !_app.isRestarting())
     _eigen_problem.initEigenvector(1.0);
 
   // Some setup
@@ -178,17 +205,19 @@ Eigenvalue::prepareSolverOptions()
 {
 #if PETSC_RELEASE_LESS_THAN(3, 12, 0)
   // Make sure the SLEPc options are setup for this app
-  Moose::SlepcSupport::slepcSetOptions(_eigen_problem, _pars);
+  Moose::SlepcSupport::slepcSetOptions(
+      _eigen_problem, _eigen_problem.solverParams(/*eigen_sys_num=*/0), _pars);
 #else
   // Options need to be setup once only
   if (!_eigen_problem.petscOptionsInserted())
   {
-    // Master app has the default data base
+    // Parent application has the default data base
     if (!_app.isUltimateMaster())
-      PetscOptionsPush(_eigen_problem.petscOptionsDatabase());
-    Moose::SlepcSupport::slepcSetOptions(_eigen_problem, _pars);
+      LibmeshPetscCall(PetscOptionsPush(_eigen_problem.petscOptionsDatabase()));
+    Moose::SlepcSupport::slepcSetOptions(
+        _eigen_problem, _eigen_problem.solverParams(/*eigen_sys_num=*/0), _pars);
     if (!_app.isUltimateMaster())
-      PetscOptionsPop();
+      LibmeshPetscCall(PetscOptionsPop());
     _eigen_problem.petscOptionsInserted() = true;
   }
 #endif
@@ -198,7 +227,7 @@ void
 Eigenvalue::checkIntegrity()
 {
   // check to make sure that we don't have any time kernels in eigenvalue simulation
-  if (_eigen_problem.getNonlinearSystemBase().containsTimeKernel())
+  if (_eigen_problem.getNonlinearSystemBase(/*nl_sys=*/0).containsTimeKernel())
     mooseError("You have specified time kernels in your eigenvalue simulation");
 }
 

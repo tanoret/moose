@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,10 +16,19 @@
 #include "libmesh/nanoflann.hpp"
 #include "libmesh/utility.h"
 
+// Make newer nanoflann API compatible with older nanoflann versions
+#if NANOFLANN_VERSION < 0x150
+namespace nanoflann
+{
+template <typename T, typename U>
+using ResultItem = std::pair<T, U>;
+}
+#endif
+
 class KDTree
 {
 public:
-  KDTree(std::vector<Point> & master_points, unsigned int max_leaf_size);
+  KDTree(const std::vector<Point> & master_points, unsigned int max_leaf_size);
 
   virtual ~KDTree() = default;
 
@@ -34,7 +43,9 @@ public:
 
   void radiusSearch(const Point & query_point,
                     Real radius,
-                    std::vector<std::pair<std::size_t, Real>> & indices_dist);
+                    std::vector<nanoflann::ResultItem<std::size_t, Real>> & indices_dist);
+
+  std::size_t numberCandidatePoints();
 
   using KdTreeT = nanoflann::KDTreeSingleIndexAdaptor<
       nanoflann::L2_Simple_Adaptor<Real,

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,10 +16,11 @@
 #include "libmesh/dof_map.h"
 
 DisplacedSystem::DisplacedSystem(DisplacedProblem & problem,
+                                 FEProblemBase & fe_problem,
                                  SystemBase & undisplaced_system,
                                  const std::string & name,
                                  Moose::VarKindType var_kind)
-  : SystemBase(problem, name, var_kind),
+  : SystemBase(problem, fe_problem, name, var_kind),
     _undisplaced_system(undisplaced_system),
     _sys(problem.es().add_system<TransientExplicitSystem>(name))
 {
@@ -49,12 +50,6 @@ DisplacedSystem::getVector(const std::string & name) const
     return _sys.get_vector(name);
   else
     return _undisplaced_system.getVector(name);
-}
-
-void
-DisplacedSystem::addTimeIntegrator(std::shared_ptr<TimeIntegrator> ti)
-{
-  _time_integrator = ti;
 }
 
 System &

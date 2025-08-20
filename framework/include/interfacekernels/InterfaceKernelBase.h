@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,26 +34,6 @@ public:
 
   /// The neighbor variable number that this interface kernel operates on
   virtual const MooseVariableFEBase & neighborVariable() const = 0;
-
-  /**
-   * Using the passed DGResidual type, selects the correct test function space and residual block,
-   * and then calls computeQpResidual
-   */
-  virtual void computeElemNeighResidual(Moose::DGResidualType type) = 0;
-
-  /**
-   * Using the passed DGJacobian type, selects the correct test function and trial function spaces
-   * and
-   * jacobian block, and then calls computeQpJacobian
-   */
-  virtual void computeElemNeighJacobian(Moose::DGJacobianType type) = 0;
-
-  /**
-   * Using the passed DGJacobian type, selects the correct test function and trial function spaces
-   * and
-   * jacobian block, and then calls computeQpOffDiagJacobian with the passed jvar
-   */
-  virtual void computeOffDiagElemNeighJacobian(Moose::DGJacobianType type, unsigned int jvar) = 0;
 
   /// Selects the correct Jacobian type and routine to call for the primary variable jacobian
   virtual void computeElementOffDiagJacobian(unsigned int jvar) = 0;

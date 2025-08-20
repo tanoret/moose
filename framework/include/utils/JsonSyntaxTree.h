@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,9 +31,10 @@ public:
    * @param path The path of the action
    * @param is_type Whether this belongs to a "<type>" or not
    * @param action Name of the action
-   * @param is_action Wheter it is an action
+   * @param is_action Whether we are adding the parameter for an action (except Components)
    * @param params The InputParameters to add to the tree
    * @param lineinfo The FileLineInfo where the action/path was registered
+   * @param classname the name of the class being added
    * @return Whether the parameters were added to the tree (ie if it matched the search string).
    */
   bool addParameters(const std::string & parent_path,
@@ -86,7 +87,7 @@ protected:
 
   size_t setParams(InputParameters * params, bool search_match, nlohmann::json & all_params);
 
-  std::string
+  static std::string
   buildOutputString(const std::iterator_traits<InputParameters::iterator>::value_type & p);
   static std::vector<std::string> splitPath(const std::string & path);
   nlohmann::json & getJson(const std::string & parent, const std::string & path, bool is_type);
@@ -102,4 +103,7 @@ protected:
   std::map<std::string, std::pair<std::string, std::string>> _action_label_map;
   std::map<std::string, std::pair<std::string, std::string>> _object_label_map;
   ///@}
+
+  // Allow the MooseServer class to use protected static convenience methods
+  friend class MooseServer;
 };

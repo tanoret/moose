@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,9 +29,6 @@ protected:
 
   /// Intrinsic impedance of the infinite medium (default is the admittance of free space)
   const Function & _admittance;
-
-  /// Magnetic permeability of free space in SI units (H/m)
-  const Real _mu0;
 
   /// Variable field component (real or imaginary)
   const MooseEnum _component;

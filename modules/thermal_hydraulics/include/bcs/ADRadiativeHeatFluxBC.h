@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,11 +22,15 @@ public:
 protected:
   virtual ADReal coefficient() const override;
 
+  /// Emissivity of the boundary
+  const Real _eps_boundary;
   /// View factor function
   const Function & _view_factor_fn;
 
   /// Post-processor by which to scale boundary condition
   const PostprocessorValue & _scale_pp;
+  /// Function by which to scale the boundary condition
+  const Function & _scale_fn;
 
 public:
   static InputParameters validParams();

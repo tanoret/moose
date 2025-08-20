@@ -11,6 +11,7 @@
     ymax = 0.304 # Length of test chamber
     xmax = 0.0257 # Test chamber radius
   []
+  coord_type = RZ
 []
 
 [Variables]
@@ -24,10 +25,10 @@
 [DarcyThermoMech]
 []
 
-[Modules/TensorMechanics/Master]
+[Physics/SolidMechanics/QuasiStatic]
   [all]
     # This block adds all of the proper Kernels, strain calculators, and Variables
-    # for TensorMechanics in the correct coordinate system (autodetected)
+    # for SolidMechanics in the correct coordinate system (autodetected)
     add_variables = true
     strain = FINITE
     eigenstrain_names = eigenstrain
@@ -126,7 +127,6 @@
 
 [Problem]
   type = FEProblem
-  coord_type = RZ
 []
 
 [Executioner]

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,7 +23,16 @@ namespace PorousFlowFLACrelperm
  * @param m van Genuchten exponent
  * @return relative permeability
  */
-Real relativePermeability(Real seff, Real m);
+template <typename T>
+T
+relativePermeability(const T & seff, Real m)
+{
+  if (MetaPhysicL::raw_value(seff) <= 0.0)
+    return 0.0;
+  else if (MetaPhysicL::raw_value(seff) >= 1.0)
+    return 1.0;
+  return (1.0 + m) * std::pow(seff, m) - m * std::pow(seff, m + 1.0);
+}
 
 /**
  * Derivative of relative permeability with respect to effective saturation

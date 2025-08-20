@@ -1,12 +1,12 @@
 # Step 1 - First Contact
 
-Continuing from the [final step](tensor_mechanics/tutorials/introduction/step04.md)
-in the tensor mechanics tutorial we add a first attempt at mechanical contact.
+Continuing from the [final step](solid_mechanics/tutorials/introduction/step04.md)
+in the solid mechanics tutorial we add a first attempt at mechanical contact.
 
 !listing modules/contact/tutorials/introduction/step01.i
 
 If you recall, in the final step of the mechanics tutorial we modeled two
-cantilevers that were bent towards eachother and ended up occupying the same
+cantilevers that were bent towards each other and ended up occupying the same
 space without interacting. We're about to change that.
 
 ## Input file

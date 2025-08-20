@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,7 @@
 
 #include <string>
 #include <map>
+#include <set>
 #include "DependencyResolver.h"
 #include "FileLineInfo.h"
 
@@ -50,8 +51,12 @@ public:
   /**
    * Method to associate another "allowed" pluggable MOOSE system to an existing registered task.
    * Each object created during a task is checked against associated systems.
+   * @param task the task to allow a new type of moose objects for
+   * @param moose_object_type the type of objects to allow with this task
+   * @param deprecated whether constructing this moose object with this task is deprecated
    */
-  void appendTaskName(const std::string & task, const std::string & moose_object_type);
+  void
+  appendTaskName(const std::string & task, const std::string & moose_object_type, bool deprecated);
 
   void addDependency(const std::string & task, const std::string & pre_req);
 
@@ -111,6 +116,11 @@ public:
                             int line = -1);
 
   /**
+   * De-registers all actions associated with a given syntax
+   */
+  void removeAllActionsForSyntax(const std::string & syntax);
+
+  /**
    *  Registration function that replaces existing Moose Actions with a completely new action
    *  Note: This function will remove all actions associated with this piece of syntax _NOT_ just
    *        a single match of some kind
@@ -160,10 +170,20 @@ public:
                                              const std::string & task = "");
 
   /**
+   * Retrieve the non-deprecated syntax associated with the passed in action type string. If a task
+   * string is also passed in, only syntax associated with that action+task combo will be returned.
+   */
+  std::vector<std::string> getNonDeprecatedSyntaxByAction(const std::string & action,
+                                                          const std::string & task = "");
+
+  /**
    * Method for determining whether a piece of syntax is associated with an Action
+   * an optional syntax map may be given to traverse instead of _syntax_to_actions
    * TODO: I need a better name
    */
-  std::string isAssociated(const std::string & real_id, bool * is_parent) const;
+  std::string isAssociated(const std::string & real_id,
+                           bool * is_parent,
+                           const std::map<std::string, std::set<std::string>> & alt_map = {}) const;
 
   /**
    * Returns a pair of multimap iterators to all the ActionInfo objects associated with a given
@@ -202,6 +222,11 @@ protected:
 
   /// The list of Moose system objects to tasks.  This map indicates which tasks are allowed to build certain MooseObjects.
   std::multimap<std::string, std::string> _moose_systems_to_tasks;
+
+  /// A list of Moose system objects to tasks that are deprecated for these systems.
+  /// If an item is in this map, the task is still allowed to build
+  /// the object from the MOOSE system, but it is deprecated to do so.
+  std::multimap<std::string, std::string> _deprecated_list_moose_systems_to_tasks;
 
   /// The dependency resolver
   DependencyResolver<std::string> _tasks;

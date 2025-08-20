@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #pylint: disable=missing-docstring
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,20 +12,16 @@
 import os
 import time
 import chigger
+import mooseutils
 
-filename = os.path.join(os.getenv('MOOSE_DIR'), 'modules', 'phase_field', 'examples', 'grain_growth', 'grain_growth_2D_graintracker_out.e')
+if os.getenv('MOOSE_DIR') == None:
+    mooseutils.mooseError("MOOSE_DIR must be set in this script")
+
+filename = os.path.join(os.getenv('MOOSE_DIR'), 'modules', 'phase_field', 'test', 'tests', 'grain_growth', 'gold', 'test_out.e-s005')
 variables = ['bnds']
 blocks = ['0']
 N = 10
-#filename = os.path.join(os.getenv('MOOSE_DIR'), '..', 'relap-7', 'pkl_1loop_out_displaced.e')
-#variables = ['alpha_liquid']
-#block = ['Pipe20']
-#N =1
 reader = chigger.exodus.ExodusReader(filename, timestep=0)
-
-#reader.update()
-#print reader.getVariableInformation()
-#print reader.getBlockInformation()
 
 def read_all_times(prefix=''):
     start_time = time.time()

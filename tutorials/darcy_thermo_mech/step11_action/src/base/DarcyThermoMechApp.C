@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,6 +21,8 @@ DarcyThermoMechApp::validParams()
   InputParameters params = MooseApp::validParams();
 
   params.set<bool>("automatic_automatic_scaling") = false;
+  params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
 
   return params;
 }
@@ -39,12 +41,9 @@ DarcyThermoMechApp::registerApps()
 void
 DarcyThermoMechApp::registerAll(Factory & factory, ActionFactory & action_factory, Syntax & syntax)
 {
-
   Registry::registerObjectsTo(factory, {"DarcyThermoMechApp"});
   Registry::registerActionsTo(action_factory, {"DarcyThermoMechApp"});
   ModulesApp::registerAll(factory, action_factory, syntax);
 
-  registerSyntaxTask("SetupDarcySimulation", "DarcyThermoMech", "add_aux_variable");
-  registerSyntaxTask("SetupDarcySimulation", "DarcyThermoMech", "add_aux_kernel");
-  registerSyntaxTask("SetupDarcySimulation", "DarcyThermoMech", "add_kernel");
+  registerSyntax("SetupDarcySimulation", "DarcyThermoMech");
 }

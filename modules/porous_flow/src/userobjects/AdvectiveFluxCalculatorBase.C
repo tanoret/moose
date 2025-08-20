@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -66,7 +66,7 @@ AdvectiveFluxCalculatorBase::AdvectiveFluxCalculatorBase(const InputParameters &
     _pairs_to_send(),
     _allowable_MB_wastage(getParam<Real>("allowable_MB_wastage"))
 {
-  if (!_execute_enum.contains(EXEC_LINEAR))
+  if (!_execute_enum.isValueSet(EXEC_LINEAR))
     paramError(
         "execute_on",
         "The AdvectiveFluxCalculator UserObject " + name() +
@@ -248,7 +248,7 @@ AdvectiveFluxCalculatorBase::executeOnElement(
 void
 AdvectiveFluxCalculatorBase::threadJoin(const UserObject & uo)
 {
-  const AdvectiveFluxCalculatorBase & afc = static_cast<const AdvectiveFluxCalculatorBase &>(uo);
+  const auto & afc = static_cast<const AdvectiveFluxCalculatorBase &>(uo);
   // add the values of _kij computed by different threads
   for (dof_id_type sequential_i = 0; sequential_i < _number_of_nodes; ++sequential_i)
   {

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -43,7 +43,7 @@ ComputePolycrystalElasticityTensor::ComputePolycrystalElasticityTensor(
   {
     // declare elasticity tensor derivative properties
     _D_elastic_tensor[op_index] = &declarePropertyDerivative<RankFourTensor>(
-        _elasticity_tensor_name, getVar("v", op_index)->name());
+        _elasticity_tensor_name, coupledName("v", op_index));
   }
 }
 

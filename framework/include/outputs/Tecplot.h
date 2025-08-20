@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,12 +25,14 @@ public:
    */
   Tecplot(const InputParameters & parameters);
 
+  bool supportsMaterialPropertyOutput() const override { return true; }
+
 protected:
   /**
    * Overload the Output::output method, this is required for Tecplot
    * output due to the method utilized for outputting single/global parameters
    */
-  virtual void output(const ExecFlagType & type) override;
+  virtual void output() override;
 
   /**
    * Returns the current filename, this method handles adding the timestep suffix

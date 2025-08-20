@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,14 +8,14 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MaxVarNDofsPerNode.h"
-#include "NonlinearSystem.h"
+#include "SolverSystem.h"
 #include "Problem.h"
 #include "Damper.h"
 
 // libmesh includes
 #include "libmesh/threads.h"
 
-MaxVarNDofsPerNode::MaxVarNDofsPerNode(FEProblemBase & feproblem, NonlinearSystemBase & sys)
+MaxVarNDofsPerNode::MaxVarNDofsPerNode(FEProblemBase & feproblem, SolverSystem & sys)
   : ThreadedNodeLoop<ConstNodeRange, ConstNodeRange::const_iterator>(feproblem),
     _system(sys),
     _max(0),

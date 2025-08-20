@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,10 +17,8 @@ MatGradSquareCoupled::validParams()
   InputParameters params = Kernel::validParams();
   params.addClassDescription("Gradient square of a coupled variable.");
   params.addCoupledVar("elec_potential", "Electric potential");
-  params.addDeprecatedCoupledVar("args",
-                                 "Vector of variable arguments to prefactor",
-                                 "args is deprecated, use 'coupled_variables' instead");
-  params.addCoupledVar("coupled_variables", "Vector of variable arguments to prefactor");
+  params.addCoupledVar("args", "Vector of variable arguments to prefactor");
+  params.deprecateCoupledVar("args", "coupled_variables", "02/27/2024");
   params.addParam<MaterialPropertyName>(
       "prefactor",
       "prefactor",

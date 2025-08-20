@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,11 +12,13 @@
 #include "AppFactory.h"
 #include "Executioner.h"
 #include "MooseMesh.h"
+#include "MooseMain.h"
+#include "FEProblemBase.h"
 
 TEST(MinimalApp, create)
 {
   const char * argv[1] = {"\0"};
-  std::shared_ptr<MooseApp> app = AppFactory::createAppShared("MooseUnitApp", 1, (char **)argv);
+  std::shared_ptr<MooseApp> app = Moose::createMooseApp("MooseUnitApp", 1, (char **)argv);
   app->parameters().set<bool>("minimal") = true;
   app->run();
   Executioner * exec = app->getExecutioner();

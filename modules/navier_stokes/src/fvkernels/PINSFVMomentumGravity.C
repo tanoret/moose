@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,5 +30,6 @@ PINSFVMomentumGravity::PINSFVMomentumGravity(const InputParameters & params)
 ADReal
 PINSFVMomentumGravity::computeQpResidual()
 {
-  return _eps(makeElemArg(_current_elem)) * INSFVMomentumGravity::computeQpResidual();
+  return _eps(makeElemArg(_current_elem), determineState()) *
+         INSFVMomentumGravity::computeQpResidual();
 }

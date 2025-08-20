@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -92,7 +92,8 @@ UpdateDisplacedMeshThread::init()
     Threads::parallel_reduce(node_range, send_list);
     send_list.unique();
     auto & [soln, ghost_soln] = libmesh_map_find(_sys_to_nonghost_and_ghost_soln, sys_num);
-    ghost_soln->init(soln->size(), soln->local_size(), send_list.send_list(), true, GHOSTED);
+    ghost_soln->init(
+        soln->size(), soln->local_size(), send_list.send_list(), true, libMesh::GHOSTED);
     soln->localize(*ghost_soln, send_list.send_list());
   }
 }

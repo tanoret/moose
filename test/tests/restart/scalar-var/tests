@@ -8,7 +8,6 @@
       input = part1.i
       exodiff = part1_out.e
       detail = 'run initial input'
-      ad_indexing_type = 'global'
     []
     [part2]
       prereq = 'restarting/part1'
@@ -16,7 +15,13 @@
       input = part2.i
       exodiff = part2_out.e
       detail = 'run restart input'
-      ad_indexing_type = 'global'
+    []
+    [part3]
+      prereq = 'restarting/part1'
+      type = 'RunException'
+      input = part3.i
+      expect_err = 'Two initial conditions have been provided for the variable v using the \'initial_condition\' and \'initial_from_file_var\' parameters. Please remove one of them.'
+      detail = 'run restart input with two initial conditions'
     []
   []
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,6 +16,7 @@
 #include "libmesh/vector_value.h"
 #include "libmesh/tensor_value.h"
 #include "libmesh/type_n_tensor.h"
+#include "libmesh/enum_fe_family.h"
 
 #include <vector>
 
@@ -33,9 +34,9 @@ class MooseVariableDataBase
 {
 public:
   // type for gradient, second and divergence of template class OutputType
-  typedef typename TensorTools::IncrementRank<OutputType>::type OutputGradient;
-  typedef typename TensorTools::IncrementRank<OutputGradient>::type OutputSecond;
-  typedef typename TensorTools::DecrementRank<OutputType>::type OutputDivergence;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputType>::type OutputGradient;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputGradient>::type OutputSecond;
+  typedef typename libMesh::TensorTools::DecrementRank<OutputType>::type OutputDivergence;
 
   // shortcut for types storing values on quadrature points
   typedef MooseArray<OutputType> FieldVariableValue;
@@ -60,6 +61,11 @@ public:
    * Whether this data is associated with a variable that has DoFs on nodes
    */
   virtual bool hasDoFsOnNodes() const = 0;
+
+  /**
+   * Return the variable continuity
+   */
+  virtual libMesh::FEContinuity getContinuity() const = 0;
 
   /**
    * Local solution getter
@@ -87,12 +93,12 @@ public:
   /**
    * Set the current local DOF values to the input vector
    */
-  void insert(NumericVector<Number> & residual);
+  void insert(libMesh::NumericVector<libMesh::Number> & residual);
 
   /**
    * Add the current local DOF values to the input vector
    */
-  void add(NumericVector<Number> & residual);
+  void add(libMesh::NumericVector<libMesh::Number> & residual);
 
   /**
    * prepare the initial condition
@@ -135,6 +141,11 @@ public:
 
 protected:
   /**
+   * @returns The variable to which the data in this class belongs to
+   */
+  virtual const MooseVariableField<OutputType> & var() const { return _var; }
+
+  /**
    * insert a solution tag into our tag containers
    */
   void insertSolutionTag(TagID tag_id);
@@ -149,7 +160,7 @@ protected:
    */
   void fetchDoFValues();
   void zeroSizeDofValues();
-  void getArrayDoFValues(const NumericVector<Number> & sol,
+  void getArrayDoFValues(const libMesh::NumericVector<libMesh::Number> & sol,
                          unsigned int n,
                          MooseArray<RealEigenVector> & dof_values) const;
   void assignNodalValue();
@@ -167,9 +178,6 @@ protected:
    */
   void resizeVectorTagData(TagID tag);
 
-  /// A const reference to the owning MooseVariableField object
-  const MooseVariableField<OutputType> & _var;
-
   /// The MOOSE system which ultimately holds the vectors and matrices relevant to this variable
   /// data
   SystemBase & _sys;
@@ -181,7 +189,7 @@ protected:
   const THREAD_ID _tid;
 
   /// The degree of freedom map from libMesh
-  const DofMap & _dof_map;
+  const libMesh::DofMap & _dof_map;
 
   /// Number of components of the associated variable
   unsigned int _count;
@@ -263,10 +271,10 @@ protected:
   /// the previous time step's solution value second time derivative
   DoFValue _dof_values_dotdot_old;
   /// derivatives of the solution value time derivative with respect to the degrees of freedom
-  MooseArray<Number> _dof_du_dot_du;
+  MooseArray<libMesh::Number> _dof_du_dot_du;
   /// derivatives of the solution value second time derivative with respect to the degrees of
   /// freedom
-  MooseArray<Number> _dof_du_dotdot_du;
+  MooseArray<libMesh::Number> _dof_du_dotdot_du;
 
   /// nodal values of u_dot
   OutputType _nodal_value_dot;
@@ -282,6 +290,10 @@ protected:
 
   /// The set of solution tags we need to evaluate
   std::set<TagID> _solution_tags;
+
+private:
+  /// A const reference to the owning MooseVariableField object
+  const MooseVariableField<OutputType> & _var;
 };
 
 template <>

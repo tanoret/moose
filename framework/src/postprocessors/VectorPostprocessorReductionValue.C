@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -44,7 +44,7 @@ VectorPostprocessorReductionValue::VectorPostprocessorReductionValue(
 }
 
 Real
-VectorPostprocessorReductionValue::getValue()
+VectorPostprocessorReductionValue::getValue() const
 {
   Real r = 0;
   switch (_value_type)

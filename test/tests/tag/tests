@@ -2,6 +2,13 @@
   issues = '#9669'
   design = 'interfaces/TaggingInterface.md'
 
+  [not_zeroed_vector_tag]
+    type = Exodiff
+    requirement = 'The system shall support the ability for a the user to create a tagged vector which is not automatically zeroed.'
+    input = 'not_zeroed_tag_vector.i'
+    exodiff = 'not_zeroed_tag_vector_out.e'
+  []
+
   [general]
     requirement = 'The system shall support the ability for a specific calculation to fill a labeled '
                   'or "tagged"'
@@ -64,6 +71,12 @@
     cli_args = 'Mesh/square/second=true Variables/u/order=SECOND'
     requirement = 'The system shall throw an error when the variable orders and families for the '
                   'tagged and the auxiliary output variables do not match.'
+  []
+
+  [call_residual]
+    type = RunApp
+    input = 'tag_residual_call.i'
+    requirement = 'The system shall be able to accumulate tagged vectors individually with multiple residual computations.'
   []
 
   [systems]
@@ -133,15 +146,22 @@
       input = 'tag_nodal_kernels.i'
       exodiff = 'tag_nodal_kernels_out.e'
 
-      detail = 'the nodal kernel system, and'
+      detail = 'the nodal kernel system,'
     []
 
     [test_eigen]
       type = 'Exodiff'
       input = 'eigen_tag.i'
       exodiff = 'eigen_tag_out.e'
-      slepc_version = '>=3.8.0'
-      detail = 'the eigen system.'
+      capabilities = 'slepc>=3.8.0'
+      detail = 'the eigen system, and '
+    []
+
+    [test_old_eigen]
+      type = 'Exodiff'
+      input = 'old_eigen_tag.i'
+      exodiff = 'old_eigen_tag_out.e'
+      detail = 'the legacy eigen system.'
     []
   []
 
@@ -196,6 +216,14 @@
     exodiff = 'tag-array-grad_out.e'
     abs_zero = 1e-08
   []
+  [array_grad_dot]
+    type = 'Exodiff'
+    input = 'coupled_array_grad_dot.i'
+    issues = '#26385'
+    requirement = 'The system shall be able to populate auxiliary array variable values using the components of gradient of time derivative of coupled array variable.'
+    exodiff = 'coupled_array_grad_dot_out.e'
+    abs_zero = 1e-08
+  []
   [multiple_component_tag_interface]
     type = 'Exodiff'
     input = 2d_diffusion_tag_vector.i
@@ -208,6 +236,20 @@
     input = tag-fv.i
     exodiff = tag-fv_out.e
     requirement = 'The system shall be able to index solution vectors and residual vectors using the degree of freedom indices of a finite volume variable.'
-    ad_indexing_type = 'global'
+  []
+  [mass]
+    requirement = 'The system shall be able to use matrix tagging to compute a mass matrix'
+    [fv]
+      type = 'Exodiff'
+      input = mass-matrix.i
+      exodiff = mass-matrix_out.e
+      detail = 'for a finite volume variable, and'
+    []
+    [fe]
+      type = 'Exodiff'
+      input = fe-mass-matrix.i
+      exodiff = fe-mass-matrix_out.e
+      detail = 'for a finite element variable.'
+    []
   []
 []

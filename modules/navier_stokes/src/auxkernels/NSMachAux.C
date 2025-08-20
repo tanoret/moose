@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,8 +36,6 @@ NSMachAux::validParams()
   params.addCoupledVar(NS::velocity_z, "z-velocity"); // Only required in 3D...
   params.addCoupledVar(NS::specific_volume, "specific volume");
   params.addCoupledVar(NS::specific_internal_energy, "internal energy");
-  params.addDeprecatedCoupledVar(
-      NS::internal_energy, NS::specific_internal_energy, "January 1, 2022");
   params.addRequiredParam<UserObjectName>("fluid_properties",
                                           "The name of the user object for fluid properties");
 

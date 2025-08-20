@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,6 +34,9 @@ protected:
   unsigned int & _num_nonlinear;
   unsigned int & _num_fixed_point;
 
+  /// The nonlinear system that this should report iteration info for
+  const unsigned int _nl_sys_num;
+
   // Used to allow for optional declare
   Real _dummy_real = 0;
   unsigned int _dummy_unsigned_int = 0;
@@ -47,7 +50,7 @@ template <typename T>
 T &
 IterationInfo::declareHelper(const std::string & item_name, T & dummy, bool extra_check)
 {
-  return (extra_check && (!_items.isValid() || _items.contains(item_name)))
+  return (extra_check && (!_items.isValid() || _items.isValueSet(item_name)))
              ? declareValueByName<T>(item_name, REPORTER_MODE_REPLICATED)
              : dummy;
 }

@@ -38,16 +38,6 @@
   []
 []
 
-[ICs]
-  [vel]
-    type = VectorConstantIC
-    variable = velocity
-    x_value = 1e-15
-    y_value = 1e-15
-    block = 1
-  []
-[]
-
 [Kernels]
   [mass]
     type = INSADMass
@@ -178,7 +168,7 @@
   []
   [energy_balance]
     type = ParsedPostprocessor
-    function = 'convective_heat_transfer + advection - source'
+    expression = 'convective_heat_transfer + advection - source'
     pp_names = 'convective_heat_transfer advection source'
   []
 []

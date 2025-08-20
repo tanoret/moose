@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,6 +29,8 @@ AddFieldSplitAction::validParams()
   params.addParam<std::vector<std::string>>(
       "petsc_options_value",
       "Values of PETSc name/value pairs (must correspond with \"petsc_options_iname\"");
+  params.addParam<NonlinearSystemName>(
+      "nl_sys", "nl0", "The nonlinear system that this split belongs to");
   return params;
 }
 
@@ -39,5 +41,6 @@ AddFieldSplitAction::AddFieldSplitAction(const InputParameters & params) : Moose
 void
 AddFieldSplitAction::act()
 {
-  _problem->getNonlinearSystemBase().addSplit(_type, _name, _moose_object_pars);
+  _problem->getNonlinearSystemBase(_problem->nlSysNum(getParam<NonlinearSystemName>("nl_sys")))
+      .addSplit(_type, _name, _moose_object_pars);
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,8 +18,8 @@ ADHSHeatFluxRZBC::validParams()
   InputParameters params = ADHSHeatFluxBC::validParams();
   params += RZSymmetry::validParams();
 
-  params.addClassDescription(
-      "Applies a specified heat flux to the side of a cylindrical heat structure");
+  params.addClassDescription("Applies a specified heat flux to the side of a cylindrical heat "
+                             "structure in XY coordinates");
 
   return params;
 }

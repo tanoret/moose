@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,23 +25,23 @@ public:
 
 protected:
   /// Type of elements to build the mesh
-  const enum class ElemType { TRI, QUAD } _element_type;
+  const enum class ElemType { TRI, QUAD, HYBRID } _element_type;
   /// Size parameter of the hexagon
   const Real _hexagon_size;
   /// Style of the size parameter
   const PolygonSizeStyle _hexagon_size_style;
   /// Pitch size of the hexagon
   Real _pitch;
-  /// Whetther block_id is provided
-  const bool _block_id_valid;
+  /// Number of radial meshing intervals
+  const unsigned int _radial_intervals;
   /// Subdomain ID of the mesh
-  const subdomain_id_type _block_id;
+  const std::vector<subdomain_id_type> _block_id;
   /// Subdomain Name of the mesh
-  const SubdomainName _block_name;
+  const std::vector<SubdomainName> _block_name;
   /// Whether external_boundary_id is provided
   const bool _boundary_id_valid;
   /// Boundary ID of the external boundary
   const boundary_id_type _external_boundary_id;
   /// Boundary Name of the external boundary
-  const std::string _external_boundary_name;
+  const BoundaryName _external_boundary_name;
 };

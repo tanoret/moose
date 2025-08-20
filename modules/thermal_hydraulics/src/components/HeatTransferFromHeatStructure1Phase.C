@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,6 +23,8 @@ HeatTransferFromHeatStructure1Phase::validParams()
   InputParameters params = HeatTransferFromTemperature1Phase::validParams();
   params += HSBoundaryInterface::validParams();
 
+  params.addParam<MooseFunctorName>("scale", 1.0, "Functor by which to scale the heat flux");
+
   params.addClassDescription("Connects a 1-phase flow channel and a heat structure");
 
   return params;
@@ -32,24 +34,14 @@ HeatTransferFromHeatStructure1Phase::HeatTransferFromHeatStructure1Phase(
     const InputParameters & parameters)
   : HeatTransferFromTemperature1Phase(parameters),
     HSBoundaryInterface(this),
-    _fch_alignment(constMesh())
+    _mesh_alignment(constMesh())
 {
 }
 
-const FEType &
+const libMesh::FEType &
 HeatTransferFromHeatStructure1Phase::getFEType()
 {
   return HeatConductionModel::feType();
-}
-
-void
-HeatTransferFromHeatStructure1Phase::preSetupMesh()
-{
-  if (hasComponentByName<HeatStructureBase>(_hs_name))
-  {
-    const HeatStructureBase & hs = getComponentByName<HeatStructureBase>(_hs_name);
-    hs.setConnectedToFlowChannel();
-  }
 }
 
 void
@@ -62,13 +54,12 @@ HeatTransferFromHeatStructure1Phase::setupMesh()
     const FlowChannel1Phase & flow_channel =
         getComponentByName<FlowChannel1Phase>(_flow_channel_name);
 
-    _fch_alignment.build(hs.getBoundaryInfo(_hs_side), flow_channel.getElementIDs());
+    _mesh_alignment.initialize(flow_channel.getElementIDs(), hs.getBoundaryInfo(_hs_side));
 
     for (auto & elem_id : flow_channel.getElementIDs())
     {
-      dof_id_type nearest_elem_id = _fch_alignment.getNearestElemID(elem_id);
-      if (nearest_elem_id != DofObject::invalid_id)
-        getTHMProblem().augmentSparsity(elem_id, nearest_elem_id);
+      if (_mesh_alignment.hasCoupledElemID(elem_id))
+        getTHMProblem().augmentSparsity(elem_id, _mesh_alignment.getCoupledElemID(elem_id));
     }
   }
 }
@@ -110,7 +101,7 @@ HeatTransferFromHeatStructure1Phase::check() const
 
     if (_hs_side_valid)
     {
-      if (!_fch_alignment.check(flow_channel.getElementIDs()))
+      if (!_mesh_alignment.meshesAreAligned())
         logError("The centers of the elements of flow channel '",
                  _flow_channel_name,
                  "' do not align with the centers of the specified heat structure side.");
@@ -149,11 +140,12 @@ HeatTransferFromHeatStructure1Phase::addMooseObjects()
     const std::string class_name = "ADHeatFluxFromHeatStructure3EqnUserObject";
     InputParameters params = _factory.getValidParams(class_name);
     params.set<std::vector<SubdomainName>>("block") = flow_channel.getSubdomainNames();
-    params.set<FlowChannelAlignment *>("_fch_alignment") = &_fch_alignment;
+    params.set<MeshAlignment *>("_mesh_alignment") = &_mesh_alignment;
     params.set<MaterialPropertyName>("T_wall") = _T_wall_name + "_coupled";
     params.set<std::vector<VariableName>>("P_hf") = {_P_hf_name};
     params.set<MaterialPropertyName>("Hw") = _Hw_1phase_name;
     params.set<MaterialPropertyName>("T") = FlowModelSinglePhase::TEMPERATURE;
+    params.set<MooseFunctorName>("scale") = getParam<MooseFunctorName>("scale");
     params.set<ExecFlagEnum>("execute_on") = execute_on;
     getTHMProblem().addUserObject(class_name, heat_flux_uo_name, params);
   }
@@ -170,7 +162,7 @@ HeatTransferFromHeatStructure1Phase::addMooseObjects()
   {
     const std::string class_name = "ADHeatFlux3EqnBC";
     InputParameters params = _factory.getValidParams(class_name);
-    params.set<std::vector<BoundaryName>>("boundary") = {getMasterSideName()};
+    params.set<std::vector<BoundaryName>>("boundary") = {getHeatStructureSideName()};
     params.set<NonlinearVariableName>("variable") = HeatConductionModel::TEMPERATURE;
     params.set<UserObjectName>("q_uo") = heat_flux_uo_name;
     params.set<Real>("P_hs_unit") = hs.getUnitPerimeter(_hs_side);
@@ -181,23 +173,22 @@ HeatTransferFromHeatStructure1Phase::addMooseObjects()
 
   // Transfer the temperature of the solid onto the flow channel
   {
-    std::string class_name = "VariableValueTransferMaterial";
+    std::string class_name = "MeshAlignmentVariableTransferMaterial";
     InputParameters params = _factory.getValidParams(class_name);
     params.set<std::vector<SubdomainName>>("block") = flow_channel.getSubdomainNames();
     params.set<MaterialPropertyName>("property_name") = _T_wall_name + "_coupled";
-    params.set<BoundaryName>("secondary_boundary") = {getSlaveSideName()};
-    params.set<BoundaryName>("primary_boundary") = getMasterSideName();
     params.set<std::string>("paired_variable") = HeatConductionModel::TEMPERATURE;
+    params.set<MeshAlignment *>("_mesh_alignment") = &_mesh_alignment;
     getTHMProblem().addMaterial(class_name, genName(name(), "T_wall_transfer_mat"), params);
   }
 
-  // Transfer the temperature of the solid onto the flow channel as aux varaible for visualization
+  // Transfer the temperature of the solid onto the flow channel as aux variable for visualization
   {
     std::string class_name = "VariableValueTransferAux";
     InputParameters params = _factory.getValidParams(class_name);
     params.set<AuxVariableName>("variable") = _T_wall_name;
-    params.set<std::vector<BoundaryName>>("boundary") = {getSlaveSideName()};
-    params.set<BoundaryName>("paired_boundary") = getMasterSideName();
+    params.set<std::vector<BoundaryName>>("boundary") = {getChannelSideName()};
+    params.set<BoundaryName>("paired_boundary") = getHeatStructureSideName();
     params.set<std::vector<VariableName>>("paired_variable") =
         std::vector<VariableName>(1, HeatConductionModel::TEMPERATURE);
     getTHMProblem().addAuxKernel(class_name, genName(name(), "T_wall_transfer"), params);
@@ -205,13 +196,13 @@ HeatTransferFromHeatStructure1Phase::addMooseObjects()
 }
 
 const BoundaryName &
-HeatTransferFromHeatStructure1Phase::getMasterSideName() const
+HeatTransferFromHeatStructure1Phase::getHeatStructureSideName() const
 {
   return getHSBoundaryName(this);
 }
 
 const BoundaryName &
-HeatTransferFromHeatStructure1Phase::getSlaveSideName() const
+HeatTransferFromHeatStructure1Phase::getChannelSideName() const
 {
   const FlowChannel1Phase & flow_channel =
       getComponentByName<FlowChannel1Phase>(_flow_channel_name);

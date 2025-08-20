@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -65,6 +65,8 @@ Sampler::Sampler(const InputParameters & parameters)
     DistributionInterface(this),
     PerfGraphInterface(this),
     SamplerInterface(this),
+    VectorPostprocessorInterface(this),
+    ReporterInterface(this),
     _min_procs_per_row(getParam<unsigned int>("min_procs_per_row") > n_processors()
                            ? n_processors()
                            : getParam<unsigned int>("min_procs_per_row")),

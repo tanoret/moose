@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,7 +46,8 @@ PNSFVMomentumPressureFluxRZ::computeQpResidual()
               "This object should only be active in an RZ coordinate system.");
 
   auto rz_radial_coord = _subproblem.getAxisymmetricRadialCoord();
+  const auto state = determineState();
 
-  return -_eps(makeElemArg(_current_elem)).value() * _p(makeElemArg(_current_elem)) /
+  return -_eps(makeElemArg(_current_elem), state) * _p(makeElemArg(_current_elem), state) /
          _q_point[_qp](rz_radial_coord);
 }

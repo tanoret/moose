@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,6 +23,7 @@ DerivativeParsedMaterialHelperTempl<is_ad>::validParams()
   params.addParam<unsigned int>("derivative_order", 3, "Maximum order of derivatives taken");
   params.addParam<std::vector<SymbolName>>(
       "additional_derivative_symbols",
+      {},
       "A list of additional (non-variable) symbols (such as material property or postprocessor "
       "names) to take derivatives w.r.t.");
   return params;
@@ -82,7 +83,7 @@ DerivativeParsedMaterialHelperTempl<is_ad>::functionsPostParse()
   }
 
   // optimize base function
-  ParsedMaterialHelper<is_ad>::functionsOptimize();
+  ParsedMaterialHelper<is_ad>::functionsOptimize(_func_F);
 
   // generate derivatives
   assembleDerivatives();
@@ -207,7 +208,7 @@ DerivativeParsedMaterialHelperTempl<is_ad>::assembleDerivatives()
   if (_tid > 0)
   {
     // get the master object from thread 0
-    const MaterialWarehouse & material_warehouse = _fe_problem.getMaterialWarehouse();
+    const MaterialWarehouse & material_warehouse = this->_fe_problem.getMaterialWarehouse();
     const MooseObjectWarehouse<MaterialBase> & warehouse = material_warehouse[_material_data_type];
 
     MooseSharedPointer<DerivativeParsedMaterialHelperTempl> master =

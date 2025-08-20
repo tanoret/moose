@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,6 +16,8 @@
 #include "libmesh/fe_interface.h"
 #include "libmesh/quadrature.h"
 
+using namespace libMesh;
+
 template <typename T>
 InitialConditionTempl<T>::InitialConditionTempl(const InputParameters & parameters)
   : InitialConditionBase(parameters),
@@ -26,7 +28,7 @@ InitialConditionTempl<T>::InitialConditionTempl(const InputParameters & paramete
                                         parameters.get<VariableName>("variable"))),
     _fe_var(dynamic_cast<MooseVariableFE<T> *>(&_var)),
     _assembly(
-        _fe_problem.assembly(_tid, _var.kind() == Moose::VAR_NONLINEAR ? _var.sys().number() : 0)),
+        _fe_problem.assembly(_tid, _var.kind() == Moose::VAR_SOLVER ? _var.sys().number() : 0)),
     _coord_sys(_assembly.coordSystem()),
     _current_elem(_var.currentElem()),
     _current_elem_volume(_assembly.elemVolume()),
@@ -53,8 +55,6 @@ InitialConditionTempl<T>::compute()
 
   // The dimension of the current element
   _dim = _current_elem->dim();
-  // The element type
-  const ElemType elem_type = _current_elem->type();
   // The number of nodes on the new element
   const unsigned int n_nodes = _current_elem->n_nodes();
 
@@ -123,7 +123,7 @@ InitialConditionTempl<T>::compute()
 
   for (_n = 0; _n != n_nodes; ++_n)
   {
-    _nc = FEInterface::n_dofs_at_node(_dim, _fe_type, elem_type, _n);
+    _nc = FEInterface::n_dofs_at_node(_fe_type, _current_elem, _n);
 
     // for nodes that are in more than one subdomain, only compute the initial
     // condition once on the lowest numbered block
@@ -156,7 +156,7 @@ InitialConditionTempl<T>::compute()
       continue;
     }
 
-    if (_cont == DISCONTINUOUS)
+    if (_cont == DISCONTINUOUS || _cont == H_CURL || _cont == H_DIV)
       libmesh_assert(_nc == 0);
     else if (_cont == C_ZERO)
       setCZeroVertices();
@@ -173,11 +173,15 @@ InitialConditionTempl<T>::compute()
   // From here on out we won't be sampling at nodes anymore
   _current_node = nullptr;
 
+  auto & dof_map = _var.dofMap();
+  const bool add_p_level =
+      dof_map.should_p_refine(dof_map.var_group_from_var_number(_var.number()));
+
   // In 3D, project any edge values next
   if (_dim > 2 && _cont != DISCONTINUOUS)
     for (unsigned int e = 0; e != _current_elem->n_edges(); ++e)
     {
-      FEInterface::dofs_on_edge(_current_elem, _dim, _fe_type, e, _side_dofs);
+      FEInterface::dofs_on_edge(_current_elem, _dim, _fe_type, e, _side_dofs, add_p_level);
 
       // Some edge dofs are on nodes and already
       // fixed, others are free to calculate
@@ -202,7 +206,7 @@ InitialConditionTempl<T>::compute()
   if (_dim > 1 && _cont != DISCONTINUOUS)
     for (unsigned int s = 0; s != _current_elem->n_sides(); ++s)
     {
-      FEInterface::dofs_on_side(_current_elem, _dim, _fe_type, s, _side_dofs);
+      FEInterface::dofs_on_side(_current_elem, _dim, _fe_type, s, _side_dofs, add_p_level);
 
       // Some side dofs are on nodes/edges and already
       // fixed, others are free to calculate

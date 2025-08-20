@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,13 +26,14 @@ PiecewiseConstantVariable::PiecewiseConstantVariable(const InputParameters & par
 
 bool
 PiecewiseConstantVariable::isExtrapolatedBoundaryFace(const FaceInfo & fi,
-                                                      const Elem * const elem) const
+                                                      const Elem * const elem,
+                                                      const Moose::StateArg & time) const
 {
-  if (isDirichletBoundaryFace(fi, elem))
+  if (isDirichletBoundaryFace(fi, elem, time))
     return false;
   if (!isInternalFace(fi))
     return true;
 
-  return !MooseUtils::relativeFuzzyEqual((*this)(Moose::ElemArg{&fi.elem(), false}),
-                                         (*this)(Moose::ElemArg{fi.neighborPtr(), false}));
+  return !MooseUtils::relativeFuzzyEqual((*this)(Moose::ElemArg{&fi.elem(), false}, time),
+                                         (*this)(Moose::ElemArg{fi.neighborPtr(), false}, time));
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,8 @@
 
 #include "ComputeWeightedGapLMMechanicalContact.h"
 #include "Function.h"
+
+class WeightedVelocitiesUserObject;
 
 /**
  * Computes frictional constraints (and normal contact constraints by calling its parent object)
@@ -86,6 +88,9 @@ protected:
 
   /// The value of the real tangential velocity vectors at the current node
   ADRealVectorValue _qp_real_tangential_velocity_nodal;
+
+  /// The weighted gap user object
+  const WeightedVelocitiesUserObject & _weighted_velocities_uo;
 
   /// Numerical factor used in the tangential constraints for convergence purposes
   const Real _c_t;

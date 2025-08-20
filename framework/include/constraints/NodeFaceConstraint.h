@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -93,6 +93,16 @@ public:
   virtual MooseVariable & primaryVariable() { return _primary_var; }
 
   /**
+   * The primary boundary ID for this constraint.
+   */
+  BoundaryID primaryBoundary() const { return _primary; }
+
+  /**
+   * The secondary boundary ID for this constraint.
+   */
+  BoundaryID secondaryBoundary() const { return _secondary; }
+
+  /**
    * The variable number that this object operates on.
    */
   const MooseVariable & variable() const override { return _var; }
@@ -104,6 +114,29 @@ public:
   Real secondaryResidual() const;
 
   void residualSetup() override;
+
+  /**
+   * @returns material property dependencies
+   */
+  virtual const std::unordered_set<unsigned int> & getMatPropDependencies() const;
+
+  /**
+   * Whether (contact) constraint is of 'explicit dynamics' type.
+   */
+  virtual bool isExplicitConstraint() const { return false; }
+
+  /**
+   * Allows for overwriting boundary variables (explicit dynamics contact).
+   */
+  virtual void overwriteBoundaryVariables(NumericVector<Number> & /*soln*/,
+                                          const Node & /*secondary_node*/) const
+  {
+  }
+
+  /**
+   * @returns IDs of the subdomains that connect to the secondary boundary
+   */
+  std::set<SubdomainID> getSecondaryConnectedBlocks() const;
 
 protected:
   /**
@@ -209,20 +242,27 @@ protected:
     return coupledNeighborSecond(var_name, comp);
   }
 
+  /**
+   * Builds the \p _boundary_ids data member and returns it
+   * @returns a set containing the secondary and primary boundary IDs
+   */
+  const std::set<BoundaryID> & buildBoundaryIDs();
+
   /// Boundary ID for the secondary surface
-  unsigned int _secondary;
+  BoundaryID _secondary;
   /// Boundary ID for the primary surface
-  unsigned int _primary;
+  BoundaryID _primary;
 
   MooseVariable & _var;
 
   const MooseArray<Point> & _primary_q_point;
   const QBase * const & _primary_qrule;
 
-public:
+  /// the union of the secondary and primary boundary ids
+  std::set<BoundaryID> _boundary_ids;
+
   PenetrationLocator & _penetration_locator;
 
-protected:
   /// current node being processed
   const Node * const & _current_node;
   const Elem * const & _current_primary;
@@ -277,7 +317,9 @@ protected:
   /// The value of the secondary residual
   Real _secondary_residual;
 
-public:
+  /// An empty material property dependency set for use with \p getMatPropDependencies
+  const std::unordered_set<unsigned int> _empty_mat_prop_deps;
+
   std::vector<dof_id_type> _connected_dof_indices;
 
   /// The Jacobian corresponding to the derivatives of the neighbor/primary residual with respect to
@@ -299,4 +341,12 @@ public:
   /// overwriting the secondary residual we traditionally want to use a different scaling factor from the
   /// one associated with interior physics
   DenseMatrix<Number> _Ken;
+
+  friend class NonlinearSystemBase;
 };
+
+inline const std::unordered_set<unsigned int> &
+NodeFaceConstraint::getMatPropDependencies() const
+{
+  return _empty_mat_prop_deps;
+}

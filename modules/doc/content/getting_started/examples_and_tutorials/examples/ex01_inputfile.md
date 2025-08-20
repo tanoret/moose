@@ -10,7 +10,7 @@ $-\nabla \cdot \nabla u = 0 \in \Omega$, $u = 1$ on the bottom, $u = 0$ on the t
 $\nabla u \cdot \hat{n} = 0$ on the remaining boundaries.
 
 The weak form ([see Finite Elements Principles](finite_element_concepts/fem_principles.md)) of
-this equation, in inner-product notation, is given by: $\nabla \phi_i, \nabla u_h = 0 \quad
+this equation, in inner-product notation, is given by: $(\nabla \phi_i, \nabla u_h) = 0 \quad
 \forall  \phi_i$, where $\phi_i$ are the test functions and $u_h$ is the finite element solution.
 
 ## Input File Syntax
@@ -37,7 +37,6 @@ file itself:
 []
 ```
 
-<br>
 
 !media large_media/examples/mug_mesh.png
        caption=mug.e mesh file
@@ -45,7 +44,7 @@ file itself:
 
 ### Variables
 
-In this simple problem, a single variable, 'diffused,' is defined, which represents $$u$$ from the
+In this simple problem, a single variable, 'diffused,' is defined, which represents $u$ from the
 continuous problem.  The 'diffused' variable is approximated with linear Lagrange shape functions.
 
 !listing examples/ex01_inputfile/ex01.i block=Variables
@@ -83,15 +82,15 @@ custom boundary conditions derived from the existing objects within MOOSE.
 
 The type of problem to solve and the method for solving it is defined within the `Executioner`
 block.  This problem is steady-state and will use the `Steady` Executioner and will use the
-default solving method Preconditioned Jacobain Free Newton Krylov.
+default solving method Preconditioned Jacobian Free Newton Krylov.
 
 !listing examples/ex01_inputfile/ex01.i block=Executioner
 
 ### Outputs
 
-Here two types of outputs are enabled: output to the screen (console) and output to an Exodus II
+Here two types of outputs are enabled: output to the screen (console) and output to an Exodus
 file (exodus).  Setting the "file_base" parameter is optional, in this example it forces the
-output file to be named "out.e" ("e" is the extension used for the Exodus II format).
+output file to be named "out.e" ("e" is the extension used for the Exodus format).
 
 !listing examples/ex01_inputfile/ex01.i block=Outputs
 
@@ -106,9 +105,8 @@ make -j8
 ```
 
 This will generate the results file, out.e, as shown in [example-1-results]. This file may be viewed using
-Peacock or an external application that supports the Exodus II format (e.g., Paraview).
+Peacock or an external application that supports the Exodus format (e.g., Paraview).
 
-<br>
 
 !media large_media/examples/ex01_results.png
        id=example-1-results
@@ -118,13 +116,12 @@ Peacock or an external application that supports the Exodus II format (e.g., Par
 ## Next Steps
 
 Although the Diffusion kernel is the only "physics" in the MOOSE framework, a large set of physics
-is included in the MOOSE [modules](http://mooseframework.org/wiki/PhysicsModules/).  In order to
-implement your own physics, you will need to understand the following:
+is included in the MOOSE [modules](modules/index.md). In order to implement your own physics, you 
+will need to understand the following:
 
-- [Finite Element Methods](http://mooseframework.org/wiki/MooseTraining/FEM/) and the generating
-  the "weak" form of for PDEs
+- [Finite Element Methods](help/faq/what_is_fem.md) and generating the "weak" form for PDEs
 - [C++](help/c++/index.md) and object-oriented design
-- [The Anatomy of a MOOSE Object](http://mooseframework.org/wiki/MooseTraining/MooseObject/)
+- The anatomy of a [MOOSE Object](base/MooseObject.md)
 - Check out more [examples](examples_and_tutorials/index.md#examples)
 
 ## Complete Source Files

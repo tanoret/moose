@@ -33,19 +33,19 @@ Using the properties given above, this yields:
 !table id=nodal_masses_11 caption=Nodal masses in the single-phase, single-component test
 | $x$ | $p$ | Density | Saturation | Nodal mass |
 | --- | --- | --- | --- | --- |
-|-1 | -1 | 0.367879441 | 0.707106781 | 0.008671002 |
+| -1 | -1 | 0.367879441 | 0.707106781 | 0.008671002 |
 | -0.333333333 | -0.333333333 | 0.716531311 | 0.948683298 | 0.02265871 |
 | -0.333333333 | -0.333333333 | 0.716531311 | 0.948683298 | 0.02265871 |
 | 0.333333333 | 0.333333333 | 1.395612425 | 1 | 0.046520414 |
 | 0.333333333 | 0.333333333 | 1.395612425 | 1 | 0.046520414 |
-| 1| 1 | 2.718281828 | 1 | 0.090609394 |
-| | | | Total | 0.237638643 |
+| 1 | 1 | 2.718281828 | 1 | 0.090609394 |
+| - | - | - | Total | 0.237638643 |
 
 MOOSE also gives the total mass as 0.237638643\,kg.
 
 ## Single-phase, two-components
 
-This is similar to the previous section, but has two fluid ocmponents
+This is similar to the previous section, but has two fluid
 components.  The mass fraction is fixed at
 \begin{equation}
 \chi_{{\mathrm{ph}}=0}^{{\mathrm{sp}}=0} = x^{2} \ .
@@ -61,8 +61,8 @@ components.  The mass fraction is fixed at
 | -0.333333333 | -0.333333333 | 0.716531311 | 0.948683298 | 0.111111 | 0.00251763 | 0.02014108 |
 | 0.333333333 | 0.333333333 | 1.395612425 | 1 | 0.111111 | 0.00516893 | 0.04135148 |
 | 0.333333333 | 0.333333333 | 1.395612425 | 1 | 0.111111 | 0.00516893 | 0.04135148 |
-| 1| 1 | 2.718281828 | 1 | 1 | 0.09060939 | 0 |
-| | | | | Total | 0.11465353 | 0.12298511 |
+| 1 | 1 | 2.718281828 | 1 | 1 | 0.09060939 | 0 |
+| - | - | - | - | Total | 0.11465353 | 0.12298511 |
 
 MOOSE produces the expected answer.
 

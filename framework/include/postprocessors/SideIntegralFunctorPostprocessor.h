@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -44,6 +44,12 @@ protected:
 
   /// Error with a helpful message if the functor is not defined on the primary block by the sideset
   void errorFunctorNotDefinedOnSideBlock() const;
+
+  void errorNoFaceInfo() const override
+  {
+    mooseError("The parameter 'functor_argument' was set to 'face', but the mesh contains no face "
+               "info objects.");
+  }
 
   /// Functor being integrated
   const Moose::Functor<GenericReal<is_ad>> & _functor;

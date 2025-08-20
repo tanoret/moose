@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -53,8 +53,8 @@ ElementVariablesDifferenceMax::ElementVariablesDifferenceMax(const InputParamete
   : ElementVectorPostprocessor(parameters),
     _a(coupledValue("compare_a")),
     _b(coupledValue("compare_b")),
-    _a_value(declareVector(getVar("compare_a", 0)->name())),
-    _b_value(declareVector(getVar("compare_b", 0)->name())),
+    _a_value(declareVector(coupledName("compare_a"))),
+    _b_value(declareVector(coupledName("compare_b"))),
     _max_difference(declareVector("Difference")),
     _position_x(declareVector("X")),
     _position_y(declareVector("Y")),
@@ -122,8 +122,7 @@ ElementVariablesDifferenceMax::initialize()
 void
 ElementVariablesDifferenceMax::threadJoin(const UserObject & s)
 {
-  const ElementVariablesDifferenceMax & sibling =
-      static_cast<const ElementVariablesDifferenceMax &>(s);
+  const auto & sibling = static_cast<const ElementVariablesDifferenceMax &>(s);
 
   if (_all[MAXIMUM_DIFFERENCE] < sibling._all[MAXIMUM_DIFFERENCE])
     _all = sibling._all;

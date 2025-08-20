@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,7 +8,6 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ADNodalKernel.h"
-#include "Problem.h"
 #include "SubProblem.h"
 #include "SystemBase.h"
 #include "MooseVariableFE.h"
@@ -19,20 +18,18 @@
 InputParameters
 ADNodalKernel::validParams()
 {
-  return NodalKernelBase::validParams();
+  auto params = NodalKernelBase::validParams();
+  params += ADFunctorInterface::validParams();
+  return params;
 }
 
 ADNodalKernel::ADNodalKernel(const InputParameters & parameters)
-  : NodalKernelBase(parameters), _u(_var.adDofValues())
+  : NodalKernelBase(parameters), ADFunctorInterface(this), _u(_var.adDofValues())
 {
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  mooseError("ADNodalKernels are only supported with global AD indexing");
-#endif
-
-  if (isParamValid("save_in"))
+  if (getParam<std::vector<AuxVariableName>>("save_in").size())
     paramError("save_in",
                "ADNodalKernels do not support save_in. Please use the tagging system instead.");
-  if (isParamValid("diag_save_in"))
+  if (getParam<std::vector<AuxVariableName>>("diag_save_in").size())
     paramError(
         "diag_save_in",
         "ADNodalKernels do not support diag_save_in. Please use the tagging system instead.");
@@ -46,22 +43,26 @@ ADNodalKernel::computeResidual()
     const auto dof_idx = _var.nodalDofIndex();
     _qp = 0;
     auto res = MetaPhysicL::raw_value(computeQpResidual());
-    _assembly.processResidual(res, dof_idx, _vector_tags);
+    addResiduals(_assembly,
+                 std::array<Real, 1>{{res}},
+                 std::array<dof_id_type, 1>{{dof_idx}},
+                 _var.scalingFactor());
   }
 }
 
 void
 ADNodalKernel::computeJacobian()
 {
-#ifdef MOOSE_GLOBAL_AD_INDEXING
   if (_var.isNodalDefined())
   {
     const auto dof_idx = _var.nodalDofIndex();
     _qp = 0;
     const auto res = computeQpResidual();
-    _assembly.processJacobian(res, dof_idx, _matrix_tags);
+    addJacobian(_assembly,
+                std::array<ADReal, 1>{{res}},
+                std::array<dof_id_type, 1>{{dof_idx}},
+                _var.scalingFactor());
   }
-#endif
 }
 
 void

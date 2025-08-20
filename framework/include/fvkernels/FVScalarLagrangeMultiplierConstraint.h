@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,6 +23,10 @@ public:
   FVScalarLagrangeMultiplierConstraint(const InputParameters & parameters);
 
   const MooseVariableScalar & lambdaVariable() const { return _lambda_var; }
+
+protected:
+  /// The value that we want the average of the primal variable to be equal to
+  const PostprocessorValue & _phi0;
 
 private:
   void computeResidual() override final;

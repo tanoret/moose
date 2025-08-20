@@ -1,6 +1,6 @@
 # ConstantDT
 
-!syntax description /Executioner/TimeStepper/ConstantDT
+!syntax description /Executioner/TimeSteppers/ConstantDT
 
 ## Description
 
@@ -19,14 +19,14 @@ user can specify a minimum time step through the `dtmin` parameter in the
 `Executioner` block. If the time step must be cut back below the minimum size
 without obtaining a solution, the problem exits with an error. If the time step
 is cut back using `ConstantDT`, that cut-back step size will be used for the
-remainder of the the analysis.
+remainder of the analysis.
 
 ## Example Input Syntax
 
 !listing test/tests/misc/check_error/wrong_displacement_order.i block=Executioner
 
-!syntax parameters /Executioner/TimeStepper/ConstantDT
+!syntax parameters /Executioner/TimeSteppers/ConstantDT
 
-!syntax inputs /Executioner/TimeStepper/ConstantDT
+!syntax inputs /Executioner/TimeSteppers/ConstantDT
 
-!syntax children /Executioner/TimeStepper/ConstantDT
+!syntax children /Executioner/TimeSteppers/ConstantDT

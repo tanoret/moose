@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,8 +20,7 @@ public:
   HeatStructureCylindricalBase(const InputParameters & params);
 
   virtual void setupMesh() override;
-  virtual void addMooseObjects() override;
-  virtual Real getUnitPerimeter(const HeatStructureSideType & side) const override;
+  virtual Real getUnitPerimeter(const ExternalBoundaryType & side) const override;
 
   /**
    * Get the inner radius of the heat structure
@@ -30,7 +29,12 @@ public:
    */
   virtual Real getInnerRadius() const { return _inner_radius; }
 
+  virtual Real computeRadialBoundaryArea(const Real & length, const Real & y) const override;
+  virtual Real computeAxialBoundaryArea(const Real & y_min, const Real & y_max) const override;
+
 protected:
+  virtual bool useCylindricalTransformation() const override { return true; }
+
   /// Inner radius of the heat structure
   Real _inner_radius;
 

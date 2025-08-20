@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -61,7 +61,7 @@ TagAuxBase<T>::TagAuxBase(const InputParameters & parameters)
   : T(parameters), _scaled(this->template getParam<bool>("scaled"))
 {
   auto & execute_on = this->template getParam<ExecFlagEnum>("execute_on");
-  if (execute_on.size() != 1 || !execute_on.contains(EXEC_TIMESTEP_END))
+  if (execute_on.size() != 1 || !execute_on.isValueSet(EXEC_TIMESTEP_END))
     paramError("execute_on", "must be set to EXEC_TIMESTEP_END");
 }
 

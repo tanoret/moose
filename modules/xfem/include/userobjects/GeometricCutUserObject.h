@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -98,8 +98,6 @@ struct GeomMarkedElemInfo3D
 
 } // namespace Xfem
 
-// Forward declarations
-
 class GeometricCutUserObject : public CrackFrontPointsProvider
 {
 public:
@@ -109,7 +107,7 @@ public:
    */
   static InputParameters validParams();
 
-  GeometricCutUserObject(const InputParameters & parameters);
+  GeometricCutUserObject(const InputParameters & parameters, const bool uses_mesh = false);
 
   virtual void initialize() override;
   virtual void execute() override;

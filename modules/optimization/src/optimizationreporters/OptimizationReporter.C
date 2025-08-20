@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,101 +11,98 @@
 
 #include "libmesh/int_range.h"
 
-registerMooseObject("OptimizationApp", OptimizationReporter);
+registerMooseObjectDeprecated("OptimizationApp", OptimizationReporter, "12/31/2024 24:00");
 
 InputParameters
 OptimizationReporter::validParams()
 {
-  InputParameters params = OptimizationReporterBase::validParams();
+  InputParameters params = OptimizationDataTempl<OptimizationReporterBase>::validParams();
   params.addClassDescription("Computes objective function, gradient and contains reporters for "
                              "communicating between optimizeSolve and subapps");
-  params.addRequiredParam<std::vector<ReporterValueName>>(
-      "parameter_names", "List of parameter names, one for each group of parameters.");
   params.addRequiredParam<std::vector<dof_id_type>>(
       "num_values",
       "Number of parameter values associated with each parameter group in 'parameter_names'.");
-  params.addParam<std::vector<Real>>("initial_condition",
-                                     "Initial condition for each parameter values, default is 0.");
-  params.addParam<std::vector<Real>>(
-      "lower_bounds", std::vector<Real>(), "Lower bounds for each parameter value.");
-  params.addParam<std::vector<Real>>(
-      "upper_bounds", std::vector<Real>(), "Upper bounds for each parameter value.");
-
+  params.addParam<std::vector<std::vector<Real>>>(
+      "initial_condition",
+      "Initial conditions for each parameter. A vector is given for each parameter group.  A "
+      "single value can be given for each group and all parameters in that group will be set to "
+      "that value.  The default value is 0.");
+  params.addParam<std::vector<std::vector<Real>>>(
+      "lower_bounds",
+      "Lower bound for each parameter.  A vector is given for each parameter group.  A single "
+      "value can be given for each group and all parameters in that group will be set to that "
+      "value");
+  params.addParam<std::vector<std::vector<Real>>>(
+      "upper_bounds",
+      "Upper bound for each parameter.  A vector is given for each parameter group.  A single "
+      "value can be given for each group and all parameters in that group will be set to that "
+      "value");
   return params;
 }
 
 OptimizationReporter::OptimizationReporter(const InputParameters & parameters)
-  : OptimizationReporterBase(parameters),
-    _parameter_names(getParam<std::vector<ReporterValueName>>("parameter_names")),
-    _nparam(_parameter_names.size()),
-    _nvalues(getParam<std::vector<dof_id_type>>("num_values")),
-    _ndof(std::accumulate(_nvalues.begin(), _nvalues.end(), 0)),
-    _lower_bounds(getParam<std::vector<Real>>("lower_bounds")),
-    _upper_bounds(getParam<std::vector<Real>>("upper_bounds")),
-    _adjoint_data(declareValueByName<std::vector<Real>>("adjoint", REPORTER_MODE_REPLICATED))
+  : OptimizationDataTempl<OptimizationReporterBase>(parameters)
 {
+  mooseDeprecated(
+      "The 'OptimizationReporter' is deprecated. Please use 'GeneralOptimization' instead. "
+      "You can achieve the same functionality by using an 'OptimizationData' object in the "
+      "forward application to calculate the objective value, similar to the method used here.");
+}
+void
+OptimizationReporter::setICsandBounds()
+{
+  _nvalues = getParam<std::vector<dof_id_type>>("num_values");
+  _ndof = std::accumulate(_nvalues.begin(), _nvalues.end(), 0);
+
+  // size checks
   if (_parameter_names.size() != _nvalues.size())
-    paramError("num_parameters",
-               "There should be a number in 'num_parameters' for each name in 'parameter_names'.");
+    paramError(
+        "num_parameters",
+        "There should be a number in \'num_parameters\' for each name in \'parameter_names\'.");
 
-  std::vector<Real> initial_condition = isParamValid("initial_condition")
-                                            ? getParam<std::vector<Real>>("initial_condition")
-                                            : std::vector<Real>(_ndof, 0.0);
-  if (initial_condition.size() != _ndof)
-    paramError("initial_condition",
-               "Initial condition must be same length as the total number of parameter values.");
-
-  if (_upper_bounds.size() > 0 && _upper_bounds.size() != _ndof)
-    paramError("upper_bounds", "Upper bound data is not equal to the total number of parameters.");
-  else if (_lower_bounds.size() > 0 && _lower_bounds.size() != _ndof)
-    paramError("lower_bounds", "Lower bound data is not equal to the total number of parameters.");
-  else if (_lower_bounds.size() != _upper_bounds.size())
-    paramError((_lower_bounds.size() == 0 ? "upper_bounds" : "lower_bounds"),
-               "Both upper and lower bounds must be specified if bounds are used");
-
-  _parameters.reserve(_nparam);
-  unsigned int v = 0;
-
-  for (const auto i : index_range(_parameter_names))
+  for (const auto & param_id : make_range(_nparams))
   {
-    _parameters.push_back(
-        &declareValueByName<std::vector<Real>>(_parameter_names[i], REPORTER_MODE_REPLICATED));
-    _parameters[i]->assign(initial_condition.begin() + v,
-                           initial_condition.begin() + v + _nvalues[i]);
-    v += _nvalues[i];
+    _gradients[param_id]->resize(_nvalues[param_id]);
+
+    std::vector<Real> ic(parseInputData("initial_condition", 0, param_id));
+    std::vector<Real> lb(
+        parseInputData("lower_bounds", std::numeric_limits<Real>::lowest(), param_id));
+    std::vector<Real> ub(
+        parseInputData("upper_bounds", std::numeric_limits<Real>::max(), param_id));
+
+    _lower_bounds.insert(_lower_bounds.end(), lb.begin(), lb.end());
+    _upper_bounds.insert(_upper_bounds.end(), ub.begin(), ub.end());
+
+    _parameters[param_id]->assign(ic.begin(), ic.end());
   }
 }
 
-void
-OptimizationReporter::setInitialCondition(libMesh::PetscVector<Number> & x)
+Real
+OptimizationReporter::computeObjective()
 {
-  x.init(_ndof);
+  // This will only be executed if measurement_values are available on the main app
+  for (const auto i : index_range(_measurement_values))
+    _misfit_values[i] = _simulation_values[i] - _measurement_values[i];
 
-  dof_id_type n = 0;
-  for (const auto & param : _parameters)
-    for (const auto & val : *param)
-      x.set(n++, val);
+  Real val = 0.0;
+  for (auto & misfit : _misfit_values)
+    val += misfit * misfit;
 
-  x.close();
+  if (_tikhonov_coeff > 0.0)
+  {
+    Real param_norm_sqr = 0;
+    for (const auto & data : _parameters)
+      for (const auto & val : *data)
+        param_norm_sqr += val * val;
+
+    val += _tikhonov_coeff * param_norm_sqr;
+  }
+
+  return val * 0.5;
 }
 
 void
-OptimizationReporter::updateParameters(const libMesh::PetscVector<Number> & x)
+OptimizationReporter::setMisfitToSimulatedValues()
 {
-  dof_id_type n = 0;
-  for (auto & param : _parameters)
-    for (auto & val : *param)
-      val = x(n++);
-}
-
-void
-OptimizationReporter::computeGradient(libMesh::PetscVector<Number> & gradient) const
-{
-  if (_adjoint_data.size() != _ndof)
-    mooseError("Adjoint data is not equal to the total number of parameters.");
-
-  for (const auto i : make_range(_ndof))
-    gradient.set(i, _adjoint_data[i]);
-
-  gradient.close();
+  _misfit_values = _simulation_values;
 }

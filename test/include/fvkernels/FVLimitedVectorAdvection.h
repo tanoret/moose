@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,6 +29,6 @@ protected:
   const RealVectorValue _velocity;
 
   const Moose::FV::LimiterType _limiter_type;
-  const VectorCompositeFunctor<ADReal> _vector;
+  const Moose::VectorCompositeFunctor<ADReal> _vector;
   const unsigned int _index;
 };

@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -99,7 +99,7 @@ WORKDIR ${MOOSE_DIR}
 #-----------------------------------------------------------------------------#
 # Install PETSc to system path
 #-----------------------------------------------------------------------------#
-ARG PETSC_REV=f855b95493736b087b8ccc16dc6c5b29bc4b5aa8
+ARG PETSC_REV=0d6defa7a01093b0f9cf3ff983d2b19d1f01a13e
 ARG PETSC_OPTIONS
 ENV PETSC_DIR=/usr/local
 COPY scripts/update_and_rebuild_petsc.sh ${MOOSE_DIR}/scripts/update_and_rebuild_petsc.sh
@@ -114,7 +114,7 @@ if [ ! -d $PETSC_DIR/lib/petsc ]; then exit 1; fi
 #-----------------------------------------------------------------------------#
 # Install Libmesh to system path
 #-----------------------------------------------------------------------------#
-ARG LIBMESH_REV=a476dcb36d78923b9d2ed13b937b388f00da77f4
+ARG LIBMESH_REV=6ef7d4395794104f48dae1fd48e64077207188e8
 ARG LIBMESH_OPTIONS
 ARG LIBMESH_METHODS="opt dbg"
 ENV LIBMESH_DIR=/usr/local \
@@ -132,6 +132,25 @@ METHODS="${LIBMESH_METHODS}" ./scripts/update_and_rebuild_libmesh.sh ${LIBMESH_O
 rm -rf libmesh/* libmesh/.* || true ; \
 # Ensure Libmesh was installed via include directory
 if [ ! -d $LIBMESH_DIR/include/libmesh ]; then exit 1; fi
+
+#-----------------------------------------------------------------------------#
+# Install wasp to system path
+#-----------------------------------------------------------------------------#
+ARG WASP_REV=c8c9ce4259115973f147e345608450d87dc390c4
+ENV WASP_DIR=/usr/local/wasp
+
+COPY scripts/update_and_rebuild_wasp.sh ${MOOSE_DIR}/scripts/update_and_rebuild_wasp.sh
+COPY scripts/configure_wasp.sh ${MOOSE_DIR}/scripts/configure_wasp.sh
+
+RUN mkdir -p framework/contrib ; \
+cd framework/contrib ; \
+git clone https://code.ornl.gov/neams-workbench/wasp.git ; \
+cd wasp ; \
+git checkout ${WASP_REV} ; \
+git submodule update --init --recursive ; \
+cd ../../.. ; \
+./scripts/update_and_rebuild_wasp.sh -D CMAKE_INSTALL_PREFIX:STRING=${WASP_DIR} ; \
+rm -rf framework || true
 
 #-----------------------------------------------------------------------------#
 # Copy and build MOOSE framework, test, and optionally modules

@@ -1,4 +1,4 @@
-# Material System
+# [Material System](syntax/Materials/index.md)
 
 A system for defining material properties to be used by multiple systems and allow for variable
 coupling.
@@ -71,7 +71,7 @@ addParam<MaterialPropertyName>("combination_property_name", 12345,
 Only scalar (`Real`) values may have defaults.
 
 When `getMaterialProperty<Real>("combination_property_name")` is called, the default will be returned
-if the value has not been computed via a `delcareProperty` call within a `Material` object.
+if the value has not been computed via a `declareProperty` call within a `Material` object.
 
 !---
 
@@ -79,7 +79,7 @@ if the value has not been computed via a `delcareProperty` call within a `Materi
 
 Output of `Material` properties is enabled by setting the "outputs" parameter.
 
-The following example creates two additional variables called "mat1" and "mat2" that will show up in
+The following example creates additional variables called "real_property", "tensor_property", and "vector_property" that will show up in
 the output file.
 
 !listing output_block.i block=Materials Outputs

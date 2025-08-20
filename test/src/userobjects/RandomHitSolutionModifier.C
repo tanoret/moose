@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,8 @@
 #include "MooseVariableFE.h"
 #include "NonlinearSystemBase.h"
 #include "RandomHitUserObject.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseTestApp", RandomHitSolutionModifier);
 
@@ -76,11 +78,11 @@ RandomHitSolutionModifier::execute()
       {
         _subproblem.reinitNode(closest_node, 0);
         _variable.setNodalValue(_variable.getNodalValue(*closest_node) + _amount);
-        _variable.insert(_fe_problem.getNonlinearSystemBase().solution());
+        _variable.insert(_fe_problem.getNonlinearSystemBase(0).solution());
       }
     }
   }
 
-  _fe_problem.getNonlinearSystemBase().solution().close();
-  _fe_problem.getNonlinearSystemBase().system().update();
+  _fe_problem.getNonlinearSystemBase(0).solution().close();
+  _fe_problem.getNonlinearSystemBase(0).system().update();
 }

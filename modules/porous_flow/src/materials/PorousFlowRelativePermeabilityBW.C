@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,11 +10,13 @@
 #include "PorousFlowRelativePermeabilityBW.h"
 
 registerMooseObject("PorousFlowApp", PorousFlowRelativePermeabilityBW);
+registerMooseObject("PorousFlowApp", ADPorousFlowRelativePermeabilityBW);
 
+template <bool is_ad>
 InputParameters
-PorousFlowRelativePermeabilityBW::validParams()
+PorousFlowRelativePermeabilityBWTempl<is_ad>::validParams()
 {
-  InputParameters params = PorousFlowRelativePermeabilityBase::validParams();
+  InputParameters params = PorousFlowRelativePermeabilityBaseTempl<is_ad>::validParams();
   params.addRequiredRangeCheckedParam<Real>(
       "Sn",
       "Sn >= 0",
@@ -39,14 +41,15 @@ PorousFlowRelativePermeabilityBW::validParams()
   return params;
 }
 
-PorousFlowRelativePermeabilityBW::PorousFlowRelativePermeabilityBW(
+template <bool is_ad>
+PorousFlowRelativePermeabilityBWTempl<is_ad>::PorousFlowRelativePermeabilityBWTempl(
     const InputParameters & parameters)
-  : PorousFlowRelativePermeabilityBase(parameters),
-    _sn(getParam<Real>("Sn")),
-    _ss(getParam<Real>("Ss")),
-    _kn(getParam<Real>("Kn")),
-    _ks(getParam<Real>("Ks")),
-    _c(getParam<Real>("C"))
+  : PorousFlowRelativePermeabilityBaseTempl<is_ad>(parameters),
+    _sn(this->template getParam<Real>("Sn")),
+    _ss(this->template getParam<Real>("Ss")),
+    _kn(this->template getParam<Real>("Kn")),
+    _ks(this->template getParam<Real>("Ks")),
+    _c(this->template getParam<Real>("C"))
 {
   if (_ss <= _sn)
     mooseError("In BW relative permeability Sn set to ",
@@ -62,14 +65,19 @@ PorousFlowRelativePermeabilityBW::PorousFlowRelativePermeabilityBW(
                " but these must obey Ks > Kn");
 }
 
-Real
-PorousFlowRelativePermeabilityBW::relativePermeability(Real seff) const
+template <bool is_ad>
+GenericReal<is_ad>
+PorousFlowRelativePermeabilityBWTempl<is_ad>::relativePermeability(GenericReal<is_ad> seff) const
 {
   return PorousFlowBroadbridgeWhite::relativePermeability(seff, _c, _sn, _ss, _kn, _ks);
 }
 
+template <bool is_ad>
 Real
-PorousFlowRelativePermeabilityBW::dRelativePermeability(Real seff) const
+PorousFlowRelativePermeabilityBWTempl<is_ad>::dRelativePermeability(Real seff) const
 {
   return PorousFlowBroadbridgeWhite::dRelativePermeability(seff, _c, _sn, _ss, _kn, _ks);
 }
+
+template class PorousFlowRelativePermeabilityBWTempl<false>;
+template class PorousFlowRelativePermeabilityBWTempl<true>;

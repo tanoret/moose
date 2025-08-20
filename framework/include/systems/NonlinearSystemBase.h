@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "SystemBase.h"
+#include "SolverSystem.h"
 #include "ConstraintWarehouse.h"
 #include "MooseObjectWarehouse.h"
 #include "MooseObjectTagWarehouse.h"
@@ -38,12 +38,15 @@ class ADDirichletBCBase;
 class DGKernelBase;
 class InterfaceKernelBase;
 class ScalarKernelBase;
-class DiracKernel;
+class DiracKernelBase;
 class NodalKernelBase;
 class Split;
 class KernelBase;
+class HDGKernel;
+class HDGIntegratedBC;
 class BoundaryCondition;
 class ResidualObject;
+class PenetrationInfo;
 
 // libMesh forward declarations
 namespace libMesh
@@ -61,13 +64,13 @@ class DiagonalMatrix;
  *
  * It is a part of FEProblemBase ;-)
  */
-class NonlinearSystemBase : public SystemBase, public PerfGraphInterface
+class NonlinearSystemBase : public SolverSystem, public PerfGraphInterface
 {
 public:
-  NonlinearSystemBase(FEProblemBase & problem, System & sys, const std::string & name);
+  NonlinearSystemBase(FEProblemBase & problem, libMesh::System & sys, const std::string & name);
   virtual ~NonlinearSystemBase();
 
-  virtual void init() override;
+  virtual void preInit() override;
 
   bool computedScalingJacobian() const { return _computed_scaling; }
 
@@ -77,24 +80,18 @@ public:
   virtual void turnOffJacobian();
 
   virtual void solve() override = 0;
-  virtual void restoreSolutions() override;
 
-  /**
-   * Quit the current solve as soon as possible.
-   */
-  virtual void stopSolve() = 0;
-
-  virtual NonlinearSolver<Number> * nonlinearSolver() = 0;
+  virtual libMesh::NonlinearSolver<Number> * nonlinearSolver() = 0;
 
   virtual SNES getSNES() = 0;
 
   virtual unsigned int getCurrentNonlinearIterationNumber() = 0;
 
   /**
-   * Returns true if this system is currently computing the initial residual for a solve.
-   * @return Whether or not we are currently computing the initial residual.
+   * Returns true if this system is currently computing the pre-SMO residual for a solve.
+   * @return Whether or not we are currently computing the pre-SMO residual.
    */
-  virtual bool computingInitialResidual() { return _computing_initial_residual; }
+  bool computingPreSMOResidual() { return _computing_pre_smo_residual; }
 
   // Setup Functions ////
   virtual void initialSetup() override;
@@ -113,29 +110,6 @@ public:
   bool haveFieldSplitPreconditioner() const { return _use_field_split_preconditioner; }
 
   /**
-   * Returns the convergence state
-   * @return true if converged, otherwise false
-   */
-  virtual bool converged() = 0;
-
-  /**
-   * Add a time integrator
-   * @param type Type of the integrator
-   * @param name The name of the integrator
-   * @param parameters Integrator params
-   */
-  void addTimeIntegrator(const std::string & type,
-                         const std::string & name,
-                         InputParameters & parameters) override;
-  using SystemBase::addTimeIntegrator;
-
-  /**
-   * Add u_dot, u_dotdot, u_dot_old and u_dotdot_old
-   * vectors if requested by the time integrator
-   */
-  void addDotVectors();
-
-  /**
    * Adds a kernel
    * @param kernel_name The type of the kernel
    * @param name The name of the kernel
@@ -144,6 +118,26 @@ public:
   virtual void addKernel(const std::string & kernel_name,
                          const std::string & name,
                          InputParameters & parameters);
+
+  /**
+   * Adds a hybridized discontinuous Galerkin (HDG) kernel
+   * @param kernel_name The type of the hybridized kernel
+   * @param name The name of the hybridized kernel
+   * @param parameters HDG kernel parameters
+   */
+  virtual void addHDGKernel(const std::string & kernel_name,
+                            const std::string & name,
+                            InputParameters & parameters);
+
+  /**
+   * Adds a hybridized discontinuous Galerkin (HDG) bc
+   * @param bc_name The type of the hybridized bc
+   * @param name The name of the hybridized bc
+   * @param parameters HDG bc parameters
+   */
+  virtual void addHDGIntegratedBC(const std::string & bc_name,
+                                  const std::string & name,
+                                  InputParameters & parameters);
 
   /**
    * Adds a NodalKernel
@@ -238,6 +232,45 @@ public:
    */
   std::shared_ptr<Split> getSplit(const std::string & name);
 
+  /**
+   * We offer the option to check convergence against the pre-SMO residual. This method handles the
+   * logic as to whether we should perform such residual evaluation.
+   *
+   * @return A boolean indicating whether we should evaluate the pre-SMO residual.
+   */
+  bool shouldEvaluatePreSMOResidual() const;
+
+  /**
+   * Set whether to evaluate the pre-SMO residual and use it in the subsequent relative convergence
+   * checks.
+   *
+   * If set to true, an _additional_ residual evaluation is performed before any
+   * solution-modifying object is executed, and before the initial (0-th nonlinear iteration)
+   * residual evaluation. Such residual is referred to as the pre-SMO residual. If the pre-SMO
+   * residual is evaluated, it is used in the subsequent relative convergence checks.
+   *
+   * If set to false, no residual evaluation takes place before the initial residual evaluation, and
+   * the initial residual is used in the subsequent relative convergence checks. This mode is
+   * recommended for performance-critical code as it avoids the additional pre-SMO residual
+   * evaluation.
+   */
+  void setPreSMOResidual(bool use) { _use_pre_smo_residual = use; }
+
+  /// Whether we are using pre-SMO residual in relative convergence checks
+  const bool & usePreSMOResidual() const { return _use_pre_smo_residual; }
+
+  /// The reference residual used in relative convergence check.
+  Real referenceResidual() const;
+
+  /// The pre-SMO residual
+  Real preSMOResidual() const;
+
+  /// The initial residual
+  Real initialResidual() const;
+
+  /// Record the initial residual (for later relative convergence check)
+  void setInitialResidual(Real r);
+
   void zeroVectorForResidual(const std::string & vector_name);
 
   void setInitialSolution();
@@ -301,10 +334,6 @@ public:
    */
   void constraintJacobians(bool displaced);
 
-  /// set all the global dof indices for a nonlinear variable
-  void setVariableGlobalDoFs(const std::string & var_name);
-  const std::vector<dof_id_type> & getVariableGlobalDoFs() { return _var_all_dof_indices; }
-
   /**
    * Computes multiple (tag associated) Jacobian matricese
    */
@@ -312,18 +341,19 @@ public:
 
   /**
    * Method used to obtain scaling factors for variables
+   * @returns whether this method ran without exceptions
    */
-  void computeScaling();
+  bool computeScaling();
 
   /**
    * Associate jacobian to systemMatrixTag, and then form a matrix for all the tags
    */
-  void computeJacobian(SparseMatrix<Number> & jacobian, const std::set<TagID> & tags);
+  void computeJacobian(libMesh::SparseMatrix<Number> & jacobian, const std::set<TagID> & tags);
 
   /**
    * Take all tags in the system, and form a matrix for all tags in the system
    */
-  void computeJacobian(SparseMatrix<Number> & jacobian);
+  void computeJacobian(libMesh::SparseMatrix<Number> & jacobian);
 
   /**
    * Computes several Jacobian blocks simultaneously, summing their contributions into smaller
@@ -346,11 +376,6 @@ public:
   Real computeDamping(const NumericVector<Number> & solution, const NumericVector<Number> & update);
 
   /**
-   * Computes the time derivative vector
-   */
-  void computeTimeDerivatives(bool jacobian_calculation = false);
-
-  /**
    * Called at the beginning of the time step
    */
   void onTimestepBegin();
@@ -363,7 +388,11 @@ public:
    */
   virtual void subdomainSetup(SubdomainID subdomain, THREAD_ID tid);
 
-  virtual void setSolution(const NumericVector<Number> & soln);
+  /**
+   * Called from explicit time stepping to overwrite boundary positions (explicit dynamics). This
+   * will close/assemble the passed-in \p soln after overwrite
+   */
+  void overwriteNodeFace(NumericVector<Number> & soln);
 
   /**
    * Update active objects of Warehouses owned by NonlinearSystemBase
@@ -386,15 +415,6 @@ public:
    */
   virtual void setSolutionUDotDot(const NumericVector<Number> & udotdot);
 
-  NumericVector<Number> * solutionUDot() override { return _u_dot; }
-  NumericVector<Number> * solutionUDotDot() override { return _u_dotdot; }
-  NumericVector<Number> * solutionUDotOld() override { return _u_dot_old; }
-  NumericVector<Number> * solutionUDotDotOld() override { return _u_dotdot_old; }
-  const NumericVector<Number> * solutionUDot() const override { return _u_dot; }
-  const NumericVector<Number> * solutionUDotDot() const override { return _u_dotdot; }
-  const NumericVector<Number> * solutionUDotOld() const override { return _u_dot_old; }
-  const NumericVector<Number> * solutionUDotDotOld() const override { return _u_dotdot_old; }
-
   /**
    *  Return a numeric vector that is associated with the time tag.
    */
@@ -410,20 +430,12 @@ public:
    */
   NumericVector<Number> & residualVector(TagID tag);
 
-  const NumericVector<Number> * const & currentSolution() const override
-  {
-    return _current_solution;
-  }
-
-  virtual void serializeSolution();
-  virtual NumericVector<Number> & serializedSolution() override;
-
   virtual NumericVector<Number> & residualCopy() override;
   virtual NumericVector<Number> & residualGhosted() override;
 
   virtual NumericVector<Number> & RHS() = 0;
 
-  virtual void augmentSparsity(SparsityPattern::Graph & sparsity,
+  virtual void augmentSparsity(libMesh::SparsityPattern::Graph & sparsity,
                                std::vector<dof_id_type> & n_nz,
                                std::vector<dof_id_type> & n_oz) override;
 
@@ -482,7 +494,7 @@ public:
    * Attach a customized preconditioner that requires physics knowledge.
    * Generic preconditioners should be implemented in PETSc, instead.
    */
-  virtual void attachPreconditioner(Preconditioner<Number> * preconditioner) = 0;
+  virtual void attachPreconditioner(libMesh::Preconditioner<Number> * preconditioner) = 0;
 
   /**
    * Setup damping stuff (called before we actually start)
@@ -506,7 +518,8 @@ public:
   ///@{
   /// System Integrity Checks
   void checkKernelCoverage(const std::set<SubdomainID> & mesh_subdomains) const;
-  bool containsTimeKernel();
+  virtual bool containsTimeKernel() override;
+  virtual std::vector<std::string> timeKernelVariableNames() override;
   ///@}
 
   /**
@@ -548,14 +561,6 @@ public:
   void setPredictor(std::shared_ptr<Predictor> predictor);
   Predictor * getPredictor() { return _predictor.get(); }
 
-  void setPCSide(MooseEnum pcs);
-
-  Moose::PCSideType getPCSide() { return _pc_side; }
-
-  void setMooseKSPNormType(MooseEnum kspnorm);
-
-  Moose::MooseKSPNormType getMooseKSPNormType() { return _ksp_norm; }
-
   /**
    * Indicated whether this system needs material properties on boundaries.
    * @return Boolean if IntegratedBCs are active
@@ -584,13 +589,22 @@ public:
    * Access functions to Warehouses from outside NonlinearSystemBase
    */
   MooseObjectTagWarehouse<KernelBase> & getKernelWarehouse() { return _kernels; }
+  const MooseObjectTagWarehouse<KernelBase> & getKernelWarehouse() const { return _kernels; }
   MooseObjectTagWarehouse<DGKernelBase> & getDGKernelWarehouse() { return _dg_kernels; }
   MooseObjectTagWarehouse<InterfaceKernelBase> & getInterfaceKernelWarehouse()
   {
     return _interface_kernels;
   }
-  MooseObjectTagWarehouse<DiracKernel> & getDiracKernelWarehouse() { return _dirac_kernels; }
+  MooseObjectTagWarehouse<DiracKernelBase> & getDiracKernelWarehouse() { return _dirac_kernels; }
   MooseObjectTagWarehouse<IntegratedBCBase> & getIntegratedBCWarehouse() { return _integrated_bcs; }
+  const MooseObjectTagWarehouse<ScalarKernelBase> & getScalarKernelWarehouse() const
+  {
+    return _scalar_kernels;
+  }
+  const MooseObjectTagWarehouse<NodalKernelBase> & getNodalKernelWarehouse() const
+  {
+    return _nodal_kernels;
+  }
   const MooseObjectWarehouse<ElementDamper> & getElementDamperWarehouse() const
   {
     return _element_dampers;
@@ -626,8 +640,8 @@ public:
    */
   bool hasDiagSaveIn() const { return _has_diag_save_in || _has_nodalbc_diag_save_in; }
 
-  virtual System & system() override { return _sys; }
-  virtual const System & system() const override { return _sys; }
+  virtual libMesh::System & system() override { return _sys; }
+  virtual const libMesh::System & system() const override { return _sys; }
 
   virtual void setSolutionUDotOld(const NumericVector<Number> & u_dot_old);
 
@@ -678,27 +692,29 @@ public:
     _off_diagonals_in_auto_scaling = off_diagonals_in_auto_scaling;
   }
 
-#ifndef MOOSE_SPARSE_AD
-  /**
-   * Set the required size of the derivative vector
-   */
-  void setRequiredDerivativeSize(std::size_t size) { _required_derivative_size = size; }
-
-  /**
-   * Return the required size of the derivative vector
-   */
-  std::size_t requiredDerivativeSize() const { return _required_derivative_size; }
-#endif
-
-  FEProblemBase & _fe_problem;
-  System & _sys;
+  libMesh::System & _sys;
   // FIXME: make these protected and create getters/setters
   Real _last_nl_rnorm;
-  Real _initial_residual_before_preset_bcs;
-  Real _initial_residual_after_preset_bcs;
   std::vector<unsigned int> _current_l_its;
   unsigned int _current_nl_its;
-  bool _compute_initial_residual_before_preset_bcs;
+
+  /**
+   * Setup the PETSc DM object (when appropriate)
+   */
+  void setupDM();
+
+  using SystemBase::reinitNodeFace;
+
+  /**
+   * Create finite differencing contexts for assembly of the Jacobian and/or approximating the
+   * action of the Jacobian on vectors (e.g. FD and/or MFFD respectively)
+   */
+  virtual void potentiallySetupFiniteDifferencing() {}
+
+  /**
+   * Destroy the coloring object if it exists
+   */
+  void destroyColoring();
 
 protected:
   /**
@@ -746,7 +762,9 @@ protected:
   /**
    * Do mortar constraint residual/jacobian computations
    */
-  void mortarConstraints(Moose::ComputeType compute_type);
+  void mortarConstraints(Moose::ComputeType compute_type,
+                         const std::set<TagID> & vector_tags,
+                         const std::set<TagID> & matrix_tags);
 
   /**
    * Compute a "Jacobian" for automatic scaling purposes
@@ -758,13 +776,11 @@ protected:
    */
   virtual void computeScalingResidual() = 0;
 
-#ifdef MOOSE_GLOBAL_AD_INDEXING
   /**
    * Assemble the numeric vector of scaling factors such that it can be used during assembly of the
    * system matrix
    */
   void assembleScalingVector();
-#endif
 
   /**
    * Called after any ResidualObject-derived objects are added
@@ -772,28 +788,31 @@ protected:
    */
   virtual void postAddResidualObject(ResidualObject &) {}
 
-  NumericVector<Number> & solutionInternal() const override { return *_sys.solution; }
+  /**
+   * Reinitialize quantities such as variables, residuals, Jacobians, materials for node-face
+   * constraints
+   */
+  void reinitNodeFace(const Node & secondary_node,
+                      const BoundaryID secondary_boundary,
+                      const PenetrationInfo & info,
+                      const bool displaced);
 
-  /// solution vector from nonlinear solver
-  const NumericVector<Number> * _current_solution;
+  /**
+   * Perform some steps to get ready for the solver. These include
+   * - zeroing iteration counters
+   * - setting initial solutions
+   * - possibly performing automatic scaling
+   * - forming a scaling vector which, at least at some point, was required when AD objects were
+   *   used with non-unity scaling factors for nonlinear variables
+   * @returns Whether any exceptions were raised while running this method
+   */
+  bool preSolve();
+
   /// ghosted form of the residual
   NumericVector<Number> * _residual_ghosted;
 
-  /// Serialized version of the solution vector
-  NumericVector<Number> & _serialized_solution;
-
-  /// Copy of the residual vector
-  NumericVector<Number> & _residual_copy;
-
-  /// solution vector for u^dot
-  NumericVector<Number> * _u_dot;
-  /// solution vector for u^dotdot
-  NumericVector<Number> * _u_dotdot;
-
-  /// old solution vector for u^dot
-  NumericVector<Number> * _u_dot_old;
-  /// old solution vector for u^dotdot
-  NumericVector<Number> * _u_dotdot_old;
+  /// Copy of the residual vector, or nullptr if a copy is not needed
+  std::unique_ptr<NumericVector<Number>> _residual_copy;
 
   /// \f$ {du^dot}\over{du} \f$
   Number _du_dot_du;
@@ -829,6 +848,7 @@ protected:
   ///@{
   /// Kernel Storage
   MooseObjectTagWarehouse<KernelBase> _kernels;
+  MooseObjectWarehouse<HDGKernel> _hybridized_kernels;
   MooseObjectTagWarehouse<ScalarKernelBase> _scalar_kernels;
   MooseObjectTagWarehouse<DGKernelBase> _dg_kernels;
   MooseObjectTagWarehouse<InterfaceKernelBase> _interface_kernels;
@@ -841,10 +861,11 @@ protected:
   MooseObjectTagWarehouse<NodalBCBase> _nodal_bcs;
   MooseObjectWarehouse<DirichletBCBase> _preset_nodal_bcs;
   MooseObjectWarehouse<ADDirichletBCBase> _ad_preset_nodal_bcs;
+  MooseObjectWarehouse<HDGIntegratedBC> _hybridized_ibcs;
   ///@}
 
   /// Dirac Kernel storage for each thread
-  MooseObjectTagWarehouse<DiracKernel> _dirac_kernels;
+  MooseObjectTagWarehouse<DiracKernelBase> _dirac_kernels;
 
   /// Element Dampers for each thread
   MooseObjectWarehouse<ElementDamper> _element_dampers;
@@ -868,10 +889,6 @@ protected:
   NumericVector<Number> * _increment_vec;
   /// Preconditioner
   std::shared_ptr<MoosePreconditioner> _preconditioner;
-  /// Preconditioning side
-  Moose::PCSideType _pc_side;
-  /// KSP norm type
-  Moose::MooseKSPNormType _ksp_norm;
 
   /// Whether or not to use a finite differenced preconditioner
   bool _use_finite_differenced_preconditioner;
@@ -891,11 +908,6 @@ protected:
   /// Whether or not to assemble the residual and Jacobian after the application of each constraint.
   bool _assemble_constraints_separately;
 
-  /// Whether or not a copy of the residual needs to be made
-  bool _need_serialized_solution;
-
-  /// Whether or not a copy of the residual needs to be made
-  bool _need_residual_copy;
   /// Whether or not a ghosted copy of the residual needs to be made
   bool _need_residual_ghosted;
   /// true if debugging residuals
@@ -918,7 +930,14 @@ protected:
   /// If predictor is active, this is non-NULL
   std::shared_ptr<Predictor> _predictor;
 
-  bool _computing_initial_residual;
+  bool _computing_pre_smo_residual;
+
+  /// The pre-SMO residual, see setPreSMOResidual for a detailed explanation
+  Real _pre_smo_residual;
+  /// The initial (i.e., 0th nonlinear iteration) residual, see setPreSMOResidual for a detailed explanation
+  Real _initial_residual;
+  /// Whether to use the pre-SMO initial residual in the relative convergence check
+  bool _use_pre_smo_residual;
 
   bool _print_all_var_norms;
 
@@ -935,8 +954,6 @@ protected:
   bool _has_nodalbc_diag_save_in;
 
   void getNodeDofs(dof_id_type node_id, std::vector<dof_id_type> & dofs);
-
-  std::vector<dof_id_type> _var_all_dof_indices;
 
   /// Flag used to indicate whether we have already computed the scaling Jacobian
   bool _computed_scaling;
@@ -966,7 +983,7 @@ protected:
   bool _off_diagonals_in_auto_scaling;
 
   /// A diagonal matrix used for computing scaling
-  std::unique_ptr<DiagonalMatrix<Number>> _scaling_matrix;
+  std::unique_ptr<libMesh::DiagonalMatrix<Number>> _scaling_matrix;
 
 private:
   /**
@@ -988,11 +1005,6 @@ private:
   /// Functors for computing displaced mortar constraints
   std::unordered_map<std::pair<BoundaryID, BoundaryID>, ComputeMortarFunctor>
       _displaced_mortar_functors;
-
-#ifndef MOOSE_SPARSE_AD
-  /// The required size of the derivative storage array
-  std::size_t _required_derivative_size;
-#endif
 
   /// The current states of the solution (0 = current, 1 = old, etc)
   std::vector<NumericVector<Number> *> _solution_state;

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,6 +24,15 @@ SideIntegralPostprocessor::SideIntegralPostprocessor(const InputParameters & par
 }
 
 void
+SideIntegralPostprocessor::initialSetup()
+{
+  SidePostprocessor::initialSetup();
+
+  if (!_qp_integration && _mesh.isFiniteVolumeInfoDirty())
+    errorNoFaceInfo();
+}
+
+void
 SideIntegralPostprocessor::initialize()
 {
   _integral_value = 0;
@@ -36,16 +45,15 @@ SideIntegralPostprocessor::execute()
 }
 
 Real
-SideIntegralPostprocessor::getValue()
+SideIntegralPostprocessor::getValue() const
 {
-
   return _integral_value;
 }
 
 void
 SideIntegralPostprocessor::threadJoin(const UserObject & y)
 {
-  const SideIntegralPostprocessor & pps = static_cast<const SideIntegralPostprocessor &>(y);
+  const auto & pps = static_cast<const SideIntegralPostprocessor &>(y);
   _integral_value += pps._integral_value;
 }
 

@@ -37,7 +37,6 @@
     type = EBSDMeshGenerator
     # Two Parallel Grains
     filename = 'EBSD_ThreeGrains.txt'
-    uniform_refine = 1
   []
 []
 
@@ -185,8 +184,8 @@
   [./CuGrGr]
     # Material properties
     type = GBEvolution # Quantitative material properties for copper grain growth.  Dimensions are nm and ns
-    GBmob0 = 2.5e-6 # Mobility prefactor for Cu from Schonfelder1997
-    GBenergy = 0.708 # GB energy for Cu from Schonfelder1997
+    GBmob0 = 2.5e-6 # Mobility prefactor for Cu from schonfelder1997molecular bibtex entry
+    GBenergy = 0.708 # GB energy for Cu from schonfelder1997molecular bibtex entry
     Q = 0.23 # Activation energy for grain growth from Schonfelder 1997
     T = 450 # Constant temperature of the simulation (for mobility calculation)
     wGB = 6 # Width of the diffuse GB
@@ -208,7 +207,7 @@
     type = TimestepSize
   [../]
   [n_elements]
-    type = NumElems
+    type = NumElements
     execute_on = 'initial timestep_end'
   []
   [n_nodes]

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -47,7 +47,7 @@ SpatialAverageBase::SpatialAverageBase(const InputParameters & parameters)
 
   // couple variables initialize vectors
   for (MooseIndex(_average) j = 0; j < _nvals; ++j)
-    _average[j] = &declareVector(getVar("variable", j)->name());
+    _average[j] = &declareVector(coupledName("variable", j));
 
   // initialize the bin center value vector
   _bin_center.resize(_nbins);
@@ -104,7 +104,7 @@ SpatialAverageBase::finalize()
 void
 SpatialAverageBase::threadJoin(const UserObject & y)
 {
-  const SpatialAverageBase & uo = static_cast<const SpatialAverageBase &>(y);
+  const auto & uo = static_cast<const SpatialAverageBase &>(y);
 
   for (MooseIndex(_counts) i = 0; i < _nbins; ++i)
   {

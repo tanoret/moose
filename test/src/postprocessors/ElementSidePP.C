@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,7 +25,7 @@ ElementSidePP::ElementSidePP(const InputParameters & parameters)
 }
 
 Real
-ElementSidePP::getValue()
+ElementSidePP::getValue() const
 {
   return _sidepp;
 }

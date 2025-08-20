@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,14 +9,14 @@
 
 #pragma once
 
-#include "ADNodalBC.h"
+#include "ADDirichletBCBaseTempl.h"
 
 /**
  * Boundary condition of a Dirichlet type
  *
  * Sets the values of a LAGRANGE_VEC variable at nodes to values specified by functions
  */
-class ADVectorFunctionDirichletBC : public ADVectorNodalBC
+class ADVectorFunctionDirichletBC : public ADDirichletBCBaseTempl<RealVectorValue>
 {
 public:
   static InputParameters validParams();
@@ -24,7 +24,7 @@ public:
   ADVectorFunctionDirichletBC(const InputParameters & parameters);
 
 protected:
-  virtual ADRealVectorValue computeQpResidual() override;
+  virtual ADRealVectorValue computeQpValue() override;
 
   /// Optional vectorValue function
   const Function * const _function;

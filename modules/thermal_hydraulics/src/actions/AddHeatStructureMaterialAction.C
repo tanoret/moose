@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,7 +16,9 @@ registerMooseAction("ThermalHydraulicsApp",
 InputParameters
 AddHeatStructureMaterialAction::validParams()
 {
-  return AddUserObjectAction::validParams();
+  InputParameters params = AddUserObjectAction::validParams();
+  params.addClassDescription("Adds HeatStructureMaterials to the Problem");
+  return params;
 }
 
 AddHeatStructureMaterialAction::AddHeatStructureMaterialAction(const InputParameters & params)

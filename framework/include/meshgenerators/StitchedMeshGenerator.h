@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -40,4 +40,11 @@ protected:
 
   /// Type of algorithm used to find matching nodes (binary or exhaustive)
   MooseEnum _algorithm;
+
+  /// Whether to renumber all boundaries in stitched meshes to prevent accidental merging
+  /// of sidesets with the same id
+  const bool _prevent_boundary_ids_overlap;
+
+  /// Whether to merge boundaries if they have the same name but different boundary IDs
+  const bool _merge_boundaries_with_same_name;
 };

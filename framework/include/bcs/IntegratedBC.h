@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -35,6 +35,7 @@ public:
    * @param jvar The number of the scalar variable
    */
   void computeOffDiagJacobianScalar(unsigned int jvar) override;
+  virtual void computeResidualAndJacobian() override;
 
 protected:
   /**

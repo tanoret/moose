@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,13 +11,14 @@
 #include "OversampleOutput.h"
 #include "FEProblem.h"
 #include "DisplacedProblem.h"
-#include "FileMesh.h"
 #include "MooseApp.h"
 
 #include "libmesh/distributed_mesh.h"
 #include "libmesh/equation_systems.h"
 #include "libmesh/mesh_function.h"
 #include "libmesh/explicit_system.h"
+
+using namespace libMesh;
 
 InputParameters
 OversampleOutput::validParams()
@@ -61,9 +62,6 @@ OversampleOutput::OversampleOutput(const InputParameters & parameters)
     _position(_change_position ? getParam<Point>("position") : Point()),
     _oversample_mesh_changed(true)
 {
-  // ** DEPRECATED SUPPORT **
-  if (getParam<bool>("append_oversample"))
-    _file_base += "_oversample";
 }
 
 void
@@ -90,14 +88,21 @@ OversampleOutput::outputStep(const ExecFlagType & type)
   if (type != EXEC_FINAL && !onInterval())
     return;
 
-  // Call the output method (this has the file checking built in b/c OversampleOutput is a
-  // FileOutput)
-  if (shouldOutput(type))
+  // store current simulation time
+  _last_output_simulation_time = _time;
+
+  // set current type
+  _current_execute_flag = type;
+
+  // Call the output method
+  if (shouldOutput())
   {
-    TIME_SECTION("outputStep", 1);
+    TIME_SECTION("outputStep", 2, "Outputting Step");
     updateOversample();
-    output(type);
+    output();
   }
+
+  _current_execute_flag = EXEC_NONE;
 }
 
 OversampleOutput::~OversampleOutput()
@@ -266,16 +271,14 @@ OversampleOutput::cloneMesh()
   // Create the new mesh from a file
   if (isParamValid("file"))
   {
-    InputParameters mesh_params = emptyInputParameters();
-    mesh_params += _mesh_ptr->parameters();
-    mesh_params.set<MeshFileName>("file") = getParam<MeshFileName>("file");
+    InputParameters mesh_params = _app.getFactory().getValidParams("FileMesh");
+    mesh_params.applyParameters(parameters(), {}, true);
     mesh_params.set<bool>("nemesis") = false;
-    mesh_params.set<bool>("skip_partitioning") = false;
-    mesh_params.set<std::string>("_object_name") = "output_problem_mesh";
-    _cloned_mesh_ptr = std::make_unique<FileMesh>(mesh_params);
+    _cloned_mesh_ptr =
+        _app.getFactory().createUnique<MooseMesh>("FileMesh", "output_problem_mesh", mesh_params);
     _cloned_mesh_ptr->allowRecovery(false); // We actually want to reread the initial mesh
     _cloned_mesh_ptr->init();
-    _cloned_mesh_ptr->prepare();
+    _cloned_mesh_ptr->prepare(/*mesh_to_clone=*/nullptr);
     _cloned_mesh_ptr->meshChanged();
   }
 
@@ -291,4 +294,13 @@ OversampleOutput::cloneMesh()
 
   // Make sure that the mesh pointer points to the newly cloned mesh
   _mesh_ptr = _cloned_mesh_ptr.get();
+}
+
+void
+OversampleOutput::setFileBaseInternal(const std::string & file_base)
+{
+  AdvancedOutput::setFileBaseInternal(file_base);
+  // ** DEPRECATED SUPPORT **
+  if (getParam<bool>("append_oversample"))
+    _file_base += "_oversample";
 }

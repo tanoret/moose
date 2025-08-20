@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -52,7 +52,7 @@ GBEvolutionBaseTempl<is_ad>::GBEvolutionBaseTempl(const InputParameters & parame
     _L(declareGenericProperty<Real, is_ad>("L")),
     _dLdT(parameters.hasDefaultCoupledValue("T")
               ? nullptr
-              : &declarePropertyDerivative<Real>("L", getVar("T", 0)->name())),
+              : &declarePropertyDerivative<Real>("L", coupledName("T", 0))),
     _l_GB(declareGenericProperty<Real, is_ad>("l_GB")),
     _mu(declareGenericProperty<Real, is_ad>("mu")),
     _entropy_diff(declareGenericProperty<Real, is_ad>("entropy_diff")),

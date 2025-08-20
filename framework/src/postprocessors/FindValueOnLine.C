@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -162,10 +162,11 @@ FindValueOnLine::getValueAtPoint(const Point & p)
 {
   const Elem * elem = (*_pl)(p);
 
-  processor_id_type elem_proc_id = elem ? elem->processor_id() : DofObject::invalid_processor_id;
+  processor_id_type elem_proc_id =
+      elem ? elem->processor_id() : libMesh::DofObject::invalid_processor_id;
   _communicator.min(elem_proc_id);
 
-  if (elem_proc_id == DofObject::invalid_processor_id)
+  if (elem_proc_id == libMesh::DofObject::invalid_processor_id)
   {
     // there is no element
     mooseError("No element found at the current search point. Please make sure the sampling line "
@@ -191,7 +192,7 @@ FindValueOnLine::getValueAtPoint(const Point & p)
 }
 
 PostprocessorValue
-FindValueOnLine::getValue()
+FindValueOnLine::getValue() const
 {
   return _position;
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,8 +10,11 @@
 #include "ExceptionKernel.h"
 #include "MooseException.h"
 #include "NonlinearSystem.h"
+#include "FEProblemBase.h"
 
 #include "libmesh/threads.h"
+
+using namespace libMesh;
 
 /**
  * Class static initialization:
@@ -132,8 +135,10 @@ bool
 ExceptionKernel::time_to_throw() const
 {
   if (_counter < 0)
-    return (_t_step == 1 &&
-            _fe_problem.getNonlinearSystemBase().getCurrentNonlinearIterationNumber() == 1);
+    return (
+        _t_step == 1 &&
+        _fe_problem.getNonlinearSystemBase(_sys.number()).getCurrentNonlinearIterationNumber() ==
+            1);
   if (_counter == 0)
     return true;
   return false;

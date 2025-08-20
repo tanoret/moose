@@ -1,0 +1,34 @@
+[Tests]
+  issues = '#23557'
+  design = MooseMesh.md
+  [add_sideset_ids]
+    type = CSVDiff
+    input = add_sideset_ids.i
+    csvdiff = add_sideset_ids_out.csv
+    design = MooseMesh.md
+    requirement = 'The system shall allow specifying valid sideset IDs that do not exist on the initial mesh.'
+  []
+  [add_sideset_ids_and_names]
+    type = CSVDiff
+    input = add_sideset_ids.i
+    prereq = 'add_sideset_ids'
+    csvdiff = add_sideset_ids_out.csv
+    cli_args = "Mesh/add_sideset_names='future' Postprocessors/flux/boundary='future' "
+               "UserObjects/side_updater/update_sideset_name=future"
+    requirement = 'The system shall allow specifying valid sideset IDs and names that do not exist on the initial mesh.'
+  []
+  [add_sideset_names]
+    type = CSVDiff
+    input = add_sideset_names.i
+    csvdiff = add_sideset_names_out.csv
+    design = MooseMesh.md
+    requirement = 'The system shall allow specifying valid sideset names that do not exist on the initial mesh, and assign IDs automatically.'
+  []
+  [remove_sidesets]
+    type = CSVDiff
+    input = remove_sideset_ids.i
+    csvdiff = remove_sideset_ids_out.csv
+    design = MooseMesh.md
+    requirement = 'The system shall be able to remove sides from sidesets when tese sides elements are moved to new blocks.'
+  []
+[]

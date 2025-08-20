@@ -52,6 +52,7 @@
     volume = 1
     on = true
     power = 1000
+    use_scalar_variables = false
   []
 
   [pipe2]
@@ -103,5 +104,5 @@
   exodus = true
   show = 'p T vel'
   velocity_as_vector = false
-  interval = 5
+  time_step_interval = 5
 []

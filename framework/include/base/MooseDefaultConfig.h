@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,20 +15,21 @@
 
 /* The size of the derivative backing array */
 #ifndef MOOSE_AD_MAX_DOFS_PER_ELEM
-#define MOOSE_AD_MAX_DOFS_PER_ELEM 53
-#endif
-
-/* Whether to use a global indexing scheme for AD */
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-#define MOOSE_GLOBAL_AD_INDEXING 1
+#define MOOSE_AD_MAX_DOFS_PER_ELEM 64
 #endif
 
 /* Whether or not libpng was detected on the system */
 /* #undef HAVE_LIBPNG */
 
+/* The directory where libtorch is installed */
+/* #undef LIBTORCH_DIR */
+
+/* Whether to use libtorch-related code or not */
+/* #undef LIBTORCH_ENABLED */
+
 /* Define to the address where bug reports for this package should be sent. */
 #ifndef MOOSE_PACKAGE_BUGREPORT
-#define MOOSE_PACKAGE_BUGREPORT "moose-users@googlegroups.com"
+#define MOOSE_PACKAGE_BUGREPORT "https://github.com/idaholab/moose/discussions"
 #endif
 
 /* Define to the full name of this package. */
@@ -48,15 +49,10 @@
 
 /* Define to the home page for this package. */
 #ifndef MOOSE_PACKAGE_URL
-#define MOOSE_PACKAGE_URL "https://mooseframework.org"
+#define MOOSE_PACKAGE_URL "https://mooseframework.inl.gov"
 #endif
 
 /* Define to the version of this package. */
 #ifndef MOOSE_PACKAGE_VERSION
 #define MOOSE_PACKAGE_VERSION "0.9.0"
-#endif
-
-/* Whether to use a sparse derivative type */
-#ifndef MOOSE_SPARSE_AD
-#define MOOSE_SPARSE_AD 1
 #endif

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -82,9 +82,13 @@ LowerDBlockFromSidesetGenerator::generate()
     mesh->allow_remote_element_removal(allow_remote_element_removal);
   }
 
+  // Check that the sidesets are present in the mesh
+  for (const auto & sideset : _sideset_names)
+    if (!MooseMeshUtils::hasBoundaryName(*mesh, sideset))
+      paramError("sidesets", "The sideset '", sideset, "' was not found within the mesh");
+
   auto sideset_ids = MooseMeshUtils::getBoundaryIDs(*mesh, _sideset_names, true);
   std::set<boundary_id_type> sidesets(sideset_ids.begin(), sideset_ids.end());
-
   auto side_list = mesh->get_boundary_info().build_side_list();
   if (!mesh->is_serial() && mesh->comm().size() > 1)
   {
@@ -104,8 +108,8 @@ LowerDBlockFromSidesetGenerator::generate()
       }
     }
 
-    std::set<const Elem *, CompareElemIdsByLevel> connected_elements(elements_to_send.begin(),
-                                                                     elements_to_send.end());
+    std::set<const Elem *, libMesh::CompareElemIdsByLevel> connected_elements(
+        elements_to_send.begin(), elements_to_send.end());
     std::set<const Node *> connected_nodes;
     reconnect_nodes(connected_elements, connected_nodes);
     std::set<dof_id_type> connected_node_ids;
@@ -121,17 +125,19 @@ LowerDBlockFromSidesetGenerator::generate()
       // Don't need to send to self
       if (pid != mesh->processor_id() && need_boundary_elems[pid])
       {
-        push_element_data[pid] = elements_to_send;
-        push_node_data[pid] = connected_nodes;
+        if (elements_to_send.size())
+          push_element_data[pid] = elements_to_send;
+        if (connected_nodes.size())
+          push_node_data[pid] = connected_nodes;
       }
 
-    auto node_action_functor = [](processor_id_type, auto &)
+    auto node_action_functor = [](processor_id_type, const auto &)
     {
       // Node packing specialization already has unpacked node into mesh, so nothing to do
     };
     Parallel::push_parallel_packed_range(
         mesh->comm(), push_node_data, mesh.get(), node_action_functor);
-    auto elem_action_functor = [](processor_id_type, auto &)
+    auto elem_action_functor = [](processor_id_type, const auto &)
     {
       // Elem packing specialization already has unpacked elem into mesh, so nothing to do
     };
@@ -148,8 +154,16 @@ LowerDBlockFromSidesetGenerator::generate()
     if (sidesets.count(std::get<2>(triple)))
     {
       if (auto elem = mesh->query_elem_ptr(std::get<0>(triple)))
+      {
+        if (!elem->active())
+          mooseError(
+              "Only active, level 0 elements can be made interior parents of new level 0 lower-d "
+              "elements. Make sure that ",
+              type(),
+              "s are run before any refinement generators");
         element_sides_on_boundary.push_back(
             std::make_pair(counter, ElemSideDouble(elem, std::get<1>(triple))));
+      }
       ++counter;
     }
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -37,7 +37,7 @@ ContactDOFSetSize::ContactDOFSetSize(const InputParameters & parameters)
   : GeneralPostprocessor(parameters),
     _var(_fe_problem.getVariable(_tid,
                                  getParam<VariableName>("variable"),
-                                 Moose::VarKindType::VAR_NONLINEAR,
+                                 Moose::VarKindType::VAR_SOLVER,
                                  Moose::VarFieldType::VAR_FIELD_STANDARD)),
     _mesh(_fe_problem.mesh().getMesh()),
     _subdomain_id(_fe_problem.mesh().getSubdomainID(getParam<SubdomainName>("subdomain"))),
@@ -64,7 +64,7 @@ ContactDOFSetSize::execute()
 
   Threads::parallel_reduce(range, aldit);
 
-  auto && solution = _fe_problem.getNonlinearSystemBase().solution();
+  const auto & solution = _fe_problem.getNonlinearSystemBase(_sys.number()).solution();
 
   for (auto dof : aldit.getDofIndices())
     if (solution(dof) > _tolerance)
@@ -75,7 +75,7 @@ ContactDOFSetSize::execute()
 }
 
 PostprocessorValue
-ContactDOFSetSize::getValue()
+ContactDOFSetSize::getValue() const
 {
   return _count;
 }

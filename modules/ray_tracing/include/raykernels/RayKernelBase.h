@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -62,6 +62,11 @@ public:
    * part it can trace
    */
   virtual void preTrace();
+
+  /**
+   * This method is called once a ray has reached the end of its trace.
+   */
+  virtual void postTrace();
 
   /**
    * Whether or not this RayKernel needs a segment reinit

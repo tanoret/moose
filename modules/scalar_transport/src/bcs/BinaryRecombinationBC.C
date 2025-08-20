@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,17 +18,18 @@ BinaryRecombinationBC::validParams()
   params.addClassDescription("Models recombination of the variable with a coupled species at "
                              "boundaries, resulting in loss");
   params.addRequiredCoupledVar("v", "The other mobile variable that takes part in recombination");
-  params.addParam<Real>("Kr", 1, "The recombination coefficient");
+  params.addParam<MaterialPropertyName>(
+      "Kr", "Kr", "The name of the material property for the recombination coefficient");
   return params;
 }
 
 BinaryRecombinationBC::BinaryRecombinationBC(const InputParameters & parameters)
-  : ADIntegratedBC(parameters), _v(adCoupledValue("v")), _Kr(getParam<Real>("Kr"))
+  : ADIntegratedBC(parameters), _v(adCoupledValue("v")), _Kr(getADMaterialProperty<Real>("Kr"))
 {
 }
 
 ADReal
 BinaryRecombinationBC::computeQpResidual()
 {
-  return _test[_i][_qp] * _Kr * _u[_qp] * _v[_qp];
+  return _test[_i][_qp] * _Kr[_qp] * _u[_qp] * _v[_qp];
 }

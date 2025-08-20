@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,20 +9,46 @@
 
 #pragma once
 
+// MOOSE includes
+#include "MooseTypes.h"
+#include "MooseUtils.h"
+#include "InputParameters.h"
+#include "FEProblemBase.h"
+#include "MooseError.h"
+#include "MooseObject.h"
+#include "Reporter.h"
+#include "DelimitedFileReader.h"
+#include "SystemBase.h"
 #include "GeneralReporter.h"
-/**
- * Reporter to hold measurement and simulation data for optimization problems
- */
-class OptimizationData : public GeneralReporter
+#include "OptimizationReporterBase.h"
+
+// Forward Declarations
+template <typename T>
+class OptimizationDataTempl;
+
+typedef OptimizationDataTempl<GeneralReporter> OptimizationData;
+
+template <typename T>
+class OptimizationDataTempl : public T
 {
 public:
   static InputParameters validParams();
-
-  OptimizationData(const InputParameters & parameters);
+  OptimizationDataTempl(const InputParameters & parameters);
 
   virtual void initialize() override {}
   virtual void execute() override;
   virtual void finalize() override {}
+
+  /**
+   * Compute misfit vectors from the simulations and measurement values.
+   */
+  void computeMisfit();
+
+  /**
+   * Compute half the sum of the misfit (squared) values
+   * @return 1/2 of the sum of the misfit values.
+   */
+  Real computeMisfitValue();
 
 protected:
   ///@{
@@ -33,18 +59,25 @@ protected:
   std::vector<Real> & _measurement_time;
   std::vector<Real> & _measurement_values;
   ///@}
-  /// simulated values at measurment xyzt
+  /// simulated values at measurement xyzt
   std::vector<Real> & _simulation_values;
-  /// difference between simulation and measurment values at measurment xyzt
+  /// difference between simulation and measurement values at measurement xyzt
   std::vector<Real> & _misfit_values;
+
+  /// Reporter value that will hold the objective value
+  Real & _objective_val;
 
 private:
   /// parse measurement data from csv file
   void readMeasurementsFromFile();
   /// parse measurement data from input file
   void readMeasurementsFromInput();
-  /// private method for testing optimizationData with test src
-  void setSimulationValuesForTesting(std::vector<Real> & data);
   /// variable
-  const MooseVariableFieldBase * const _var;
+  std::vector<MooseVariableFieldBase *> _var_vec;
+  /// Weight names to reporter values
+  std::vector<std::vector<Real> *> _variable_weights;
+  /// Weight names to reporter values map created from input file
+  std::map<std::string, std::vector<Real> *> _weight_names_weights_map;
+  /// helper to check data sizes
+  void errorCheckDataSize();
 };

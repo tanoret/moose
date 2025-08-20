@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,6 +16,8 @@ GeneralizedCircumference::validParams()
 {
   InputParameters params = Function::validParams();
   params.addRequiredParam<FunctionName>("area_function", "function to compute the cross section");
+  params.addClassDescription("Computes a generalized circumference from a function "
+                             "providing the area.");
   return params;
 }
 

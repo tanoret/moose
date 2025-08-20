@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,7 @@
 #include "ADRankTwoTensorForward.h"
 #include "ADRankFourTensorForward.h"
 #include "ADRankThreeTensorForward.h"
+#include "MooseError.h"
 
 #include "libmesh/libmesh.h"
 #include "libmesh/tuple_of.h"
@@ -26,7 +27,6 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
-using libMesh::Real;
 using libMesh::tuple_of;
 namespace libMesh
 {
@@ -73,6 +73,7 @@ public:
   ///@}
 
   typedef tuple_of<4, unsigned int> index_type;
+  typedef T value_type;
 
   /// Initialization method
   enum InitMethod
@@ -112,17 +113,17 @@ public:
   template <typename Scalar>
   struct TwoTensorMultTraits<RankTwoTensorTempl, Scalar>
   {
-    static const bool value = ScalarTraits<Scalar>::value;
+    static const bool value = libMesh::ScalarTraits<Scalar>::value;
   };
   template <typename Scalar>
   struct TwoTensorMultTraits<TensorValue, Scalar>
   {
-    static const bool value = ScalarTraits<Scalar>::value;
+    static const bool value = libMesh::ScalarTraits<Scalar>::value;
   };
   template <typename Scalar>
   struct TwoTensorMultTraits<TypeTensor, Scalar>
   {
-    static const bool value = ScalarTraits<Scalar>::value;
+    static const bool value = libMesh::ScalarTraits<Scalar>::value;
   };
 
   /// Default constructor; fills to zero
@@ -142,6 +143,29 @@ public:
    */
   template <typename T2>
   RankFourTensorTempl(const RankFourTensorTempl<T2> & copy);
+
+  /**
+   * The conversion operator from a `SymmetricRankFourTensorTempl`
+   */
+  template <typename T2>
+  RankFourTensorTempl(const SymmetricRankFourTensorTempl<T2> & t)
+  {
+    for (const auto a : make_range(SymmetricRankFourTensorTempl<T2>::N))
+      for (const auto b : make_range(SymmetricRankFourTensorTempl<T2>::N))
+      {
+        const auto & idx = SymmetricRankFourTensorTempl<T2>::full_index[a][b];
+        const auto i = idx[0];
+        const auto j = idx[1];
+        const auto k = idx[2];
+        const auto l = idx[3];
+
+        // Rijkl = Rjikl = Rijlk = Rjilk
+        (*this)(i, j, k, l) = t(a, b) / SymmetricRankFourTensorTempl<T2>::mandelFactor(a, b);
+        (*this)(j, i, k, l) = t(a, b) / SymmetricRankFourTensorTempl<T2>::mandelFactor(a, b);
+        (*this)(i, j, l, k) = t(a, b) / SymmetricRankFourTensorTempl<T2>::mandelFactor(a, b);
+        (*this)(j, i, l, k) = t(a, b) / SymmetricRankFourTensorTempl<T2>::mandelFactor(a, b);
+      }
+  }
 
   // Named constructors
   static RankFourTensorTempl<T> Identity() { return RankFourTensorTempl<T>(initIdentity); }
@@ -173,11 +197,17 @@ public:
   /// Print the rank four tensor
   void print(std::ostream & stm = Moose::out) const;
 
+  friend std::ostream & operator<<(std::ostream & os, const RankFourTensorTempl<T> & t)
+  {
+    t.print(os);
+    return os;
+  }
+
   /// Print the values of the rank four tensor
   void printReal(std::ostream & stm = Moose::out) const;
 
   /// copies values from a into this tensor
-  RankFourTensorTempl<T> & operator=(const RankFourTensorTempl<T> & a);
+  RankFourTensorTempl<T> & operator=(const RankFourTensorTempl<T> & a) = default;
 
   /**
    * Assignment-from-scalar operator.  Used only to zero out the tensor.
@@ -185,7 +215,8 @@ public:
    * \returns A reference to *this.
    */
   template <typename Scalar>
-  typename boostcopy::enable_if_c<ScalarTraits<Scalar>::value, RankFourTensorTempl &>::type
+  typename libMesh::boostcopy::enable_if_c<libMesh::ScalarTraits<Scalar>::value,
+                                           RankFourTensorTempl &>::type
   operator=(const Scalar & libmesh_dbg_var(p))
   {
     libmesh_assert_equal_to(p, Scalar(0));
@@ -202,7 +233,7 @@ public:
   /// C_ijkl*a
   template <typename T2>
   auto operator*(const T2 & a) const ->
-      typename std::enable_if<ScalarTraits<T2>::value,
+      typename std::enable_if<libMesh::ScalarTraits<T2>::value,
                               RankFourTensorTempl<decltype(T() * T2())>>::type;
 
   /// C_ijkl *= a
@@ -211,7 +242,7 @@ public:
   /// C_ijkl/a
   template <typename T2>
   auto operator/(const T2 & a) const ->
-      typename std::enable_if<ScalarTraits<T2>::value,
+      typename std::enable_if<libMesh::ScalarTraits<T2>::value,
                               RankFourTensorTempl<decltype(T() / T2())>>::type;
 
   /// C_ijkl /= a  for all i, j, k, l
@@ -285,7 +316,7 @@ public:
    * @return C_xxx = a_ijkl*b_m where m={i,j,k,l} and xxx the remaining indices
    */
   template <int m>
-  RankThreeTensorTempl<T> contraction(const VectorValue<T> & b) const;
+  RankThreeTensorTempl<T> contraction(const libMesh::VectorValue<T> & b) const;
 
   /**
    * Fills the tensor entries ignoring the last dimension (ie, C_ijkl=0 if any of i, j, k, or l =
@@ -365,7 +396,7 @@ public:
   T sum3x3() const;
 
   /// Calculates the vector a[i] = sum over j Ciijj for i and j varying from 0 to 2
-  VectorValue<T> sum3x1() const;
+  libMesh::VectorValue<T> sum3x1() const;
 
   /// Calculates C_imnt A_jm B_kn C_lt
   RankFourTensorTempl<T> tripleProductJkl(const RankTwoTensorTempl<T> &,
@@ -515,10 +546,10 @@ struct RawType<RankFourTensorTempl<T>>
   {
     constexpr auto N = RankFourTensorTempl<T>::N;
     value_type ret;
-    for (auto i : make_range(N))
-      for (auto j : make_range(N))
-        for (auto k : make_range(N))
-          for (auto l : make_range(N))
+    for (auto i : libMesh::make_range(N))
+      for (auto j : libMesh::make_range(N))
+        for (auto k : libMesh::make_range(N))
+          for (auto l : libMesh::make_range(N))
             ret(i, j, k, l) = raw_value(in(i, j, k, l));
 
     return ret;
@@ -529,7 +560,7 @@ struct RawType<RankFourTensorTempl<T>>
 template <typename T1, typename T2>
 inline auto
 operator*(const T1 & a, const RankFourTensorTempl<T2> & b) ->
-    typename std::enable_if<ScalarTraits<T1>::value,
+    typename std::enable_if<libMesh::ScalarTraits<T1>::value,
                             RankFourTensorTempl<decltype(T1() * T2())>>::type
 {
   return b * a;
@@ -539,7 +570,7 @@ template <typename T>
 template <typename T2>
 RankFourTensorTempl<T>::RankFourTensorTempl(const RankFourTensorTempl<T2> & copy)
 {
-  for (auto i : make_range(N4))
+  for (auto i : libMesh::make_range(N4))
     _vals[i] = copy._vals[i];
 }
 
@@ -547,13 +578,13 @@ template <typename T>
 template <typename T2>
 auto
 RankFourTensorTempl<T>::operator*(const T2 & b) const ->
-    typename std::enable_if<ScalarTraits<T2>::value,
+    typename std::enable_if<libMesh::ScalarTraits<T2>::value,
                             RankFourTensorTempl<decltype(T() * T2())>>::type
 {
   typedef decltype(T() * T2()) ValueType;
   RankFourTensorTempl<ValueType> result;
 
-  for (auto i : make_range(N4))
+  for (auto i : libMesh::make_range(N4))
     result._vals[i] = _vals[i] * b;
 
   return result;
@@ -563,11 +594,11 @@ template <typename T>
 template <typename T2>
 auto
 RankFourTensorTempl<T>::operator/(const T2 & b) const ->
-    typename std::enable_if<ScalarTraits<T2>::value,
+    typename std::enable_if<libMesh::ScalarTraits<T2>::value,
                             RankFourTensorTempl<decltype(T() / T2())>>::type
 {
   RankFourTensorTempl<decltype(T() / T2())> result;
-  for (auto i : make_range(N4))
+  for (auto i : libMesh::make_range(N4))
     result._vals[i] = _vals[i] / b;
   return result;
 }
@@ -734,12 +765,12 @@ RankFourTensorTempl<T>::inverse() const
   {
     // Allocate on the heap if you're going to exceed the stack size limit
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mat(9, 9);
-    for (auto i : make_range(9 * 9))
+    for (auto i : libMesh::make_range(9 * 9))
       mat(i) = _vals[i];
 
     mat = mat.inverse();
 
-    for (auto i : make_range(9 * 9))
+    for (auto i : libMesh::make_range(9 * 9))
       result._vals[i] = mat(i);
   }
   else
@@ -756,7 +787,7 @@ RankFourTensorTempl<T>::inverse() const
 template <typename T>
 template <int m>
 RankThreeTensorTempl<T>
-RankFourTensorTempl<T>::contraction(const VectorValue<T> & b) const
+RankFourTensorTempl<T>::contraction(const libMesh::VectorValue<T> & b) const
 {
   RankThreeTensorTempl<T> result;
   static constexpr std::size_t z[4][3] = {{1, 2, 3}, {0, 2, 3}, {0, 1, 3}, {0, 1, 2}};

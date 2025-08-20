@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -7,11 +7,10 @@
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
-#include "DualRealOps.h"
 #include "RankFourTensorImplementation.h"
 
 template class RankFourTensorTempl<Real>;
-template class RankFourTensorTempl<DualReal>;
+template class RankFourTensorTempl<ADReal>;
 
 namespace MathUtils
 {
@@ -32,8 +31,8 @@ mooseSetToZero<ADRankFourTensor>(ADRankFourTensor & v)
 #define RankTwoTensorMultInstantiate(TemplateClass)                                                \
   template RankTwoTensor RankFourTensor::operator*(const TemplateClass<Real> & a) const;           \
   template ADRankTwoTensor ADRankFourTensor::operator*(const TemplateClass<Real> & a) const;       \
-  template ADRankTwoTensor RankFourTensor::operator*(const TemplateClass<DualReal> & a) const;     \
-  template ADRankTwoTensor ADRankFourTensor::operator*(const TemplateClass<DualReal> & a) const
+  template ADRankTwoTensor RankFourTensor::operator*(const TemplateClass<ADReal> & a) const;       \
+  template ADRankTwoTensor ADRankFourTensor::operator*(const TemplateClass<ADReal> & a) const
 
 RankTwoTensorMultInstantiate(RankTwoTensorTempl);
 RankTwoTensorMultInstantiate(TensorValue);

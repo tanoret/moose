@@ -1,20 +1,33 @@
 # Conda MOOSE Environment
 
-Our preferred method for obtaining dependencies necessary for MOOSE-based
-application development is via Conda's myriad array of libraries. Follow these
-instructions to create an environment on your machine using Conda. At this time,
-an option to install MOOSE directly on a Windows system is not yet supported.
-On-going efforts are being made to add a conda installation option for Windows,
-and an experimental [WSL](installation/windows.md) option is available.
+!style halign=left
+Our preferred method for obtaining dependencies necessary for MOOSE-based application development is
+via Conda's myriad array of available libraries. Follow these instructions to create an environment
+on your machine using Conda.
 
-!include installation/install_miniconda.md
+!alert tip
+Those interested in operating in their own optimized environment, please seek help from one of our
+'[From Source](getting_started/installation/index.md optional=True)' instructional pages. Our Conda
+packages are designed to 'just work', making them unsuitable for things like benchmark case studies.
 
-!include installation/install_conda_moose.md
+!include getting_started/installation/install_miniconda.md
 
-!include getting_started/installation/clone_moose.md optional=True
+!include getting_started/installation/install_conda_moose.md
 
-!include getting_started/installation/test_moose.md optional=True
+## Cloning MOOSE
 
-Head back over to the [getting_started/installation/index.md optional=True] page to continue your tour of MOOSE.
+!style! halign=left
+!template load file=installation/clone_moose.md.template PATH=~/projects
+!style-end!
 
-!include installation/uninstall_conda.md
+## Build and Test MOOSE
+
+!style! halign=left
+!template load file=installation/build_moose.md.template PATH=~/projects
+!style-end!
+
+!template load file=installation/test_moose.md.template PATH=~/projects
+
+!include getting_started/installation/uninstall_conda.md
+
+!include installation/conda_pagination.md optional=True

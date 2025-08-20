@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -47,7 +47,7 @@ SideAverageMaterialPropertyTempl<is_ad>::execute()
 
 template <bool is_ad>
 Real
-SideAverageMaterialPropertyTempl<is_ad>::getValue()
+SideAverageMaterialPropertyTempl<is_ad>::getValue() const
 {
   return _integral_value / _area;
 }
@@ -66,8 +66,7 @@ SideAverageMaterialPropertyTempl<is_ad>::threadJoin(const UserObject & y)
 {
   SideIntegralMaterialPropertyTempl<is_ad>::threadJoin(y);
 
-  const SideAverageMaterialPropertyTempl<is_ad> & pps =
-      static_cast<const SideAverageMaterialPropertyTempl<is_ad> &>(y);
+  const auto & pps = static_cast<const SideAverageMaterialPropertyTempl<is_ad> &>(y);
   _area += pps._area;
 }
 

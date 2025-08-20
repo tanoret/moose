@@ -17,12 +17,13 @@
     requirement = "The system shall automatically create the correct preconditioning object when performing a Newton solve."
     prereq = manual
   []
-  [fail]
-    type = 'RunApp'
+  [petsc_pre_description]
+    type = 'Exodiff'
     input = 'ad_coupled_convection.i'
-    cli_args = "Preconditioning/active='' Executioner/auto_preconditioning=false Outputs/exodus=false"
-    requirement = "The system shall not automatically create a preconditioning object when performing a Newton solve if the auto preconditioning capability is disabled."
-    expect_out = "Solve Did NOT Converge"
-    ad_indexing_type = 'local' # It's currently not possible to tell AD with global indexing not to build a perfect, beautiful Jacobian
+    exodiff = 'ad_coupled_convection_out.e'
+    prereq = auto
+    requirement = 'The system shall output the PETSc preconditioner type requested in the executioner options.'
+    cli_args = "Executioner/petsc_options_iname='-pc_type' Executioner/petsc_options_value='lu'"
+    expect_out = 'PETSc Preconditioner:\s+lu'
   []
 []

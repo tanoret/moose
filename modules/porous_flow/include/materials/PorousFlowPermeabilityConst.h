@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,16 +14,22 @@
 /**
  * Material designed to provide a constant permeability tensor
  */
-class PorousFlowPermeabilityConst : public PorousFlowPermeabilityBase
+template <bool is_ad>
+class PorousFlowPermeabilityConstTempl : public PorousFlowPermeabilityBaseTempl<is_ad>
 {
 public:
   static InputParameters validParams();
 
-  PorousFlowPermeabilityConst(const InputParameters & parameters);
+  PorousFlowPermeabilityConstTempl(const InputParameters & parameters);
 
 protected:
   void computeQpProperties() override;
 
   /// Constant value of permeability tensor
   const RealTensorValue _input_permeability;
+
+  usingPorousFlowPermeabilityBaseMembers;
 };
+
+typedef PorousFlowPermeabilityConstTempl<false> PorousFlowPermeabilityConst;
+typedef PorousFlowPermeabilityConstTempl<true> ADPorousFlowPermeabilityConst;

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,7 +27,7 @@ ElementH1SemiError::ElementH1SemiError(const InputParameters & parameters)
 }
 
 Real
-ElementH1SemiError::getValue()
+ElementH1SemiError::getValue() const
 {
   return std::sqrt(ElementIntegralVariablePostprocessor::getValue());
 }

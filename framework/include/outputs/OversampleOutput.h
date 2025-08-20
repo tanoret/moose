@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -53,6 +53,9 @@ protected:
    */
   virtual void updateOversample();
 
+  /// Appends the base class's file base string
+  virtual void setFileBaseInternal(const std::string & file_base) override;
+
   /// The number of oversampling refinements
   const unsigned int _refinements;
 
@@ -83,7 +86,7 @@ private:
    * This is only populated when the oversample() function is called, it must
    * be cleaned up by the destructor.
    */
-  std::vector<std::vector<std::unique_ptr<MeshFunction>>> _mesh_functions;
+  std::vector<std::vector<std::unique_ptr<libMesh::MeshFunction>>> _mesh_functions;
 
   /// When oversampling, the output is shift by this amount
   Point _position;

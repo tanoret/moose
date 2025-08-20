@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,8 +18,6 @@
 #include <fstream>
 #include <string>
 
-PerfLog Moose::perf_log("gtest");
-
 GTEST_API_ int
 main(int argc, char ** argv)
 {
@@ -28,6 +26,7 @@ main(int argc, char ** argv)
 
   MooseInit init(argc, argv);
   registerApp(MooseUnitApp);
+  registerApp(OtherMooseUnitApp);
   Moose::_throw_on_error = true;
   Moose::_throw_on_warning = true;
 

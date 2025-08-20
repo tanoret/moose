@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,7 +32,7 @@ public:
   virtual void computeOffDiagJacobian(unsigned int jvar) override;
 
 protected:
-  VectorMooseVariable & _var;
+  const VectorMooseVariable & _var;
 
   /// current node being processed
   const Node * const & _current_node;

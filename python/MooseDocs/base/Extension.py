@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -88,7 +88,7 @@ class Extension(mixins.ConfigObject, mixins.TranslatorObject):
 
     def preRead(self, page):
         """
-        Called after to reading the file.
+        Called before reading the file.
 
         Input:
              page[pages.Source]: The source object representing the content
@@ -97,7 +97,7 @@ class Extension(mixins.ConfigObject, mixins.TranslatorObject):
 
     def postRead(self, page, content):
         """
-        Called after to reading the file.
+        Called after reading the file.
 
         Input:
              content[str]: The content read from the page
@@ -149,7 +149,7 @@ class Extension(mixins.ConfigObject, mixins.TranslatorObject):
 
     def preWrite(self, page, result):
         """
-        Called after renderer has written content.
+        Called before renderer has written content.
 
         Inputs:
             page[pages.Source]: The source object representing the content

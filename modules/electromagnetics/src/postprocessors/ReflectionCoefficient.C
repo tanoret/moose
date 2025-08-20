@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -63,7 +63,7 @@ ReflectionCoefficient::execute()
 }
 
 PostprocessorValue
-ReflectionCoefficient::getValue()
+ReflectionCoefficient::getValue() const
 {
   return _reflection_coefficient;
 }
@@ -71,7 +71,7 @@ ReflectionCoefficient::getValue()
 void
 ReflectionCoefficient::threadJoin(const UserObject & y)
 {
-  const ReflectionCoefficient & pps = static_cast<const ReflectionCoefficient &>(y);
+  const auto & pps = static_cast<const ReflectionCoefficient &>(y);
   Real temp_rc = _reflection_coefficient;
   _reflection_coefficient = std::max(temp_rc, pps._reflection_coefficient);
 }

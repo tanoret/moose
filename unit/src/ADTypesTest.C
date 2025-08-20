@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,9 +10,11 @@
 #include "Moose.h"
 #include "Material.h"
 #include "DenseMatrix.h"
+#include "EigenADReal.h"
 
 #include "libmesh/dense_vector.h"
 #include "gtest_include.h"
+#include "Eigen/Dense"
 
 #include <vector>
 
@@ -25,7 +27,7 @@ public:
 
 TEST(ADTypesTest, vector_DenseMatrix_Real)
 {
-  std::vector<DenseMatrix<DualReal>> vm(2);
+  std::vector<DenseMatrix<ADReal>> vm(2);
   auto & m1 = vm[0];
   auto & m2 = vm[1];
   m1.resize(3, 3);
@@ -44,7 +46,7 @@ TEST(ADTypesTest, vector_DenseMatrix_Real)
 
 TEST(ADTypesTest, vector_DenseVector_Real)
 {
-  std::vector<DenseVector<DualReal>> vv(2);
+  std::vector<DenseVector<ADReal>> vv(2);
   auto & v1 = vv[0];
   auto & v2 = vv[1];
   v1.resize(3);
@@ -57,4 +59,14 @@ TEST(ADTypesTest, vector_DenseVector_Real)
   v2(2) = 3;
   auto val = v1.dot(v2);
   EXPECT_EQ(14.0, val);
+}
+
+TEST(ADTypesTest, EigenMatrix_ADReal)
+{
+  Eigen::Matrix<ADReal, 3, 3> m1;
+  m1 << 1, 2, 3, 4, 5, 6, 7, 8, 9;
+
+  const Eigen::Matrix<Real, 3, 3> m2 = MetaPhysicL::raw_value(m1);
+
+  EXPECT_EQ((m1 - m2).norm(), 0.0);
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,6 +19,9 @@ public:
 
 protected:
   ADReal computeQpResidual() override;
+
+  /// The time derivative of the primary variable
+  const ADVariableValue & _u_dot;
 
   /// The porosity
   const MaterialProperty<Real> & _eps;

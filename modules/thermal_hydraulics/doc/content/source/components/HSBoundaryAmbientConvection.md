@@ -11,10 +11,16 @@ that applies convective heat transfer boundary conditions.
 The parameter [!param](/Components/HSBoundaryAmbientConvection/T_ambient) gives the ambient temperature $T_\infty$, and
 [!param](/Components/HSBoundaryAmbientConvection/htc_ambient) gives the heat transfer coefficient $\mathcal{H}$.
 
-The parameter [!param](/Components/HSBoundaryAmbientConvection/scale_pp) specifies
-the name of a post-processor $f$ that can scale the boundary conditions.
+The parameter [!param](/Components/HSBoundaryAmbientConvection/scale) specifies
+the name of a [functor](Functors/index.md) $f$ that can scale the boundary conditions, for
+example, a functor material property created with [FinEnhancementFactorFunctorMaterial.md]
+for heat transfer enhancement due to fins.
 
 !syntax parameters /Components/HSBoundaryAmbientConvection
+
+If this component is used with a cylindrical heat structure, the post-processor
+*name*`_integral` is added, which gives the heat rate found by integrating this
+heat flux over the boundary.
 
 ## Formulation
 

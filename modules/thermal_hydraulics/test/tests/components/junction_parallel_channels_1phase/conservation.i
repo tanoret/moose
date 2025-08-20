@@ -16,6 +16,7 @@
   fp = eos
 
   scaling_factor_1phase = '1 1e-2 1e-5'
+  scaling_factor_rhoEV = 1e-5
 
   closures = simple_closures
 []
@@ -37,6 +38,14 @@
   []
 []
 
+[Functions]
+  [K_loss_fn]
+    type = PiecewiseLinear
+    x = '0 0.2'
+    y = '0 1'
+  []
+[]
+
 [Components]
   [pipe1]
     type = FlowChannel1Phase
@@ -50,10 +59,10 @@
   [junction1]
     type = JunctionParallelChannels1Phase
     connections = 'pipe1:out pipe2:in'
-    scaling_factor_rhouV = 1e-4
-    scaling_factor_rhoEV = 1e-5
     position = '1 0 0'
     volume = 1e-2
+    K = 0
+    use_scalar_variables = false
   []
 
   [pipe2]
@@ -68,10 +77,19 @@
   [junction2]
     type = JunctionParallelChannels1Phase
     connections = 'pipe2:out pipe1:in'
-    scaling_factor_rhouV = 1e-4
-    scaling_factor_rhoEV = 1e-5
     position = '1 0 0'
     volume = 1e-2
+    use_scalar_variables = false
+  []
+[]
+
+[ControlLogic]
+  active = ''
+  [K_crtl]
+    type = TimeFunctionComponentControl
+    component = junction1
+    parameter = K
+    function = K_loss_fn
   []
 []
 
@@ -96,16 +114,12 @@
   petsc_options_iname = '-pc_type'
   petsc_options_value = ' lu'
   nl_rel_tol = 0
-  nl_abs_tol = 1e-6
+  nl_abs_tol = 1e-8
   nl_max_its = 20
 
   l_tol = 1e-3
   l_max_its = 20
 
-  [Quadrature]
-    type = GAUSS
-    order = SECOND
-  []
 []
 
 [Postprocessors]
@@ -117,13 +131,15 @@
     execute_on = 'initial timestep_end'
   []
   [mass_junction1]
-    type = ScalarVariable
-    variable = junction1:rhoV
+    type = ElementAverageValue
+    variable = rhoV
+    block = 'junction1'
     execute_on = 'initial timestep_end'
   []
   [mass_junction2]
-    type = ScalarVariable
-    variable = junction2:rhoV
+    type = ElementAverageValue
+    variable = rhoV
+    block = 'junction2'
     execute_on = 'initial timestep_end'
   []
   [mass_tot]
@@ -147,13 +163,15 @@
     execute_on = 'initial timestep_end'
   []
   [E_junction1]
-    type = ScalarVariable
-    variable = junction1:rhoEV
+    type = ElementAverageValue
+    variable = rhoEV
+    block = 'junction1'
     execute_on = 'initial timestep_end'
   []
   [E_junction2]
-    type = ScalarVariable
-    variable = junction2:rhoEV
+    type = ElementAverageValue
+    variable = rhoEV
+    block = 'junction2'
     execute_on = 'initial timestep_end'
   []
   [E_tot]
@@ -167,6 +185,22 @@
     postprocessor = E_tot
     compute_relative_change = true
     execute_on = 'initial timestep_end'
+  []
+
+  [p_pipe1_out]
+    type = SideAverageValue
+    boundary = pipe1:out
+    variable = p
+  []
+  [p_pipe2_in]
+    type = SideAverageValue
+    boundary = pipe2:in
+    variable = p
+  []
+  [dp_junction]
+    type = DifferencePostprocessor
+    value1 = p_pipe1_out
+    value2 = p_pipe2_in
   []
 []
 

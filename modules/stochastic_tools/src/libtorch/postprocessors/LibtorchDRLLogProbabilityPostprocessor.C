@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -58,7 +58,7 @@ LibtorchDRLLogProbabilityPostprocessor::initialSetup()
 }
 
 Real
-LibtorchDRLLogProbabilityPostprocessor::getValue()
+LibtorchDRLLogProbabilityPostprocessor::getValue() const
 {
   // Return the value of the control signal
   return _libtorch_nn_control->getSignalLogProbability(_signal_index);

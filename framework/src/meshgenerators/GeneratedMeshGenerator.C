@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,9 +29,7 @@ GeneratedMeshGenerator::validParams()
 {
   InputParameters params = MeshGenerator::validParams();
 
-  MooseEnum elem_types(
-      "EDGE EDGE2 EDGE3 EDGE4 QUAD QUAD4 QUAD8 QUAD9 TRI3 TRI6 HEX HEX8 HEX20 HEX27 TET4 TET10 "
-      "PRISM6 PRISM15 PRISM18 PYRAMID5 PYRAMID13 PYRAMID14"); // no default
+  MooseEnum elem_types(LIST_GEOM_ELEM); // no default
 
   MooseEnum dims("1=1 2 3");
   params.addRequiredParam<MooseEnum>("dim", dims, "The dimension of the mesh to be generated");
@@ -50,7 +48,12 @@ GeneratedMeshGenerator::validParams()
                              "The type of element from libMesh to "
                              "generate (default: linear element for "
                              "requested dimension)");
-  params.addParam<std::vector<SubdomainID>>("subdomain_ids", "Subdomain IDs, default to all zero");
+  params.addParam<std::vector<SubdomainID>>(
+      "subdomain_ids",
+      "Subdomain IDs for each element, default to all zero. If a single number is specified, that "
+      "subdomain id is used for all element.");
+  params.addParam<SubdomainName>("subdomain_name",
+                                 "If specified, single subdomain name for all elements");
 
   params.addParam<bool>(
       "gauss_lobatto_grid",
@@ -76,8 +79,6 @@ GeneratedMeshGenerator::validParams()
                                "If provided, prefix the built in boundary names with this string");
   params.addParam<boundary_id_type>(
       "boundary_id_offset", 0, "This offset is added to the generated boundary IDs");
-
-  params.addParamNamesToGroup("dim", "Main");
 
   params.addParam<std::vector<ExtraElementIDName>>("extra_element_integers",
                                                    "Names of extra element integers");
@@ -112,13 +113,19 @@ GeneratedMeshGenerator::GeneratedMeshGenerator(const InputParameters & parameter
 {
   if (_gauss_lobatto_grid && (_bias_x != 1.0 || _bias_y != 1.0 || _bias_z != 1.0))
     mooseError("Cannot apply both Gauss-Lobatto mesh grading and biasing at the same time.");
+  if (_xmax < _xmin)
+    paramError("xmax", "xmax must be larger than xmin.");
+  if (_ymax < _ymin)
+    paramError("ymax", "ymax must be larger than ymin.");
+  if (_zmax < _zmin)
+    paramError("zmax", "zmax must be larger than zmin.");
 }
 
 std::unique_ptr<MeshBase>
 GeneratedMeshGenerator::generate()
 {
   // Have MOOSE construct the correct libMesh::Mesh object using Mesh block and CLI parameters.
-  auto mesh = buildMeshBaseObject();
+  auto mesh = buildMeshBaseObject(_dim);
 
   if (isParamValid("extra_element_integers"))
   {
@@ -151,7 +158,7 @@ GeneratedMeshGenerator::generate()
   switch (_dim)
   {
     // The build_XYZ mesh generation functions take an
-    // UnstructuredMesh& as the first argument, hence the dynamic_cast.
+    // UnstructuredMesh& as the first argument, hence the static_cast.
     case 1:
       MeshTools::Generation::build_line(static_cast<UnstructuredMesh &>(*mesh),
                                         _nx,
@@ -190,9 +197,9 @@ GeneratedMeshGenerator::generate()
   if (_has_subdomain_ids)
   {
     auto & bids = getParam<std::vector<SubdomainID>>("subdomain_ids");
-    if (bids.size() != _nx * _ny * _nz)
+    if (bids.size() != _nx * _ny * _nz && bids.size() != 1)
       paramError("subdomain_ids",
-                 "Size must equal to the product of number of elements in all directions");
+                 "Size must equal to the product of number of elements in all directions, or one.");
     for (auto & elem : mesh->element_ptr_range())
     {
       const Point p = elem->vertex_average();
@@ -200,15 +207,35 @@ GeneratedMeshGenerator::generate()
       unsigned int iy = std::floor((p(1) - _ymin) / (_ymax - _ymin) * _ny);
       unsigned int iz = std::floor((p(2) - _zmin) / (_zmax - _zmin) * _nz);
       unsigned int i = iz * _nx * _ny + iy * _nx + ix;
-      elem->subdomain_id() = bids[i];
+      if (bids.size() == 1)
+        elem->subdomain_id() = bids[0];
+      else
+        elem->subdomain_id() = bids[i];
     }
+  }
+
+  if (isParamValid("subdomain_name"))
+  {
+    const auto & subdomain_name = getParam<SubdomainName>("subdomain_name");
+    if (isParamValid("subdomain_ids"))
+    {
+      const auto & bids = getParam<std::vector<SubdomainID>>("subdomain_ids");
+      if (bids.size() > 1)
+        paramError(
+            "subdomain_ids",
+            "Specifying a subdomain_name is only supported for a single entry in subdomain_ids");
+      else
+        mesh->subdomain_name(bids[0]) = subdomain_name;
+    }
+    else
+      mesh->subdomain_name(0) = subdomain_name;
   }
 
   // rename and shift boundaries
   BoundaryInfo & boundary_info = mesh->get_boundary_info();
 
   // Copy, since we're modifying the container mid-iteration
-  const auto mesh_boundary_ids = boundary_info.get_boundary_ids();
+  const auto mesh_boundary_ids = boundary_info.get_global_boundary_ids();
   for (auto rit = mesh_boundary_ids.rbegin(); rit != mesh_boundary_ids.rend(); ++rit)
   {
     const std::string old_sideset_name = boundary_info.sideset_name(*rit);
@@ -314,5 +341,6 @@ GeneratedMeshGenerator::generate()
     }
   }
 
+  mesh->set_isnt_prepared();
   return dynamic_pointer_cast<MeshBase>(mesh);
 }

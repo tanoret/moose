@@ -7,6 +7,8 @@
     xmax = 0.304 # Length of test chamber
     ymax = 0.0257 # Test chamber radius
   []
+  coord_type = RZ
+  rz_coord_axis = X
 []
 
 [Variables]
@@ -23,6 +25,8 @@
   [heat_conduction_time_derivative]
     type = ADHeatConductionTimeDerivative
     variable = temperature
+    specific_heat = specific_heat
+    density_name = density
   []
 []
 
@@ -51,8 +55,6 @@
 
 [Problem]
   type = FEProblem
-  coord_type = RZ
-  rz_coord_axis = X
 []
 
 [Executioner]

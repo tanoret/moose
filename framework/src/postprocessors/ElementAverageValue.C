@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,7 +39,7 @@ ElementAverageValue::execute()
 }
 
 Real
-ElementAverageValue::getValue()
+ElementAverageValue::getValue() const
 {
   return _integral_value / _volume;
 }
@@ -55,6 +55,6 @@ void
 ElementAverageValue::threadJoin(const UserObject & y)
 {
   ElementIntegralVariablePostprocessor::threadJoin(y);
-  const ElementAverageValue & pps = static_cast<const ElementAverageValue &>(y);
+  const auto & pps = static_cast<const ElementAverageValue &>(y);
   _volume += pps._volume;
 }

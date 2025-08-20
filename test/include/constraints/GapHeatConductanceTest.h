@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,7 +26,7 @@ protected:
 
   const ADMaterialProperty<Real> & _secondary_gap_conductance;
   const ADMaterialProperty<Real> & _primary_gap_conductance;
-  const FunctionTempl<Real> & _secondary_mms_function;
-  const FunctionTempl<Real> & _primary_mms_function;
+  const Function & _secondary_mms_function;
+  const Function & _primary_mms_function;
   const bool _functor_evals_for_primal;
 };

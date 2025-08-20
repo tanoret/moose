@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,7 +39,7 @@ DifferencePostprocessor::execute()
 }
 
 PostprocessorValue
-DifferencePostprocessor::getValue()
+DifferencePostprocessor::getValue() const
 {
   return _value1 - _value2;
 }

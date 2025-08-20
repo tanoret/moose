@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -103,7 +103,6 @@ RestartableTypesChecker::execute()
     dataLoad(iss, _dense_vector_data, this);
     dataLoad(iss, _dense_matrix_data, this);
     dataLoad(iss, _raw_parameters, this);
-    dataLoad(iss, *this, this);
 
     // Finally confirm that the data is sane
     checkData();

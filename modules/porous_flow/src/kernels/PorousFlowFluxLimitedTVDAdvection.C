@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -111,7 +111,7 @@ PorousFlowFluxLimitedTVDAdvection::computeJacobian()
         j++;
       }
       // Add the result to the system's Jacobian matrix
-      _assembly.cacheJacobianBlock(deriv_matrix, idof_indices, jdof_indices, _var.scalingFactor());
+      addJacobian(_assembly, deriv_matrix, idof_indices, jdof_indices, _var.scalingFactor());
     }
   }
 }

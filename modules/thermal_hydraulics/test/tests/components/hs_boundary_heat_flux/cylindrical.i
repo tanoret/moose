@@ -15,7 +15,8 @@ R_i = ${fparse 0.5 * D_i}
 D_o = ${fparse D_i + 2 * thickness}
 A = ${fparse pi * D_o * L}
 scale = 0.8
-E_change = ${fparse scale * heat_flux * A * t}
+power = ${fparse scale * heat_flux * A}
+E_change = ${fparse power * t}
 
 [Functions]
   [q_fn]
@@ -24,9 +25,9 @@ E_change = ${fparse scale * heat_flux * A * t}
   []
 []
 
-[HeatStructureMaterials]
+[SolidProperties]
   [hs_mat]
-    type = SolidMaterialProperties
+    type = ThermalFunctionSolidProperties
     rho = ${density}
     cp = ${specific_heat_capacity}
     k = ${conductivity}
@@ -44,7 +45,8 @@ E_change = ${fparse scale * heat_flux * A * t}
     inner_radius = ${R_i}
     widths = '${thickness}'
     n_part_elems = '10'
-    materials = 'hs_mat'
+    solid_properties = 'hs_mat'
+    solid_properties_T_ref = '300'
     names = 'region'
 
     initial_T = ${T_hs}
@@ -55,16 +57,11 @@ E_change = ${fparse scale * heat_flux * A * t}
     boundary = 'hs:outer'
     hs = hs
     q = q_fn
-    scale_pp = bc_scale_pp
+    scale = ${scale}
   []
 []
 
 [Postprocessors]
-  [bc_scale_pp]
-    type = FunctionValuePostprocessor
-    function = ${scale}
-    execute_on = 'INITIAL TIMESTEP_END'
-  []
   [E_hs]
     type = ADHeatStructureEnergyRZ
     block = 'hs:region'
@@ -83,6 +80,13 @@ E_change = ${fparse scale * heat_flux * A * t}
     value2 = ${E_change}
     execute_on = 'INITIAL TIMESTEP_END'
   []
+
+  [heat_rate_pp_relerr]
+    type = RelativeDifferencePostprocessor
+    value1 = heat_flux_boundary_integral
+    value2 = ${power}
+    execute_on = 'INITIAL'
+  []
 []
 
 [Executioner]
@@ -100,7 +104,7 @@ E_change = ${fparse scale * heat_flux * A * t}
 [Outputs]
   [out]
     type = CSV
-    show = 'E_change_relerr'
+    show = 'E_change_relerr heat_rate_pp_relerr'
     execute_on = 'FINAL'
   []
 []

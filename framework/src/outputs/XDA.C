@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,8 @@
 
 // libMesh includes
 #include "libmesh/enum_xdr_mode.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", XDA);
 registerMooseObjectAliased("MooseApp", XDA, "XDR");
@@ -42,7 +44,7 @@ XDA::XDA(const InputParameters & parameters)
 }
 
 void
-XDA::output(const ExecFlagType & /*type*/)
+XDA::output()
 {
   // Strings for the two filenames to be written
   std::string es_name = filename();

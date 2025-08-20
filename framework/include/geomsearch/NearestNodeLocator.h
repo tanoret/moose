@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -92,7 +92,7 @@ protected:
 
   MooseMesh & _mesh;
 
-  NodeIdRange * _secondary_node_range;
+  std::unique_ptr<NodeIdRange> _secondary_node_range;
 
 public:
   std::map<dof_id_type, NearestNodeInfo> _nearest_node_info;
@@ -101,6 +101,12 @@ public:
   BoundaryID _boundary2;
 
   bool _first;
+
+  // Compute neighborhood nodes around the secondary nodes if iteration update strategy is selected.
+  // This flag is required for (at least initial) adaptivity in parallel and is set to true on
+  // reinit()
+  bool _reinit_iteration;
+
   std::vector<dof_id_type> _secondary_nodes;
 
   std::map<dof_id_type, std::vector<dof_id_type>> _neighbor_nodes;

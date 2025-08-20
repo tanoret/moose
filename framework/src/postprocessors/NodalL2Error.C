@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,7 +42,7 @@ NodalL2Error::execute()
 }
 
 Real
-NodalL2Error::getValue()
+NodalL2Error::getValue() const
 {
   return std::sqrt(_integral_value);
 }
@@ -50,7 +50,7 @@ NodalL2Error::getValue()
 void
 NodalL2Error::threadJoin(const UserObject & y)
 {
-  const NodalL2Error & pps = static_cast<const NodalL2Error &>(y);
+  const auto & pps = static_cast<const NodalL2Error &>(y);
   _integral_value += pps._integral_value;
 }
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,6 +16,8 @@
 #include "libmesh/dense_matrix.h"
 #include "libmesh/elem.h"
 #include "libmesh/point.h"
+
+using namespace libMesh;
 
 namespace Moose
 {
@@ -40,7 +42,7 @@ outer_product(const TypeVector<T> & a, const TypeVector<T2> & b)
 
 template <typename T, typename Map>
 typename FaceCenteredMapFunctor<T, Map>::ValueType
-FaceCenteredMapFunctor<T, Map>::evaluate(const ElemArg & elem_arg, unsigned int) const
+FaceCenteredMapFunctor<T, Map>::evaluate(const ElemArg & elem_arg, const StateArg &) const
 {
   // The following reconstruction is based on Weller's method. For more information on this,
   // we recommend:
@@ -120,7 +122,7 @@ FaceCenteredMapFunctor<T, Map>::evaluate(const ElemArg & elem_arg, unsigned int)
 
 template <typename T, typename Map>
 typename FaceCenteredMapFunctor<T, Map>::ValueType
-FaceCenteredMapFunctor<T, Map>::evaluate(const FaceArg & face, unsigned int) const
+FaceCenteredMapFunctor<T, Map>::evaluate(const FaceArg & face, const StateArg &) const
 {
   return this->evaluate(face.fi);
 }
@@ -162,3 +164,4 @@ template class FaceCenteredMapFunctor<ADRealVectorValue,
                                       std::unordered_map<dof_id_type, ADRealVectorValue>>;
 template class FaceCenteredMapFunctor<RealVectorValue,
                                       std::unordered_map<dof_id_type, RealVectorValue>>;
+template class FaceCenteredMapFunctor<Real, std::unordered_map<dof_id_type, Real>>;

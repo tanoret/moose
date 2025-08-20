@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -66,24 +66,8 @@ Shaft::check() const
 void
 Shaft::addVariables()
 {
-  std::vector<SubdomainName> connected_subdomains;
-  for (const auto & comp_name : _connected_components)
-  {
-    const Component & c = getComponentByName<Component>(comp_name);
-    if (dynamic_cast<const Component1DConnection *>(&c) != nullptr)
-    {
-      const Component1DConnection & fc = dynamic_cast<const Component1DConnection &>(c);
-      auto fc_csdn = fc.getConnectedSubdomainNames();
-      connected_subdomains.insert(connected_subdomains.end(), fc_csdn.begin(), fc_csdn.end());
-    }
-  }
-
-  if (connected_subdomains.size() > 0)
-    getTHMProblem().addSimVariable(
-        true, _omega_var_name, FEType(FIRST, SCALAR), connected_subdomains, _scaling_factor_omega);
-  else
-    getTHMProblem().addSimVariable(
-        true, _omega_var_name, FEType(FIRST, SCALAR), _scaling_factor_omega);
+  getTHMProblem().addSimVariable(
+      true, _omega_var_name, libMesh::FEType(FIRST, SCALAR), _scaling_factor_omega);
 
   if (isParamValid("initial_speed"))
     getTHMProblem().addConstantScalarIC(_omega_var_name, getParam<Real>("initial_speed"));

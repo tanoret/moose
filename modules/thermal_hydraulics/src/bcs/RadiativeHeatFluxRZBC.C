@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,8 +18,8 @@ RadiativeHeatFluxRZBC::validParams()
   InputParameters params = RadiativeHeatFluxBC::validParams();
   params += RZSymmetry::validParams();
 
-  params.addClassDescription(
-      "Radiative heat transfer boundary condition for a cylindrical heat structure");
+  params.addClassDescription("Radiative heat transfer boundary condition for a cylindrical heat "
+                             "structure in a XY coordinate system");
 
   return params;
 }

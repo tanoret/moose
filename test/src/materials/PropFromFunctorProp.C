@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,5 +30,6 @@ PropFromFunctorProp::PropFromFunctorProp(const InputParameters & params)
 void
 PropFromFunctorProp::computeQpProperties()
 {
-  _vector_prop[_qp] = _vector_functor(std::make_tuple(_current_elem, _qp, _qrule));
+  _vector_prop[_qp] = _vector_functor(Moose::ElemQpArg{_current_elem, _qp, _qrule, _q_point[_qp]},
+                                      Moose::currentState());
 }

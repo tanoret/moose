@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -56,9 +56,6 @@ protected:
 
   /// Elemental auxiliary kernels acting on array field variables
   const ExecuteMooseObjectWarehouse<ArrayAuxKernel> & _elem_array_aux;
-
-  /// The integrated boundary conditions from the nonlinear system
-  const MooseObjectTagWarehouse<IntegratedBCBase> & _integrated_bcs;
 
   /// A warehouse query that we will use to obtain user objects for boundary variable dependency
   /// integrity checks

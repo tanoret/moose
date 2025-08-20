@@ -1,3 +1,12 @@
+//* This file is part of the MOOSE framework
+//* https://mooseframework.inl.gov
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #pragma once
 
 // Local includes
@@ -46,6 +55,8 @@ struct TraceData
   void addPoint(const libMesh::Point & point) { _point_data.emplace_back(point); }
 
   TracePointData & lastPoint() { return _point_data.back(); }
+
+  bool stationary() const { return _last && _intersections == 0 && _point_data.size() == 1; }
 
   unsigned int numSegments() const
   {

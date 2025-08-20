@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,7 +31,7 @@ ElementW1pError::ElementW1pError(const InputParameters & parameters)
 }
 
 Real
-ElementW1pError::getValue()
+ElementW1pError::getValue() const
 {
   return std::pow(ElementIntegralPostprocessor::getValue(), 1. / _p);
 }

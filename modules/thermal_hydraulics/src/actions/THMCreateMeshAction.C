@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,7 +23,7 @@ THMCreateMeshAction::validParams()
 {
   InputParameters params = Action::validParams();
   params.addClassDescription("Action that creates an empty mesh (in case one was not already "
-                             "created) and also builds THMProblem.");
+                             "created) and also builds THMProblem (same).");
   return params;
 }
 
@@ -52,7 +52,7 @@ THMCreateMeshAction::act()
     {
       const std::string class_name = "THMProblem";
       InputParameters params = _factory.getValidParams(class_name);
-      _app.parser().extractParams("", params); // extract global params
+      _app.builder().extractParams("", params); // extract global params
       // apply common parameters of the object held by CreateProblemAction to honor user inputs in
       // [Problem]
       auto p = _awh.getActionByTask<CreateProblemAction>("create_problem");
@@ -65,7 +65,10 @@ THMCreateMeshAction::act()
   }
   else if (_current_task == "uniform_refine_mesh")
   {
-    auto level = _app.getParam<unsigned int>("refinements");
-    _mesh->setUniformRefineLevel(level, false);
+    if (_app.isParamSetByUser("refinements"))
+    {
+      auto level = _app.getParam<unsigned int>("refinements");
+      _mesh->setUniformRefineLevel(level, false);
+    }
   }
 }

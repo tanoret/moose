@@ -24,8 +24,8 @@ viscosity.
 
 Both shall be computed with a single `Material` object: `PackedColumn`.
 
-As in the reference article, permeability varies with the size of the steel spheres, so linear
-interpolation will be used for defining this property.
+As in the reference article, permeability varies with the size of the steel spheres, so we'll
+perform an interpolation calculation for it over the range of valid values.
 
 !---
 
@@ -69,7 +69,7 @@ it must be updated to consume the newly created material properties.
 ## Step 3: Run
 
 ```bash
-cd ~/projects/moose/tutorials/darcy-thermo_mech/step03_darcy_material
+cd ~/projects/moose/tutorials/darcy_thermo_mech/step03_darcy_material
 make -j 12 # use number of processors for your system
 cd problems
 ../darcy_thermo_mech-opt -i step3.i

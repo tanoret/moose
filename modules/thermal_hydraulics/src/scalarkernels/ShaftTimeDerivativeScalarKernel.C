@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,7 +21,7 @@ ShaftTimeDerivativeScalarKernel::validParams()
   InputParameters params = ScalarKernel::validParams();
   params.addRequiredParam<std::vector<UserObjectName>>("uo_names",
                                                        "Names of shaft-connectable user objects");
-
+  params.addClassDescription("Adds a time derivative term to the shaft ODE");
   params.set<MultiMooseEnum>("vector_tags") = "time";
   params.set<MultiMooseEnum>("matrix_tags") = "system time";
 
@@ -82,6 +82,6 @@ ShaftTimeDerivativeScalarKernel::computeJacobian()
     std::vector<dof_id_type> dofs_j;
     _shaft_connected_uos[i]->getMomentOfInertiaJacobianData(jacobian_block, dofs_j);
     jacobian_block.scale(_u_dot[0]);
-    _assembly.cacheJacobianBlock(jacobian_block, _var.dofIndices(), dofs_j, _var.scalingFactor());
+    addJacobian(_assembly, jacobian_block, _var.dofIndices(), dofs_j, _var.scalingFactor());
   }
 }

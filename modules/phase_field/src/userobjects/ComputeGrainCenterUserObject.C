@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -69,7 +69,7 @@ ComputeGrainCenterUserObject::finalize()
 void
 ComputeGrainCenterUserObject::threadJoin(const UserObject & y)
 {
-  const ComputeGrainCenterUserObject & pps = static_cast<const ComputeGrainCenterUserObject &>(y);
+  const auto & pps = static_cast<const ComputeGrainCenterUserObject &>(y);
   for (unsigned int i = 0; i < _ncomp; ++i)
     _grain_data[i] += pps._grain_data[i];
 }

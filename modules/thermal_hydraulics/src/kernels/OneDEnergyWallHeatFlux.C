@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,6 +17,7 @@ OneDEnergyWallHeatFlux::validParams()
   InputParameters params = Kernel::validParams();
   params.addRequiredParam<MaterialPropertyName>("q_wall", "Wall heat flux material property");
   params.addRequiredCoupledVar("P_hf", "heat flux perimeter");
+  params.addClassDescription("Adds a heat flux along the local heated perimeter");
   return params;
 }
 

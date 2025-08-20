@@ -195,7 +195,7 @@ alpha_fluid = 2e-4 # thermal expansion coefficient of fluid used in INSADBoussin
   []
 []
 
-[Modules/TensorMechanics/Master]
+[Physics/SolidMechanics/QuasiStatic]
   strain = FINITE
   material_output_order = FIRST
   generate_output = 'vonmises_stress stress_xx stress_yy stress_zz strain_xx strain_yy strain_zz'
@@ -225,6 +225,7 @@ alpha_fluid = 2e-4 # thermal expansion coefficient of fluid used in INSADBoussin
     function = heat_source_distribution_function
     block = 'solid'
     use_displaced_mesh = true
+    execute_on = 'INITIAL TIMESTEP_BEGIN'
   []
 []
 

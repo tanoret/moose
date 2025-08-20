@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,8 +23,8 @@ public:
   PerfGraphOutput(const InputParameters & parameters);
 
 protected:
-  virtual bool shouldOutput(const ExecFlagType & type) override;
-  virtual void output(const ExecFlagType & type) override;
+  virtual bool shouldOutput() override;
+  virtual void output() override;
 
   // Detail level
   unsigned int _level;

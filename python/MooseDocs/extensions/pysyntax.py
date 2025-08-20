@@ -1,12 +1,11 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
 #*
 #* Licensed under LGPL 2.1, please see LICENSE for details
 #* https://www.gnu.org/licenses/lgpl-2.1.html
-import os
 import re
 import pydoc
 import logging
@@ -59,7 +58,11 @@ class PySyntax(object):
             return out
 
     def __init__(self, cls):
-        cls = pydoc.locate(cls) if isinstance(cls, str) else cls
+        cls = self._locate(cls) if isinstance(cls, str) else cls
+        if inspect.ismodule(cls):
+            raise ValueError(
+                f"{cls.__name__} appears to be a module, not a class or function."
+            )
         self.documentation = inspect.getdoc(cls)
         self.filename = inspect.getfile(cls)
         self.signature = str(inspect.signature(cls))
@@ -90,6 +93,25 @@ class PySyntax(object):
                     ((function is None) or (info.function == function)):
                 yield name, info
 
+    @staticmethod
+    def _locate(cls_in: str) -> object:
+        """Get the module, class, or function that a string is representing."""
+        # See what pydoc gets
+        cls = pydoc.locate(cls_in)
+        if not inspect.ismodule(cls):
+            return cls
+
+        # Sometimes a class signature can be the same as the modules,
+        # so check if it can be a class and will prefer that.
+        parts = [part for part in cls_in.split('.') if part]
+        mod = pydoc.safeimport('.'.join(parts[:-1]))
+        if mod:
+            object = getattr(mod, parts[-1])
+            return (
+                object if inspect.isclass(object) or inspect.isfunction(object) else cls
+            )
+
+
 class PySyntaxExtension(command.CommandExtension):
     def extend(self, reader, renderer):
         self.requires(command)
@@ -107,10 +129,19 @@ class PySyntaxCommandBase(command.CommandComponent):
         settings = command.CommandComponent.defaultSettings()
         settings['name'] = (None, "The name python object/function to extract documentation.")
         settings['heading-level'] = (2, "The heading level to use for class documentation.")
+        settings['show-internal'] = (True, "Whether or not to show internal methods")
+        settings['show-private'] = (True, "Whether or not to show private methods")
+        settings['show-protected'] = (True, "Whether or not to show protected methods")
         return settings
 
-    def _addDocumentation(self, parent, page, doc, h_level, **kwargs):
+    def _addDocumentation(self, parent, page, doc, settings, h_level, **kwargs):
         for name, pyinfo in doc.items(**kwargs):
+            if pyinfo.internal and not settings['show-internal']:
+                continue
+            if pyinfo.private and not settings['show-private']:
+                continue
+            if pyinfo.protected and not settings['show-protected']:
+                continue
             h = core.Heading(parent, level=h_level, class_='moose-pysyntax-member-heading')
             fname = name + pyinfo.signature if pyinfo.signature is not None else name
             core.Monospace(core.Strong(h), string=fname)
@@ -120,11 +151,11 @@ class PySyntaxCommandBase(command.CommandComponent):
             else:
                 self.reader.tokenize(parent, pyinfo.documentation, page)
 
-    def _addFunctionDocumentation(self, parent, page, doc, h_level):
+    def _addFunctionDocumentation(self, parent, page, doc, settings, h_level):
         sec = PyFunction(parent)
-        self._addDocumentation(sec, page, doc, h_level)
+        self._addDocumentation(sec, page, doc, settings, h_level)
 
-    def _addClassDocumentation(self, parent, page, name, doc, h_level, **kwargs):
+    def _addClassDocumentation(self, parent, page, name, doc, settings, h_level, **kwargs):
         """Helper for listing class members"""
         sec = PyClass(parent)
 
@@ -137,7 +168,7 @@ class PySyntaxCommandBase(command.CommandComponent):
         else:
             self.reader.tokenize(sec, doc.documentation, page)
 
-        self._addDocumentation(sec, page, doc, h_level + 1, **kwargs)
+        self._addDocumentation(sec, page, doc, settings, h_level + 1, **kwargs)
 
 class PySyntaxClassCommand(PySyntaxCommandBase):
     SUBCOMMAND = 'class'
@@ -157,7 +188,7 @@ class PySyntaxClassCommand(PySyntaxCommandBase):
         if not doc.is_class:
             raise exceptions.MooseDocsException("'%s' is not a python class.", obj)
 
-        self._addClassDocumentation(parent, page, obj, doc, h_level, public=True, protected=True)
+        self._addClassDocumentation(parent, page, obj, doc, settings, h_level, public=True, protected=True)
         return parent
 
 class PySyntaxFunctionCommand(PySyntaxCommandBase):
@@ -179,7 +210,7 @@ class PySyntaxFunctionCommand(PySyntaxCommandBase):
         if not doc.is_function:
             raise exceptions.MooseDocsException("'%s' is not a python function.", obj)
 
-        self._addFunctionDocumentation(parent, page, doc, h_level)
+        self._addFunctionDocumentation(parent, page, doc, settings, h_level)
         return parent
 
 class RenderPyClass(components.RenderComponent):

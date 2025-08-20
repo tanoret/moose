@@ -4,7 +4,7 @@
 
 `MaterialDerivativeTestKernel` is a generic test `Kernel` that allows checking
 the correctness of derivative material properties using the built-in Jacobian
-checks in the MOOSE test harness. Its weak form is given by $$(\psi_i, p)$$
+checks in the MOOSE test harness. Its weak form is given by $(\psi_i, p)$
 where p is a material property that depends on the governing
 variables. `MaterialDerivativeTestKernel` inherits from
 `DerivativeMaterialInterface` which gives it access to functions like
@@ -42,7 +42,7 @@ and `var2 = v`. Then as long as we pass `u` and `v` as coupled variables in the
 `args` parameter of `MaterialDerivativeTestKernel`, we will automatically access
 the correct material property derivatives in our kernel.
 
-This kernel puts a seleted scalar (`Real` type) material property (`material_property`) in the residual vector
+This kernel puts a selected scalar (`Real` type) material property (`material_property`) in the residual vector
 and assembles the Jacobian using the derivatives of the material property as provided by the
 [DerivativeMaterialInterface](/DerivativeMaterialInterface.md).
 

@@ -131,14 +131,14 @@
 
 [Bounds]
   [./pwater_upper_bounds]
-    type = ConstantBoundsAux
+    type = ConstantBounds
     variable = bounds_dummy
     bounded_variable = pwater
     bound_type = upper
     bound_value = 1E7
   [../]
   [./pwater_lower_bounds]
-    type = ConstantBoundsAux
+    type = ConstantBounds
     variable = bounds_dummy
     bounded_variable = pwater
     bound_type = lower
@@ -254,7 +254,7 @@
 [Outputs]
   file_base = bl20
   execute_on = 'initial timestep_end final'
-  interval = 10000
+  time_step_interval = 10000
   exodus = true
   hide = pgas
 []

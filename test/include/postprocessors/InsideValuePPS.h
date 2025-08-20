@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,9 +24,9 @@ public:
   InsideValuePPS(const InputParameters & parameters);
   virtual ~InsideValuePPS();
 
-  virtual void initialize();
-  virtual void execute();
-  virtual Real getValue();
+  virtual void initialize() override;
+  virtual void execute() override;
+  virtual Real getValue() const override;
 
 protected:
   const InsideUserObject & _uo;

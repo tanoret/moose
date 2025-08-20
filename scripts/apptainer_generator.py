@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
+"""
+Manipulate Apptainer/Harbor containers based on version/hashes of MOOSE repository
+"""
 import os
 import sys
 import argparse
 import socket
 import subprocess
+import shutil
+import platform
+import getpass
+import re
+from typing import Union
 
 import jinja2
+from jinja2 import meta
 
-from versioner import Versioner
+from versioner import Versioner, Package
 
 MOOSE_DIR = os.environ.get('MOOSE_DIR',
                            os.path.abspath(os.path.join(os.path.dirname(
@@ -19,21 +28,30 @@ class ApptainerGenerator:
     MOOSE and MOOSE-based applications.
     """
     def __init__(self):
-        self.meta = Versioner().meta()
-        self.args = self.parse_args(list(self.meta.keys()))
+        self.packages = Versioner().get_packages('HEAD')
 
-        library_meta = self.meta[self.args.library]['apptainer'].copy()
-        self.project = library_meta['name_base']
-        self.name = library_meta['name']
-        self.tag = library_meta['tag']
+        # Get the packages that have an 'apptainer' key in versioner.yaml
+        apptainer_packages = []
+        for name, package in self.packages.items():
+            if package.apptainer:
+                apptainer_packages.append(name)
+
+        self.args = self.parse_args(apptainer_packages)
+        self.args = self.verify_args(self.args)
+
+        self.package = self.packages[self.args.library]
+        self.project = self.package.apptainer.name_base
+        self.name = self.package.apptainer.name
+        self.tag = self.package.apptainer.tag
+        self.version = self.package.apptainer.tag
 
         if hasattr(self.args, 'modify') and self.args.modify is not None:
             self.def_path = os.path.abspath(self.args.modify)
         else:
-            self.def_path = library_meta['def']
+            self.def_path = self.package.apptainer.def_path
 
-        if self.args.suffix is not None:
-            self.name = self.add_name_suffix(library_meta, self.args.suffix)
+        if getattr(self.args, 'suffix', None):
+            self.name = self.add_name_suffix(self.package, self.args.suffix)
         if self.args.tag is not None:
             self.tag = self.args.tag
         if self.args.tag_prefix is not None:
@@ -45,6 +63,24 @@ class ApptainerGenerator:
                 self.error(f'Generation path {self.dir} does not exist')
         else:
             self.dir = None
+
+    @staticmethod
+    def verify_args(args):
+        """
+        Verify arguments are sane.
+        TODO: for now, this only checks for the presence of required executables
+        """
+        error_list = []
+        # [(binary name, check for existence)] list of tuples
+        requirements = [('oras', args.action=='def' and not args.local),
+                        ('apptainer', args.action!='def')]
+        for (requirement, check) in requirements:
+            if check and shutil.which(requirement) is None:
+                error_list.append(f'{requirement} executable not found')
+        if error_list:
+            print('/n'.join(error_list))
+            sys.exit(1)
+        return args
 
     @staticmethod
     def parse_args(entities):
@@ -61,10 +97,11 @@ class ApptainerGenerator:
         action_parser = parser.add_subparsers(dest='action', help='Action to perform')
         action_parser.required = True
 
-        def add_default_args(parser, write=True, remote=False):
+        def add_default_args(parser, write=True, remote=False, remote_fetch=False, repo=True):
             parser.add_argument('library', choices=entities,
                     help='The library to act on')
-            parser.add_argument('--suffix', type=str, help='Suffix to add to the name')
+            if repo:
+                parser.add_argument('--suffix', type=str, help='Suffix to add to the name')
             parser.add_argument('--tag', type=str, help='Alternate tag')
             parser.add_argument('--tag-prefix', type=str, help='Prefix to add to the tag')
             if write:
@@ -75,18 +112,25 @@ class ApptainerGenerator:
                 parser.add_argument('--oras-url', type=str, default=oras_url_default,
                                     help='The ORAS URL to use; ' +
                                         f'defaults to {oras_url_default}')
+                parser.add_argument('--disable-cache', action='store_true',
+                                    help='Disable the apptainer cache')
+            if remote_fetch:
+                parser.add_argument('--project-suffix', type=str,
+                                    help='Suffix to add to the project')
 
         exists_parser = action_parser.add_parser('exists', parents=[parent],
                                                  help='Checks if a container exists'
                                                  + ' on a remote')
-        add_default_args(exists_parser, write=False, remote=True)
+        add_default_args(exists_parser, write=False, remote=True, remote_fetch=True)
 
         def_parser = action_parser.add_parser('def', parents=[parent],
                                               help='Generates a definition')
         def add_def_args(parser):
-            add_default_args(parser, remote=True)
+            add_default_args(parser, remote=True, remote_fetch=True)
             parser.add_argument('--local', action='store_true',
                                 help='Use a local dependency container')
+            parser.add_argument('--dep', type=str,
+                                help='Use this dependency instead')
             parser.add_argument('--alt-dep-tag', type=str,
                                 help='An alternate dependency tag to pull')
             parser.add_argument('--alt-dep-tag-prefix', type=str,
@@ -98,7 +142,7 @@ class ApptainerGenerator:
 
         pull_parser = action_parser.add_parser('pull', parents=[parent],
                                                help='Pull a container')
-        add_default_args(pull_parser, remote=True)
+        add_default_args(pull_parser, remote=True, remote_fetch=True)
         pull_parser.add_argument('--pull-args', type=str,
                                  help="Arguments to pass to apptainer pull")
 
@@ -113,6 +157,10 @@ class ApptainerGenerator:
                                   help="Arguments to pass to apptainer build")
         build_parser.add_argument('--sign', type=int,
                                   help='Sign the built container with the given key')
+        build_parser.add_argument('--skip-tests', action='store_true',
+                                  help='Set to skip running the tests after the build')
+        build_parser.add_argument('--no-cleanup', action='store_true',
+                                  help='Pass to apptainer to not cleanup the build (for debugging)')
 
         push_parser = action_parser.add_parser('push', parents=[parent],
                                                 help='Push a container')
@@ -121,12 +169,18 @@ class ApptainerGenerator:
                                  help='An alternate tag to push to')
         push_parser.add_argument('--to-tag-prefix', type=str,
                                  help='A prefix to add to the pushed tag')
+        push_parser.add_argument('--to-project-suffix', type=str,
+                                 help='A suffix to add to the project to push to')
 
         uri_parser = action_parser.add_parser('uri', parents=[parent],
                                               help='Get the URI to a container')
-        add_default_args(uri_parser, write=False, remote=True)
+        add_default_args(uri_parser, write=False, remote=True, remote_fetch=True)
         uri_parser.add_argument('--check', action='store_true',
                                 help='Check whether or not the container exists')
+
+        tag_parser = action_parser.add_parser('tag', parents=[parent],
+                                              help='Get the tag for a container')
+        add_default_args(tag_parser, write=False, repo=False)
 
         return parser.parse_args()
 
@@ -164,6 +218,44 @@ class ApptainerGenerator:
         ApptainerGenerator.print(content, prefix_color='red', file=sys.stderr)
         sys.exit(1)
 
+    @staticmethod
+    def git_repo_sha(dir):
+        """ gets sha of the given repo """
+        command = ['git', 'rev-parse', 'HEAD']
+        return subprocess.check_output(command, cwd=dir, encoding='utf-8').strip()
+
+    @staticmethod
+    def git_submodule_sha(dir, name):
+        """ gets the sha of the given submodule """
+        command = ['git', 'submodule', 'status', name]
+        result = subprocess.check_output(command, cwd=dir, encoding='utf-8').strip()
+        sha_re = re.search(r'^[U+-]?([a-f0-9]{40}) ', result)
+        if sha_re:
+            return sha_re.group(1)
+        raise Exception(f'Failed to parse submodule sha for {name} from "{result}"')
+
+    @staticmethod
+    def git_submodule_remote(dir, name):
+        """ gets the remote of the given submodule """
+        command = ['git', 'config', '--file=.gitmodules', f'submodule.{name}.url']
+        remote = subprocess.check_output(command, cwd=dir, encoding='utf-8').strip()
+
+        # Need to replace remotes that are relative paths
+        # Here, we'll replace even SSH relative paths with HTTPS relative paths
+        # because we shouldn't have private dependencies and SSH keys probably
+        # aren't available in the build
+        if remote.startswith('../..'):
+            base_command = ['git', 'remote', 'get-url', 'origin']
+            base_remote = subprocess.check_output(base_command, cwd=dir, encoding='utf-8').strip()
+            host_re = re.search(r'^git@([a-zA-Z0-9_.-]+\.[a-zA-Z]+):', base_remote)
+            if not host_re:
+                host_re = re.search(r'^https:\/\/([a-zA-Z0-9_.-]+\.[a-zA-Z]+)\/', base_remote)
+            if not host_re:
+                raise Exception(f'Failed to replace ../../ in git submodule remote for {name}')
+            return remote.replace('../../', f'https://{host_re.group(1)}/')
+
+        return remote
+
     def run(self, command):
         """
         Prints a command to screen and then runs it
@@ -178,34 +270,40 @@ class ApptainerGenerator:
         ext = 'sif' if image else 'def'
         return os.path.join(self.dir, f'{name}_{tag}.{ext}')
 
-    def oras_uri(self, project: str, name: str, tag: str):
+    def oras_uri(self, project: str, name: str, tag: str, project_suffix=None):
         """
         Gets the ORAS URI for the given image
         """
+        if project_suffix is not None:
+            project = f'{project}-{project_suffix}'
         return f'oras://{self.args.oras_url}/{project}/{name}:{tag}'
 
-    def apptainer_pull(self, project: str, name: str, tag: str, args=None):
+    def apptainer_pull(self, project: str, name: str, tag: str, project_suffix=None, args=None):
         """
         Pulls the given image via apptainer
         """
-        oras_uri = self.oras_uri(project, name, tag)
+        oras_uri = self.oras_uri(project, name, tag, project_suffix=project_suffix)
         file = self.container_path(name, tag)
         self.print(f'Pulling {oras_uri}')
 
         command = ['apptainer', 'pull']
         if args is not None:
             command += args
+        if (hasattr(self.args, 'disable_cache') and
+            self.args.disable_cache and
+            '--disable-cache' not in command):
+            command += ['--disable-cache']
         command += [file, oras_uri]
         self.run(command)
         return file
 
-    def apptainer_push(self, project: str, name: str, from_tag: str, to_tag=None):
+    def apptainer_push(self, project: str, name: str, from_tag: str, to_tag=None, project_suffix=None):
         """
         Pushes the given image via apptainer
         """
         if to_tag is None:
             to_tag = from_tag
-        oras_uri = self.oras_uri(project, name, to_tag)
+        oras_uri = self.oras_uri(project, name, to_tag, project_suffix=project_suffix)
         file = self.container_path(name, from_tag)
         self.print(f'Pushing {file}')
         command = ['apptainer', 'push', file, oras_uri]
@@ -229,6 +327,10 @@ class ApptainerGenerator:
         command = ['apptainer', 'build', '--fakeroot']
         if args is not None:
             command += args
+        if (hasattr(self.args, 'disable_cache') and
+            self.args.disable_cache and
+            '--disable-cache' not in command):
+            command += ['--disable-cache']
         command += [file, def_file]
         self.run(command)
 
@@ -252,33 +354,32 @@ class ApptainerGenerator:
         raise Exception('Failed to check ORAS image existance')
 
     @staticmethod
-    def add_name_suffix(meta, suffix):
+    def add_name_suffix(package: Package, suffix: str) -> str:
         """
-        Adds a suffix to the name for the given library meta
+        Adds a suffix to the name for the given package
         """
-        current_suffix = meta['name_suffix']
-        new_suffix = suffix + '-' + meta['name_suffix']
-        return meta['name'].replace(current_suffix, new_suffix)
+        current_suffix = package.apptainer.name_suffix
+        new_suffix = suffix + '-' + package.apptainer.name_suffix
+        return package.apptainer.name.replace(current_suffix, new_suffix)
 
-    def _find_dependency_meta(self, library):
+    def _find_dependency_package(self, library: str) -> Union[Package, None]:
         """
-        Find the dependency meta for the given library (if any)
+        Find the dependency package for the given library (if any)
         """
-        all_libraries = list(self.meta.keys())
-        for i in range(1, len(all_libraries)):
-            if all_libraries[i] == library:
-                return self.meta[all_libraries[i - 1]]['apptainer']
+        from_name = self.packages[library].apptainer.from_name
+        if from_name:
+            return self.packages[from_name]
         return None
 
-    def _dependency_from(self, meta):
+    def _dependency_from(self, package: Package) -> str:
         """
         Finds the BootStrap and From options based on the given dependency
         """
-        project = meta['name_base']
-        name = meta['name']
-        tag = meta['tag']
+        project = package.apptainer.name_base
+        name = package.apptainer.name
+        tag = package.apptainer.tag
         if self.args.dep_suffix is not None:
-            name = self.add_name_suffix(meta, self.args.dep_suffix)
+            name = self.add_name_suffix(package, self.args.dep_suffix)
 
         # localimage (with --local option)
         if self.args.local:
@@ -289,7 +390,7 @@ class ApptainerGenerator:
             return 'localimage', container_path
 
         # First, try the production tag
-        uri = self.oras_uri(project, name, tag)
+        uri = self.oras_uri(project, name, tag, project_suffix=self.args.project_suffix)
         prod_exists = self.oras_exists(uri)
         # Failed to find a production tag
         if not self.oras_exists(uri):
@@ -305,7 +406,7 @@ class ApptainerGenerator:
                 tag = self.args.alt_dep_tag
             if self.args.alt_dep_tag_prefix is not None:
                 tag = f'{self.args.alt_dep_tag_prefix}-{tag}'
-            uri = self.oras_uri(project, name, tag)
+            uri = self.oras_uri(project, name, tag, project_suffix=self.args.project_suffix)
             alt_exists = self.oras_exists(uri)
 
             # No luck, we're still screwed
@@ -319,58 +420,227 @@ class ApptainerGenerator:
         self.print(f'Using remote dependency for {name} from {uri}')
         return 'oras', uri.replace('oras://', '')
 
+    def _definition_header(self, jinja_data):
+        """
+        Adds a useful header to generated definitions
+        """
+        definition = open(self.def_path, 'r').read()
+        jinja_env = jinja2.Environment()
+        jinja_vars = meta.find_undeclared_variables(jinja_env.parse(definition))
+
+        arguments = ' '.join(sys.argv[1:])
+
+        header = '#\n'
+        header += '# Generated via MOOSE ApptainerGenerator (scripts/apptainer_generator.py)\n'
+        header += '#\n'
+        header += f'#   Arguments: {arguments}\n'
+        header += f'#   Template:  {os.path.relpath(self.def_path, MOOSE_DIR)}\n'
+        header += '#\n'
+        header += '# Consumed jinja variables\n'
+        header += '#\n'
+        for var in sorted(jinja_vars):
+            contents = f'"{jinja_data.get(var, "")}"'
+            if '\n' in contents:
+                contents = 'Multi-line string'
+            header += f'#   {var}={contents}\n'
+        header += '#\n'
+        header += '\n'
+
+        return header
+
     def _add_definition_labels(self, definition):
         """
         Adds common labels to the given definition content
         """
-        definition += '\n\n%labels\n'
+        contents = '%labels\n'
         name = self.name
         if hasattr(self.args, 'modify') and self.args.modify is not None:
             name += '.modified'
-        definition += f'    {name}.buildhost {socket.gethostname()}\n'
-        definition += f'    {name}.version {self.tag}\n'
+        contents += f'{name}.host.hostname {socket.gethostname()}\n'
+        contents += f'{name}.host.user {getpass.getuser()}\n'
+        contents += f'{name}.moose.sha {self.git_repo_sha(MOOSE_DIR)}\n'
+        contents += f'{name}.version {self.tag}\n'
         # If we have CIVET info, add the url
         if 'CIVET_SERVER' in os.environ and 'CIVET_JOB_ID' in os.environ:
             civet_server = os.environ.get('CIVET_SERVER')
             civet_job_id = os.environ.get('CIVET_JOB_ID')
-            definition += f'    {name}.job {civet_server}/job/{civet_job_id}\n'
+
+            # We use the backend server on most build clients, so replace that
+            # URL with something more useful if we can
+            civet_server = civet_server.replace('https://civet-be.', 'https://civet.')
+
+            contents += f'{name}.civet.job {civet_server}/job/{civet_job_id}\n'
+        return definition + '\n\n' + self.add_def_whitespace(contents)
+
+    def _add_definition_environment(self, definition):
+        """
+        Adds to the definition environment
+        """
+        if self.version == self.tag:
+            name_summary = f'{self.name}:{self.tag}'
+        else:
+            name_summary = f'{self.name}:{self.tag}({self.version})'
+
+        content = [f'#',
+                   f'# Begin environment for {name_summary}',
+                   f'#',
+                   f'export MOOSE_APPTAINER_GENERATOR_LIBRARY="{self.args.library}"',
+                   f'export MOOSE_APPTAINER_GENERATOR_NAME="{self.name}"',
+                   f'export MOOSE_APPTAINER_GENERATOR_NAME_SUMMARY="{name_summary}"',
+                   f'export MOOSE_APPTAINER_GENERATOR_TAG="{self.tag}"',
+                   f'export MOOSE_APPTAINER_GENERATOR_VERSION="{self.version}"']
+        content = '\n    ' + '\n    '.join(content) + '\n\n'
+
+        env_header = '\n%environment\n'
+        if env_header in definition:
+            definition = definition.replace(env_header, env_header + content)
+        else:
+            definition += env_header + content
+
         return definition
+
+    @staticmethod
+    def create_filename(app_root, section_key, actions):
+        """
+        Build and return a list of (sections, file_path) tuples
+        Returns:
+            [('SECTION_METHOD_ACTION','approot/apptainer/section_method_action.sh')]
+        """
+        file_list = []
+        # Support sections that have neither method or action (like environment.sh)
+        if os.path.exists(os.path.join(app_root,
+                                       'apptainer',
+                                       f'{section_key}.sh')):
+            file_list = [(f'SECTION_{section_key.upper()}',
+                         os.path.join(app_root, 'apptainer', f'{section_key}.sh'))]
+
+        for method in ['pre', 'post']:
+            # Support sections that have no action (like post_pre.sh)
+            if os.path.exists(os.path.join(app_root,
+                                           'apptainer',
+                                           f'{section_key}_{method}.sh')):
+                file_list.append((f'SECTION_{section_key.upper()}_{method.upper()}',
+                                  os.path.join(app_root,
+                                               'apptainer',
+                                               f'{section_key}_{method}.sh')))
+
+            for action in actions:
+                file_path = os.path.join(app_root,
+                                        'apptainer',
+                                        f'{section_key}_{method}_{action}.sh')
+                # Support sections that have method and an action (post_pre_configure.sh)
+                if os.path.exists(file_path):
+                    file_list.append((f'SECTION_{section_key.upper()}_'
+                                      f'{method.upper()}_{action.upper()}',
+                                      file_path))
+        return file_list
+
+    @staticmethod
+    def add_def_whitespace(content):
+        """
+        Adds whitespace to content for adding to a defintion file
+        """
+        if not content:
+            return content
+        return content.replace('\n', '\n    ')
+
+    def add_definition_includes(self, jinja_data):
+        """
+        Includes files from the repository into the definition file as defined.
+        This is done by setting pre-defined jinja variables for the includes.
+
+        Currently, this is only for the "app" container.
+
+        From syntax (lower, file in repo): apptainer/<container>_<section>_<method>
+        Jinja variable (upper): SECTION_<section>_<method>
+
+        Current supported includes:
+            apptainer/app_environment
+            apptainer/app_post_begin
+            apptainer/app_post_pre_make
+            apptainer/app_post_pre_install
+            apptainer/app_post_post_install
+            apptainer/app_post_end
+            apptainer/app_test_begin
+            apptainer/app_test_end
+        """
+        if self.args.library != 'app':
+            return
+
+        app_info = Versioner.get_app_info()
+        sections = ['environment', 'post_begin', 'post_pre_make', 'post_pre_install',
+                    'post_post_install', 'post_end', 'test_begin', 'test_end']
+
+        for section in sections:
+            filename = f'apptainer/app_{section}'
+            full_filename = os.path.join(app_info.git_root, filename)
+            if not os.path.isfile(full_filename):
+                continue
+
+            var = f'SECTION_{section.upper()}'
+            file_contents = open(full_filename, 'r').read()
+            contents = f"# Begin include from '{filename}' in {app_info.name}\n"
+            contents += file_contents
+            contents += f"# End include from '{filename}' in {app_info.name}\n"
+            contents = self.add_def_whitespace(contents)
+
+            jinja_data[var] = contents
 
     def add_definition_vars(self, jinja_data):
         """
         Adds conditional apptainer definition vars to jinja data
         """
+        jinja_data['ARCH'] = platform.machine()
+
         # Set application-related variables
         if self.args.library == 'app':
-            app_name, app_root, _ = Versioner.get_app()
-            jinja_data['APPLICATION_DIR'] = app_root
-            jinja_data['APPLICATION_NAME'] = os.path.basename(app_root)
-            jinja_data['BINARY_NAME'] = app_name
+            app_info = Versioner.get_app_info()
+            jinja_data['APPLICATION_DIR'] = app_info.git_root
+            jinja_data['APPLICATION_NAME'] = os.path.basename(app_info.git_root)
+            jinja_data['BINARY_NAME'] = app_info.name
+
         # Set MOOSE_[TOOLS, TEST_TOOLS]_VERSION
-        if self.args.library == 'moose':
-            for package in ['tools', 'test-tools']:
-                meta_yaml = os.path.join(MOOSE_DIR, f'conda/{package}/meta.yaml')
-                with open(meta_yaml, 'r') as meta_contents:
-                    _, version, _, _ = Versioner.conda_meta_jinja(meta_contents.read())
-                    variable_name = 'MOOSE_'
-                    variable_name += package.upper().replace('-', '_')
-                    variable_name += '_VERSION'
-                    jinja_data[variable_name] = version
+        if self.args.library == 'moose-dev':
+            for name in ['tools']:
+                package = self.packages[name]
+                variable_name = f'MOOSE_{package.name.upper()}_VERSION'
+                jinja_data[variable_name] = package.conda.install
         elif self.args.library == 'libmesh':
-            package = 'libmesh-vtk'
-            meta_yaml = os.path.join(MOOSE_DIR, f'conda/{package}/meta.yaml')
-            with open(meta_yaml, 'r') as meta_contents:
-                _, _, _, meta = Versioner.conda_meta_jinja(meta_contents.read())
+            package = self.packages['libmesh-vtk']
+
+            # Jinja returns a list of dictionaries when variants are involved
+            source = {k:v for element in package.conda.meta['source'] for k,v in element.items()}
             for var in ['url', 'sha256', 'vtk_friendly_version']:
                 jinja_var = f'vtk_{var}'
-                jinja_data[jinja_var] = meta['source'][var]
+                jinja_data[jinja_var] = source[var]
 
+        # Set petsc and libmesh versions
+        need_versions = {'petsc': [{'package': 'petsc', 'submodule': 'petsc'}],
+                         'libmesh': [{'package': 'libmesh', 'submodule': 'libmesh'}],
+                         'moose-dev': [{'package': 'conduit', 'submodule': 'framework/contrib/conduit'},
+                                       {'package': 'mfem', 'submodule': 'framework/contrib/mfem'},
+                                       {'package': 'wasp', 'submodule': 'framework/contrib/wasp'}]}
+        needed = need_versions.get(self.args.library)
+        if needed is not None:
+            for package_info in needed:
+                package = package_info['package']
+                submodule = package_info['submodule']
+
+                repo_sha = self.git_submodule_sha(MOOSE_DIR, submodule)
+                repo_remote = self.git_submodule_remote(MOOSE_DIR, submodule)
+
+                variable_prefix = f'{package}_'.upper()
+                jinja_data[variable_prefix + 'GIT_SHA'] = repo_sha
+                jinja_data[variable_prefix + 'GIT_REMOTE'] = repo_remote
+
+        # Add include contents, if any
+        self.add_definition_includes(jinja_data)
 
     def _action_exists(self):
         """
         Performs the "exists" action
         """
-        uri = self.oras_uri(self.project, self.name, self.tag)
+        uri = self.oras_uri(self.project, self.name, self.tag, project_suffix=self.args.project_suffix)
         if self.oras_exists(uri):
             self.print(f'Container {uri} exists')
         else:
@@ -388,12 +658,12 @@ class ApptainerGenerator:
             else:
                 self.error(f'Container already exists in {container_path}')
 
-        uri = self.oras_uri(self.project, self.name, self.tag)
+        uri = self.oras_uri(self.project, self.name, self.tag, project_suffix=self.args.project_suffix)
         if not self.oras_exists(uri):
             self.error(f'Container {uri} does not exist')
 
         args = [] if self.args.pull_args is None else self.args.pull_args.split(' ')
-        self.apptainer_pull(self.project, self.name, self.tag, args)
+        self.apptainer_pull(self.project, self.name, self.tag, project_suffix=self.args.project_suffix, args=args)
 
     def _action_def(self):
         """
@@ -409,23 +679,37 @@ class ApptainerGenerator:
 
         # Find the dependent library (if any)
         if self.args.modify is None:
-            dep_meta = self._find_dependency_meta(self.args.library)
+            dep_package = self._find_dependency_package(self.args.library)
         else:
             self.print(f'Modifying container with definition {self.def_path}')
-            dep_meta = self.meta[self.args.library]['apptainer']
+            dep_package = self.package
 
         # Whether or not the definition file has a dependency
         needs_from = '{{ APPTAINER_BOOTSTRAP }}' in definition
+        # User provided an alternate dependency
+        if self.args.dep:
+            self.print(f'Using alternate dependency {self.args.dep}')
+            # Provided one but we don't need it
+            if not needs_from:
+                self.error(f'Library {self.name} does not need a dependency, but --dep was provided')
         # No dependent library needed
-        if dep_meta is None:
+        if dep_package is None:
             if needs_from:
                 self.error(f'Library {self.name} needs a dependency, but none found')
         # Dependency library is needed, figure out how to get it
         else:
+            apptainer_bootstrap, apptainer_from = None, None
             if not needs_from:
                 self.error(f'Definition {self.def_path} missing a templated BootStrap')
-
-            apptainer_bootstrap, apptainer_from = self._dependency_from(dep_meta)
+            if self.args.dep:
+                if self.args.dep.startswith('oras'):
+                    apptainer_bootstrap = 'oras'
+                    apptainer_from = self.args.dep.replace('oras://', '')
+                else:
+                    apptainer_bootstrap = 'localimage'
+                    apptainer_from = self.args.dep
+            else:
+                apptainer_bootstrap, apptainer_from = self._dependency_from(dep_package)
             jinja_data['APPTAINER_BOOTSTRAP'] = apptainer_bootstrap
             jinja_data['APPTAINER_FROM'] = apptainer_from
 
@@ -439,8 +723,14 @@ class ApptainerGenerator:
         jinja_env.lstrip_blocks = True
         new_definition = definition_template.render(**jinja_data)
 
+        # Add a header
+        new_definition = self._definition_header(jinja_data) + new_definition
+
         # Add in a few labels
         new_definition = self._add_definition_labels(new_definition)
+
+        # Add in the environment which contains the version strings
+        new_definition = self._add_definition_environment(new_definition)
 
         # Definition file checks
         container_definition_path = self.container_path(self.name, self.tag, image=False)
@@ -474,8 +764,12 @@ class ApptainerGenerator:
 
         # Do the build!
         args = []
+        if self.args.skip_tests:
+            args.append('-T')
+        if self.args.no_cleanup:
+            args.append('--no-cleanup')
         if self.args.build_args is not None:
-            args = self.args.build_args.split(' ')
+            args.extend(self.args.build_args.split(' '))
         container_definition_path = self.container_path(self.name, self.tag, image=False)
         self.apptainer_build(container_definition_path, self.name, self.tag, args=args)
 
@@ -496,14 +790,14 @@ class ApptainerGenerator:
         if not os.path.exists(container_path):
             self.error(f'Container {container_path} does not exist')
 
-        uri = self.oras_uri(self.project, self.name, to_tag)
+        uri = self.oras_uri(self.project, self.name, to_tag, project_suffix=self.args.to_project_suffix)
         if self.oras_exists(uri):
             if self.args.overwrite:
                 self.warn(f'Overwriting {uri}')
             else:
                 self.error(f'Tag {uri} already exists')
 
-        self.apptainer_push(self.project, self.name, from_tag, to_tag)
+        self.apptainer_push(self.project, self.name, from_tag, to_tag, project_suffix=self.args.to_project_suffix)
 
     def _action_path(self):
         """
@@ -515,10 +809,16 @@ class ApptainerGenerator:
         """
         Performs the "uri" action
         """
-        uri = self.oras_uri(self.project, self.name, self.tag)
+        uri = self.oras_uri(self.project, self.name, self.tag, project_suffix=self.args.project_suffix)
         if self.args.check and not self.oras_exists(uri):
             self.error(f'Container {uri} does not exist')
         print(uri)
+
+    def _action_tag(self):
+        """
+        Performs the "tag" action
+        """
+        print(self.tag)
 
     def main(self):
         """

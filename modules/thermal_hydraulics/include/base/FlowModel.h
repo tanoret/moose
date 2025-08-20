@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -65,7 +65,7 @@ protected:
   FlowChannelBase & _flow_channel;
 
   /// The type of FE used for flow
-  const FEType & _fe_type;
+  const libMesh::FEType & _fe_type;
 
   /// The name of the user object that defines fluid properties
   const UserObjectName _fp_name;

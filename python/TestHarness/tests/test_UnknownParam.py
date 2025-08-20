@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,4 +15,4 @@ class TestHarnessTester(TestHarnessTestCase):
             self.runTests('--no-color', '-i', 'unknown_param')
 
         self.assertIn('unknown_param:5: unused parameter "not_a_parameter"',
-                      cm.exception.output.decode('utf-8'))
+                      cm.exception.output)

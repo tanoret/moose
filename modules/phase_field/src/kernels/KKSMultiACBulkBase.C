@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,7 +27,7 @@ KKSMultiACBulkBase::validParams()
 
 KKSMultiACBulkBase::KKSMultiACBulkBase(const InputParameters & parameters)
   : ACBulk<Real>(parameters),
-    _etai_name(getVar("eta_i", 0)->name()),
+    _etai_name(coupledName("eta_i", 0)),
     _etai_var(coupled("eta_i", 0)),
     _Fj_names(getParam<std::vector<MaterialPropertyName>>("Fj_names")),
     _num_j(_Fj_names.size()),

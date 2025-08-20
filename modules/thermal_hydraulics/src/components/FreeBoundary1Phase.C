@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,6 +16,7 @@ InputParameters
 FreeBoundary1Phase::validParams()
 {
   InputParameters params = FlowBoundary1Phase::validParams();
+  params.addClassDescription("Component to create a free flow boundary for single-phase flow.");
   return params;
 }
 

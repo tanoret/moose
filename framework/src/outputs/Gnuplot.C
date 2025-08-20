@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -38,10 +38,10 @@ Gnuplot::filename()
 }
 
 void
-Gnuplot::output(const ExecFlagType & type)
+Gnuplot::output()
 {
   // Call the base class output (populates tables)
-  TableOutput::output(type);
+  TableOutput::output();
 
   // Print the table containing all the data to a file
   if (!_all_data_table.empty())

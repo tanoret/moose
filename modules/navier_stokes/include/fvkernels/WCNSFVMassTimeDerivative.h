@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "FVTimeKernel.h"
+#include "FVFunctorTimeKernel.h"
 
 /**
  * Computes the mass time derivative for the weakly compressible formulation of the mass
  * equation, using functor material properties
  */
-class WCNSFVMassTimeDerivative : public FVTimeKernel
+class WCNSFVMassTimeDerivative : public FVFunctorTimeKernel
 {
 public:
   static InputParameters validParams();

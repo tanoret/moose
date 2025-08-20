@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,12 +28,13 @@ public:
 
   virtual void initialize() override {}
   virtual void execute() override;
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
   virtual void finalize() override;
+  virtual void initialSetup() override;
 
 protected:
-  MooseMesh & _mesh;
-  std::string _var_name;
-  Elem * _element;
+  const MooseMesh & _mesh;
+  const std::string & _var_name;
+  const Elem * _element;
   Real _value;
 };

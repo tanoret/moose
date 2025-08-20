@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -33,9 +33,6 @@ public:
 
 private:
   ADReal computeQpResidual() override final;
-
-  /// The value that we want the elemental value of the primal variable to be equal to
-  const Real _phi0;
 
   /// What type of bound (min or max) this kernel intends to apply
   const MooseEnum _bound_type;

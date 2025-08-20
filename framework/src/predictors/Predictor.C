@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,8 +11,11 @@
 #include "Predictor.h"
 #include "NonlinearSystem.h"
 #include "FEProblem.h"
+#include "Transient.h"
 
 #include "libmesh/numeric_vector.h"
+
+using namespace libMesh;
 
 InputParameters
 Predictor::validParams()
@@ -21,13 +24,16 @@ Predictor::validParams()
   params.addRequiredParam<Real>("scale",
                                 "The scale factor for the predictor (can range from 0 to 1)");
   params.addParam<std::vector<Real>>(
-      "skip_times", "Skip the predictor if the current solution time is in this list of times");
+      "skip_times", {}, "Skip the predictor if the current solution time is in this list of times");
   params.addParam<std::vector<Real>>(
       "skip_times_old",
+      {},
       "Skip the predictor if the previous solution time is in this list of times");
   params.addParam<bool>("skip_after_failed_timestep",
                         false,
                         "Skip prediction in a repeated time step after a failed time step");
+  params.addParam<NonlinearSystemName>(
+      "nl_sys", "nl0", "The nonlinear system that this predictor should be applied to.");
 
   params.registerBase("Predictor");
 
@@ -38,7 +44,8 @@ Predictor::Predictor(const InputParameters & parameters)
   : MooseObject(parameters),
     Restartable(this, "Predictors"),
     _fe_problem(*getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
-    _nl(_fe_problem.getNonlinearSystemBase()),
+    _nl(_fe_problem.getNonlinearSystemBase(
+        _fe_problem.nlSysNum(getParam<NonlinearSystemName>("nl_sys")))),
     _t_step(_fe_problem.timeStep()),
     _dt(_fe_problem.dt()),
     _dt_old(_fe_problem.dtOld()),
@@ -51,7 +58,8 @@ Predictor::Predictor(const InputParameters & parameters)
     _scale(getParam<Real>("scale")),
     _skip_times(getParam<std::vector<Real>>("skip_times")),
     _skip_times_old(getParam<std::vector<Real>>("skip_times_old")),
-    _skip_after_failed_timetep(getParam<bool>("skip_after_failed_timestep"))
+    _skip_after_failed_timetep(getParam<bool>("skip_after_failed_timestep")),
+    _timestep_tolerance(dynamic_cast<TransientBase *>(_app.getExecutioner())->timestepTol())
 {
   if (_scale < 0.0 || _scale > 1.0)
     mooseError("Input value for scale = ", _scale, " is outside of permissible range (0 to 1)");
@@ -85,12 +93,12 @@ Predictor::shouldApply()
   const Real & old_time = _fe_problem.timeOld();
   for (unsigned int i = 0; i < _skip_times.size() && should_apply; ++i)
   {
-    if (MooseUtils::absoluteFuzzyEqual(current_time, _skip_times[i]))
+    if (MooseUtils::absoluteFuzzyEqual(current_time, _skip_times[i], _timestep_tolerance))
       should_apply = false;
   }
   for (unsigned int i = 0; i < _skip_times_old.size() && should_apply; ++i)
   {
-    if (MooseUtils::absoluteFuzzyEqual(old_time, _skip_times_old[i]))
+    if (MooseUtils::absoluteFuzzyEqual(old_time, _skip_times_old[i], _timestep_tolerance))
       should_apply = false;
   }
   return should_apply;

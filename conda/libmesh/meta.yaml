@@ -1,11 +1,11 @@
 # Making a Change to this package?
 # REMEMBER TO UPDATE the .yaml files for the following packages:
-#   template/
-#   moose/
+#   moose-dev/*
+#
+# As well as any directions pertaining to modifying those files.
+# ALSO: Follow the directions in scripts/tests/versioner_hashes.yaml
 {% set build = 0 %}
-{% set strbuild = "build_" + build|string %}
-{% set version = "2023.01.09" %}
-{% set vtk_friendly_version = "9.1" %}
+{% set version = "2025.04.22" %}
 
 package:
   name: moose-libmesh
@@ -14,29 +14,30 @@ package:
 source:
   - path: ../../libmesh
   - path: ../../scripts/configure_libmesh.sh
+  - path: ../functions/retry_build.sh
 
 build:
   number: {{ build }}
-  string: {{ strbuild }}
+  string: {{ mpi }}_{{ build }}
   skip: true                                            # [win]
   script_env:
     - MOOSE_JOBS
-    - vtk_friendly_version={{ vtk_friendly_version }}
+    - REQUESTS_CA_BUNDLE
+    - SSL_CERT_FILE
 
 requirements:
   build:
-    - {{ moose_mpich }}
     - {{ moose_petsc }}
     - {{ moose_libmesh_vtk }}
     - pkg-config
     - libpng
+    - zlib
   run:
-    - {{ moose_mpich }}
+    - {{ mpi }}
     - {{ moose_petsc }}
     - {{ moose_libmesh_vtk }}
     - pkg-config
     - packaging
-    - setuptools <60
 
 test:
   commands:
@@ -57,3 +58,4 @@ about:
 extra:
   recipe-maintainers:
     - milljm
+    - cticenhour

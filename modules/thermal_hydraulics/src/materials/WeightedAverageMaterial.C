@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,8 +16,7 @@ WeightedAverageMaterial::validParams()
 {
   InputParameters params = Material::validParams();
 
-  params.addClassDescription(
-      "Weighted average of material properties using aux variables as weights");
+  params.addClassDescription("Weighted average of material properties using variables as weights");
 
   params.addRequiredParam<MaterialPropertyName>(
       "prop_name", "The name of the material property where the average is stored");

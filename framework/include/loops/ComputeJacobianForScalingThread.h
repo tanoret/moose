@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,5 +28,5 @@ public:
   void operator()(const libMesh::ConstElemRange & range, bool bypass_threading = false) final;
 
 protected:
-  virtual void computeJacobian() override;
+  virtual void computeOnElement() override;
 };

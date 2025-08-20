@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,7 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MonotoneCubicInterpolation.h"
+#include "Conversion.h"
 
 #include <fstream>
 #include <sstream>
@@ -40,6 +41,10 @@ MonotoneCubicInterpolation::errorCheck()
 {
   if (_x.size() != _y.size())
     throw std::domain_error("MonotoneCubicInterpolation: x and y vectors are not the same length");
+
+  if (_x.size() < 3)
+    throw std::domain_error("MonotoneCubicInterpolation: " + Moose::stringify(_x.size()) +
+                            " points is not enough data for a cubic interpolation");
 
   bool error = false;
   for (unsigned i = 0; !error && i + 1 < _x.size(); ++i)

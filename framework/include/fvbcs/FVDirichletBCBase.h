@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,5 +23,5 @@ public:
 
   static InputParameters validParams();
 
-  virtual ADReal boundaryValue(const FaceInfo & fi) const = 0;
+  virtual ADReal boundaryValue(const FaceInfo & fi, const Moose::StateArg & state) const = 0;
 };

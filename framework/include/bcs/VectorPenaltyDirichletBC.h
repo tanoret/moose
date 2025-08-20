@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,9 +12,9 @@
 #include "VectorIntegratedBC.h"
 
 /**
- *  Enforces a Dirichlet boundary condition for vector nonlinear variables in a
- *  weak sense by applying a penalty to the difference in the current solution and
- *  the Dirichlet data.
+ * Enforces a Dirichlet boundary condition for vector nonlinear variables in a
+ * weak sense by applying a penalty to the difference in the current solution and
+ * the Dirichlet data.
  */
 class VectorPenaltyDirichletBC : public VectorIntegratedBC
 {
@@ -24,8 +24,8 @@ public:
   VectorPenaltyDirichletBC(const InputParameters & parameters);
 
 protected:
-  virtual Real computeQpResidual();
-  virtual Real computeQpJacobian();
+  virtual Real computeQpResidual() override;
+  virtual Real computeQpJacobian() override;
 
 private:
   /// The penalty coefficient
@@ -39,7 +39,4 @@ private:
 
   /// The exact solution for the z component
   const Function & _exact_z;
-
-  /// Whether this is formulated as a linear problem
-  const bool _linear;
 };

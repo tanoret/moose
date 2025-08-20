@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,7 +28,7 @@ CivetTestBadges = tokens.newToken('CivetTestBadges', prefix=None, tests=list())
 CivetTestReport = tokens.newToken('CivetTestReport', prefix=None, tests=list(), source=None)
 
 class CivetExtension(command.CommandExtension):
-    "Adds ability to include CIVET links."""
+    """Adds ability to include CIVET links."""
 
     @staticmethod
     def defaultConfig():

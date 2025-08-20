@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,12 +21,16 @@
 #include "MooseUtils.h"
 #include "DisplacedSystem.h"
 #include "NonlinearSystemBase.h"
+#include "LinearSystem.h"
 
 #include "libmesh/equation_systems.h"
 #include "libmesh/system.h"
 #include "libmesh/dof_map.h"
+#include "libmesh/string_to_enum.h"
 
 #include <regex>
+
+using namespace libMesh;
 
 InputParameters
 SubProblem::validParams()
@@ -43,6 +47,15 @@ SubProblem::validParams()
   return params;
 }
 
+const std::unordered_set<FEFamily> SubProblem::_default_families_without_p_refinement = {
+    libMesh::LAGRANGE,
+    libMesh::NEDELEC_ONE,
+    libMesh::RAVIART_THOMAS,
+    libMesh::LAGRANGE_VEC,
+    libMesh::CLOUGH,
+    libMesh::BERNSTEIN,
+    libMesh::RATIONAL_BERNSTEIN};
+
 // SubProblem /////
 SubProblem::SubProblem(const InputParameters & parameters)
   : Problem(parameters),
@@ -57,12 +70,12 @@ SubProblem::SubProblem(const InputParameters & parameters)
     _safe_access_tagged_vectors(false),
     _have_ad_objects(false),
     _output_functors(false),
-    _typed_vector_tags(2)
+    _typed_vector_tags(2),
+    _have_p_refinement(false)
 {
   unsigned int n_threads = libMesh::n_threads();
   _active_elemental_moose_variables.resize(n_threads);
   _has_active_elemental_moose_variables.resize(n_threads);
-  _active_material_property_ids.resize(n_threads);
 
   _active_fe_var_coupleable_matrix_tags.resize(n_threads);
   _active_fe_var_coupleable_vector_tags.resize(n_threads);
@@ -70,6 +83,8 @@ SubProblem::SubProblem(const InputParameters & parameters)
   _active_sc_var_coupleable_vector_tags.resize(n_threads);
 
   _functors.resize(n_threads);
+  _pbblf_functors.resize(n_threads);
+  _functor_to_request_info.resize(n_threads);
 }
 
 SubProblem::~SubProblem() {}
@@ -131,6 +146,18 @@ SubProblem::vectorTagExists(const TagName & tag_name) const
   return false;
 }
 
+void
+SubProblem::addNotZeroedVectorTag(const TagID tag)
+{
+  _not_zeroed_tagged_vectors.insert(tag);
+}
+
+bool
+SubProblem::vectorTagNotZeroed(const TagID tag) const
+{
+  return _not_zeroed_tagged_vectors.count(tag);
+}
+
 const VectorTag &
 SubProblem::getVectorTag(const TagID tag_id) const
 {
@@ -140,6 +167,18 @@ SubProblem::getVectorTag(const TagID tag_id) const
     mooseError("Vector tag with ID ", tag_id, " does not exist");
 
   return _vector_tags[tag_id];
+}
+
+std::vector<VectorTag>
+SubProblem::getVectorTags(const std::set<TagID> & tag_ids) const
+{
+  mooseAssert(verifyVectorTags(), "Vector tag storage invalid");
+
+  std::vector<VectorTag> tags;
+  tags.reserve(tag_ids.size());
+  for (const auto & tag_id : tag_ids)
+    tags.push_back(getVectorTag(tag_id));
+  return tags;
 }
 
 const std::vector<VectorTag> &
@@ -247,6 +286,28 @@ SubProblem::verifyVectorTags() const
   return true;
 }
 
+void
+SubProblem::selectVectorTagsFromSystem(const SystemBase & system,
+                                       const std::vector<VectorTag> & input_vector_tags,
+                                       std::set<TagID> & selected_tags)
+{
+  selected_tags.clear();
+  for (const auto & vector_tag : input_vector_tags)
+    if (system.hasVector(vector_tag._id))
+      selected_tags.insert(vector_tag._id);
+}
+
+void
+SubProblem::selectMatrixTagsFromSystem(const SystemBase & system,
+                                       const std::map<TagName, TagID> & input_matrix_tags,
+                                       std::set<TagID> & selected_tags)
+{
+  selected_tags.clear();
+  for (const auto & matrix_tag_pair : input_matrix_tags)
+    if (system.hasMatrix(matrix_tag_pair.second))
+      selected_tags.insert(matrix_tag_pair.second);
+}
+
 TagID
 SubProblem::addMatrixTag(TagName tag_name)
 {
@@ -265,7 +326,7 @@ SubProblem::addMatrixTag(TagName tag_name)
 }
 
 bool
-SubProblem::matrixTagExists(const TagName & tag_name)
+SubProblem::matrixTagExists(const TagName & tag_name) const
 {
   auto tag_name_upper = MooseUtils::toUpper(tag_name);
 
@@ -273,13 +334,13 @@ SubProblem::matrixTagExists(const TagName & tag_name)
 }
 
 bool
-SubProblem::matrixTagExists(TagID tag_id)
+SubProblem::matrixTagExists(TagID tag_id) const
 {
   return _matrix_tag_id_to_tag_name.find(tag_id) != _matrix_tag_id_to_tag_name.end();
 }
 
 TagID
-SubProblem::getMatrixTagID(const TagName & tag_name)
+SubProblem::getMatrixTagID(const TagName & tag_name) const
 {
   auto tag_name_upper = MooseUtils::toUpper(tag_name);
 
@@ -300,13 +361,13 @@ SubProblem::matrixTagName(TagID tag)
 }
 
 void
-SubProblem::setActiveFEVariableCoupleableMatrixTags(std::set<TagID> & mtags, THREAD_ID tid)
+SubProblem::setActiveFEVariableCoupleableMatrixTags(std::set<TagID> & mtags, const THREAD_ID tid)
 {
   _active_fe_var_coupleable_matrix_tags[tid] = mtags;
 }
 
 void
-SubProblem::setActiveFEVariableCoupleableVectorTags(std::set<TagID> & vtags, THREAD_ID tid)
+SubProblem::setActiveFEVariableCoupleableVectorTags(std::set<TagID> & vtags, const THREAD_ID tid)
 {
   _active_fe_var_coupleable_vector_tags[tid] = vtags;
   for (const auto nl_sys_num : make_range(numNonlinearSystems()))
@@ -315,37 +376,39 @@ SubProblem::setActiveFEVariableCoupleableVectorTags(std::set<TagID> & vtags, THR
 }
 
 void
-SubProblem::clearActiveFEVariableCoupleableVectorTags(THREAD_ID tid)
+SubProblem::clearActiveFEVariableCoupleableVectorTags(const THREAD_ID tid)
 {
   _active_fe_var_coupleable_vector_tags[tid].clear();
 }
 
 void
-SubProblem::clearActiveFEVariableCoupleableMatrixTags(THREAD_ID tid)
+SubProblem::clearActiveFEVariableCoupleableMatrixTags(const THREAD_ID tid)
 {
   _active_fe_var_coupleable_matrix_tags[tid].clear();
 }
 
 const std::set<TagID> &
-SubProblem::getActiveFEVariableCoupleableMatrixTags(THREAD_ID tid) const
+SubProblem::getActiveFEVariableCoupleableMatrixTags(const THREAD_ID tid) const
 {
   return _active_fe_var_coupleable_matrix_tags[tid];
 }
 
 const std::set<TagID> &
-SubProblem::getActiveFEVariableCoupleableVectorTags(THREAD_ID tid) const
+SubProblem::getActiveFEVariableCoupleableVectorTags(const THREAD_ID tid) const
 {
   return _active_fe_var_coupleable_vector_tags[tid];
 }
 
 void
-SubProblem::setActiveScalarVariableCoupleableMatrixTags(std::set<TagID> & mtags, THREAD_ID tid)
+SubProblem::setActiveScalarVariableCoupleableMatrixTags(std::set<TagID> & mtags,
+                                                        const THREAD_ID tid)
 {
   _active_sc_var_coupleable_matrix_tags[tid] = mtags;
 }
 
 void
-SubProblem::setActiveScalarVariableCoupleableVectorTags(std::set<TagID> & vtags, THREAD_ID tid)
+SubProblem::setActiveScalarVariableCoupleableVectorTags(std::set<TagID> & vtags,
+                                                        const THREAD_ID tid)
 {
   _active_sc_var_coupleable_vector_tags[tid] = vtags;
   for (const auto nl_sys_num : make_range(numNonlinearSystems()))
@@ -354,32 +417,32 @@ SubProblem::setActiveScalarVariableCoupleableVectorTags(std::set<TagID> & vtags,
 }
 
 void
-SubProblem::clearActiveScalarVariableCoupleableVectorTags(THREAD_ID tid)
+SubProblem::clearActiveScalarVariableCoupleableVectorTags(const THREAD_ID tid)
 {
   _active_sc_var_coupleable_vector_tags[tid].clear();
 }
 
 void
-SubProblem::clearActiveScalarVariableCoupleableMatrixTags(THREAD_ID tid)
+SubProblem::clearActiveScalarVariableCoupleableMatrixTags(const THREAD_ID tid)
 {
   _active_sc_var_coupleable_matrix_tags[tid].clear();
 }
 
 const std::set<TagID> &
-SubProblem::getActiveScalarVariableCoupleableMatrixTags(THREAD_ID tid) const
+SubProblem::getActiveScalarVariableCoupleableMatrixTags(const THREAD_ID tid) const
 {
   return _active_sc_var_coupleable_matrix_tags[tid];
 }
 
 const std::set<TagID> &
-SubProblem::getActiveScalarVariableCoupleableVectorTags(THREAD_ID tid) const
+SubProblem::getActiveScalarVariableCoupleableVectorTags(const THREAD_ID tid) const
 {
   return _active_sc_var_coupleable_vector_tags[tid];
 }
 
 void
 SubProblem::setActiveElementalMooseVariables(const std::set<MooseVariableFEBase *> & moose_vars,
-                                             THREAD_ID tid)
+                                             const THREAD_ID tid)
 {
   if (!moose_vars.empty())
   {
@@ -389,19 +452,19 @@ SubProblem::setActiveElementalMooseVariables(const std::set<MooseVariableFEBase 
 }
 
 const std::set<MooseVariableFEBase *> &
-SubProblem::getActiveElementalMooseVariables(THREAD_ID tid) const
+SubProblem::getActiveElementalMooseVariables(const THREAD_ID tid) const
 {
   return _active_elemental_moose_variables[tid];
 }
 
 bool
-SubProblem::hasActiveElementalMooseVariables(THREAD_ID tid) const
+SubProblem::hasActiveElementalMooseVariables(const THREAD_ID tid) const
 {
   return _has_active_elemental_moose_variables[tid];
 }
 
 void
-SubProblem::clearActiveElementalMooseVariables(THREAD_ID tid)
+SubProblem::clearActiveElementalMooseVariables(const THREAD_ID tid)
 {
   _has_active_elemental_moose_variables[tid] = 0;
   _active_elemental_moose_variables[tid].clear();
@@ -432,17 +495,12 @@ SubProblem::getMaterialPropertyBlockNames(const std::string & prop_name)
   for (const auto & block_id : blocks)
   {
     SubdomainName name;
-    if (block_id == Moose::ANY_BLOCK_ID)
-      name = "ANY_BLOCK_ID";
-    else
+    name = mesh().getMesh().subdomain_name(block_id);
+    if (name.empty())
     {
-      name = mesh().getMesh().subdomain_name(block_id);
-      if (name.empty())
-      {
-        std::ostringstream oss;
-        oss << block_id;
-        name = oss.str();
-      }
+      std::ostringstream oss;
+      oss << block_id;
+      name = oss.str();
     }
     block_names.push_back(name);
   }
@@ -565,9 +623,6 @@ SubProblem::storeBoundaryDelayedCheckMatProp(const std::string & requestor,
 void
 SubProblem::checkBlockMatProps()
 {
-  // Variable for storing the value for ANY_BLOCK_ID/ANY_BOUNDARY_ID
-  SubdomainID any_id = Moose::ANY_BLOCK_ID;
-
   // Variable for storing all available blocks/boundaries from the mesh
   std::set<SubdomainID> all_ids(mesh().meshSubdomains());
 
@@ -579,11 +634,7 @@ SubProblem::checkBlockMatProps()
     // The current id for the property being checked (BoundaryID || BlockID)
     SubdomainID check_id = check_it.first;
 
-    // In the case when the material being checked has an ID is set to ANY, then loop through all
-    // the possible ids and verify that the material property is defined.
     std::set<SubdomainID> check_ids = {check_id};
-    if (check_id == any_id)
-      check_ids = all_ids;
 
     // Loop through all the block/boundary ids
     for (const auto & id : check_ids)
@@ -595,9 +646,7 @@ SubProblem::checkBlockMatProps()
         // and any block/boundary
         // and not is not a zero material property.
         if (_map_block_material_props[id].count(prop_it.second) == 0 &&
-            _map_block_material_props[any_id].count(prop_it.second) == 0 &&
-            _zero_block_material_props[id].count(prop_it.second) == 0 &&
-            _zero_block_material_props[any_id].count(prop_it.second) == 0)
+            _zero_block_material_props[id].count(prop_it.second) == 0)
         {
           std::string check_name = restrictionSubdomainCheckName(id);
           if (check_name.empty())
@@ -616,7 +665,7 @@ SubProblem::checkBlockMatProps()
 void
 SubProblem::checkBoundaryMatProps()
 {
-  // Variable for storing the value for ANY_BLOCK_ID/ANY_BOUNDARY_ID
+  // Variable for storing the value for ANY_BOUNDARY_ID
   BoundaryID any_id = Moose::ANY_BOUNDARY_ID;
 
   // Variable for storing all available blocks/boundaries from the mesh
@@ -662,6 +711,14 @@ SubProblem::checkBoundaryMatProps()
 
   if (!errors.str().empty())
     mooseError(errors.str());
+}
+
+bool
+SubProblem::nlConverged(const unsigned int nl_sys_num)
+{
+  mooseAssert(nl_sys_num < numNonlinearSystems(),
+              "The nonlinear system number is higher than the number of systems we have!");
+  return solverSystemConverged(nl_sys_num);
 }
 
 void
@@ -736,7 +793,7 @@ SubProblem::restrictionBoundaryCheckName(BoundaryID check_id)
 }
 
 void
-SubProblem::setCurrentBoundaryID(BoundaryID bid, THREAD_ID tid)
+SubProblem::setCurrentBoundaryID(BoundaryID bid, const THREAD_ID tid)
 {
   for (const auto nl_sys_num : make_range(numNonlinearSystems()))
     assembly(tid, nl_sys_num).setCurrentBoundaryID(bid);
@@ -748,39 +805,54 @@ SubProblem::getAxisymmetricRadialCoord() const
   return mesh().getAxisymmetricRadialCoord();
 }
 
+bool
+SubProblem::hasLinearVariable(const std::string & var_name) const
+{
+  for (const auto i : make_range(numLinearSystems()))
+    if (systemBaseLinear(i).hasVariable(var_name))
+      return true;
+  return false;
+}
+
+bool
+SubProblem::hasAuxiliaryVariable(const std::string & var_name) const
+{
+  return systemBaseAuxiliary().hasVariable(var_name);
+}
+
 template <typename T>
 MooseVariableFEBase &
-SubProblem::getVariableHelper(THREAD_ID tid,
+SubProblem::getVariableHelper(const THREAD_ID tid,
                               const std::string & var_name,
                               Moose::VarKindType expected_var_type,
                               Moose::VarFieldType expected_var_field_type,
-                              const std::vector<T> & nls,
+                              const std::vector<T> & systems,
                               const SystemBase & aux) const
 {
   // Eventual return value
   MooseVariableFEBase * var = nullptr;
 
-  const auto [var_in_nl, nl_sys_num] = determineNonlinearSystem(var_name);
+  const auto [var_in_sys, sys_num] = determineSolverSystem(var_name);
 
   // First check that the variable is found on the expected system.
   if (expected_var_type == Moose::VarKindType::VAR_ANY)
   {
-    if (var_in_nl)
-      var = &(nls[nl_sys_num]->getVariable(tid, var_name));
+    if (var_in_sys)
+      var = &(systems[sys_num]->getVariable(tid, var_name));
     else if (aux.hasVariable(var_name))
       var = &(aux.getVariable(tid, var_name));
     else
       mooseError("Unknown variable " + var_name);
   }
-  else if (expected_var_type == Moose::VarKindType::VAR_NONLINEAR &&
-           nls[nl_sys_num]->hasVariable(var_name))
-    var = &(nls[nl_sys_num]->getVariable(tid, var_name));
+  else if (expected_var_type == Moose::VarKindType::VAR_SOLVER && var_in_sys &&
+           systems[sys_num]->hasVariable(var_name))
+    var = &(systems[sys_num]->getVariable(tid, var_name));
   else if (expected_var_type == Moose::VarKindType::VAR_AUXILIARY && aux.hasVariable(var_name))
     var = &(aux.getVariable(tid, var_name));
   else
   {
     std::string expected_var_type_string =
-        (expected_var_type == Moose::VarKindType::VAR_NONLINEAR ? "nonlinear" : "auxiliary");
+        (expected_var_type == Moose::VarKindType::VAR_SOLVER ? "nonlinear" : "auxiliary");
     mooseError("No ",
                expected_var_type_string,
                " variable named ",
@@ -816,11 +888,10 @@ SubProblem::getVariableHelper(THREAD_ID tid,
 void
 SubProblem::reinitElemFaceRef(const Elem * elem,
                               unsigned int side,
-                              BoundaryID bnd_id,
                               Real tolerance,
                               const std::vector<Point> * const pts,
                               const std::vector<Real> * const weights,
-                              THREAD_ID tid)
+                              const THREAD_ID tid)
 {
   for (const auto nl_sys_num : make_range(numNonlinearSystems()))
   {
@@ -837,28 +908,29 @@ SubProblem::reinitElemFaceRef(const Elem * elem,
     nl.prepare(tid);
 
     // Let's finally compute our variable values!
-    nl.reinitElemFace(elem, side, bnd_id, tid);
+    nl.reinitElemFace(elem, side, tid);
   }
 
   // do same for aux as for nl
   systemBaseAuxiliary().prepare(tid);
-  systemBaseAuxiliary().reinitElemFace(elem, side, bnd_id, tid);
+  systemBaseAuxiliary().reinitElemFace(elem, side, tid);
 
   // With the dof indices set in the moose variables, now let's properly size
   // our local residuals/Jacobians
   auto & current_assembly = assembly(tid, currentNlSysNum());
-  current_assembly.prepareJacobianBlock();
-  current_assembly.prepareResidual();
+  if (currentlyComputingJacobian() || currentlyComputingResidualAndJacobian())
+    current_assembly.prepareJacobianBlock();
+  if (!currentlyComputingJacobian())
+    current_assembly.prepareResidual();
 }
 
 void
 SubProblem::reinitNeighborFaceRef(const Elem * neighbor_elem,
                                   unsigned int neighbor_side,
-                                  BoundaryID bnd_id,
                                   Real tolerance,
                                   const std::vector<Point> * const pts,
                                   const std::vector<Real> * const weights,
-                                  THREAD_ID tid)
+                                  const THREAD_ID tid)
 {
   for (const auto nl_sys_num : make_range(numNonlinearSystems()))
   {
@@ -876,12 +948,12 @@ SubProblem::reinitNeighborFaceRef(const Elem * neighbor_elem,
     nl.prepareNeighbor(tid);
 
     // Let's finally compute our variable values!
-    nl.reinitNeighborFace(neighbor_elem, neighbor_side, bnd_id, tid);
+    nl.reinitNeighborFace(neighbor_elem, neighbor_side, tid);
   }
 
   // do same for aux as for nl
   systemBaseAuxiliary().prepareNeighbor(tid);
-  systemBaseAuxiliary().reinitNeighborFace(neighbor_elem, neighbor_side, bnd_id, tid);
+  systemBaseAuxiliary().reinitNeighborFace(neighbor_elem, neighbor_side, tid);
 
   // With the dof indices set in the moose variables, now let's properly size
   // our local residuals/Jacobians
@@ -890,7 +962,7 @@ SubProblem::reinitNeighborFaceRef(const Elem * neighbor_elem,
 
 void
 SubProblem::reinitLowerDElem(const Elem * elem,
-                             THREAD_ID tid,
+                             const THREAD_ID tid,
                              const std::vector<Point> * const pts,
                              const std::vector<Real> * const weights)
 {
@@ -919,14 +991,14 @@ SubProblem::reinitLowerDElem(const Elem * elem,
 }
 
 void
-SubProblem::reinitNeighborLowerDElem(const Elem * elem, THREAD_ID tid)
+SubProblem::reinitNeighborLowerDElem(const Elem * elem, const THREAD_ID tid)
 {
   for (const auto nl_sys_num : make_range(numNonlinearSystems()))
     assembly(tid, nl_sys_num).reinitNeighborLowerDElem(elem);
 }
 
 void
-SubProblem::reinitMortarElem(const Elem * elem, THREAD_ID tid)
+SubProblem::reinitMortarElem(const Elem * elem, const THREAD_ID tid)
 {
   for (const auto nl_sys_num : make_range(numNonlinearSystems()))
     assembly(tid, nl_sys_num).reinitMortarElem(elem);
@@ -948,7 +1020,7 @@ SubProblem::cloneAlgebraicGhostingFunctor(GhostingFunctor & algebraic_gf, bool t
     DofMap & dof_map = eq.get_system(i).get_dof_map();
     std::shared_ptr<GhostingFunctor> clone_alg_gf = algebraic_gf.clone();
     std::dynamic_pointer_cast<RelationshipManager>(clone_alg_gf)
-        ->init(*algebraic_gf.get_mesh(), &dof_map);
+        ->init(mesh(), *algebraic_gf.get_mesh(), &dof_map);
     dof_map.add_algebraic_ghosting_functor(clone_alg_gf, to_mesh);
     clones_vec[i - 1] = clone_alg_gf;
   }
@@ -967,15 +1039,35 @@ SubProblem::addAlgebraicGhostingFunctor(GhostingFunctor & algebraic_gf, bool to_
 }
 
 void
-SubProblem::addAlgebraicGhostingFunctor(std::shared_ptr<GhostingFunctor> algebraic_gf, bool to_mesh)
+SubProblem::cloneCouplingGhostingFunctor(GhostingFunctor & coupling_gf, bool to_mesh)
 {
-  EquationSystems & eq = es();
-  const auto n_sys = eq.n_systems();
-  if (!n_sys)
+  const std::size_t num_nl_sys = numNonlinearSystems();
+
+  auto pr = _root_coupling_gf_to_sys_clones.emplace(
+      &coupling_gf, std::vector<std::shared_ptr<GhostingFunctor>>(num_nl_sys - 1));
+  mooseAssert(pr.second, "We are adding a duplicate coupling functor");
+  auto & clones_vec = pr.first->second;
+
+  for (const auto i : make_range(std::size_t(1), num_nl_sys))
+  {
+    DofMap & dof_map = systemBaseNonlinear(i).system().get_dof_map();
+    std::shared_ptr<GhostingFunctor> clone_coupling_gf = coupling_gf.clone();
+    std::dynamic_pointer_cast<RelationshipManager>(clone_coupling_gf)
+        ->init(mesh(), *coupling_gf.get_mesh(), &dof_map);
+    dof_map.add_coupling_functor(clone_coupling_gf, to_mesh);
+    clones_vec[i - 1] = clone_coupling_gf;
+  }
+}
+
+void
+SubProblem::addCouplingGhostingFunctor(GhostingFunctor & coupling_gf, bool to_mesh)
+{
+  const auto num_nl_sys = numNonlinearSystems();
+  if (!num_nl_sys)
     return;
 
-  eq.get_system(0).get_dof_map().add_algebraic_ghosting_functor(algebraic_gf, to_mesh);
-  cloneAlgebraicGhostingFunctor(*algebraic_gf, to_mesh);
+  systemBaseNonlinear(0).system().get_dof_map().add_coupling_functor(coupling_gf, to_mesh);
+  cloneCouplingGhostingFunctor(coupling_gf, to_mesh);
 }
 
 void
@@ -1006,11 +1098,58 @@ SubProblem::removeAlgebraicGhostingFunctor(GhostingFunctor & algebraic_gf)
   auto & clones_vec = it->second;
   mooseAssert((n_sys - 1) == clones_vec.size(),
               "The size of the gf clones vector doesn't match the number of systems minus one");
+  if (clones_vec.empty())
+  {
+    mooseAssert(n_sys == 1, "The clones vector should only be empty if there is only one system");
+    return;
+  }
 
   for (const auto i : make_range(n_sys))
     eq.get_system(i + 1).get_dof_map().remove_algebraic_ghosting_functor(*clones_vec[i]);
 
   _root_alg_gf_to_sys_clones.erase(it->first);
+}
+
+void
+SubProblem::removeCouplingGhostingFunctor(GhostingFunctor & coupling_gf)
+{
+  EquationSystems & eq = es();
+  const auto num_nl_sys = numNonlinearSystems();
+  if (!num_nl_sys)
+    return;
+
+#ifndef NDEBUG
+  const DofMap & nl_dof_map = eq.get_system(0).get_dof_map();
+  const bool found_in_root_sys = std::find(nl_dof_map.coupling_functors_begin(),
+                                           nl_dof_map.coupling_functors_end(),
+                                           &coupling_gf) != nl_dof_map.coupling_functors_end();
+  const bool found_in_our_map =
+      _root_coupling_gf_to_sys_clones.find(&coupling_gf) != _root_coupling_gf_to_sys_clones.end();
+  mooseAssert(found_in_root_sys == found_in_our_map,
+              "If the ghosting functor exists in the root DofMap, then we need to have a key for "
+              "it in our gf to clones map");
+#endif
+
+  eq.get_system(0).get_dof_map().remove_coupling_functor(coupling_gf);
+
+  auto it = _root_coupling_gf_to_sys_clones.find(&coupling_gf);
+  if (it == _root_coupling_gf_to_sys_clones.end())
+    return;
+
+  auto & clones_vec = it->second;
+  mooseAssert((num_nl_sys - 1) == clones_vec.size(),
+              "The size of the gf clones vector doesn't match the number of systems minus one");
+  if (clones_vec.empty())
+  {
+    mooseAssert(num_nl_sys == 1,
+                "The clones vector should only be empty if there is only one nonlinear system");
+    return;
+  }
+
+  for (const auto i : make_range(num_nl_sys))
+    eq.get_system(i + 1).get_dof_map().remove_coupling_functor(*clones_vec[i]);
+
+  _root_coupling_gf_to_sys_clones.erase(it->first);
 }
 
 void
@@ -1028,15 +1167,12 @@ SubProblem::automaticScaling() const
   return systemBaseNonlinear(0).automaticScaling();
 }
 
-#ifdef MOOSE_GLOBAL_AD_INDEXING
 void
-SubProblem::hasScalingVector()
+SubProblem::hasScalingVector(const unsigned int nl_sys_num)
 {
   for (const THREAD_ID tid : make_range(libMesh::n_threads()))
-    for (const auto nl_sys_num : make_range(numNonlinearSystems()))
-      assembly(tid, nl_sys_num).hasScalingVector();
+    assembly(tid, nl_sys_num).hasScalingVector();
 }
-#endif
 
 void
 SubProblem::clearAllDofIndices()
@@ -1049,7 +1185,7 @@ SubProblem::clearAllDofIndices()
 void
 SubProblem::timestepSetup()
 {
-  for (auto & map : _functors)
+  for (auto & map : _pbblf_functors)
     for (auto & pr : map)
       pr.second->timestepSetup();
 }
@@ -1057,7 +1193,7 @@ SubProblem::timestepSetup()
 void
 SubProblem::customSetup(const ExecFlagType & exec_type)
 {
-  for (auto & map : _functors)
+  for (auto & map : _pbblf_functors)
     for (auto & pr : map)
       pr.second->customSetup(exec_type);
 }
@@ -1065,7 +1201,7 @@ SubProblem::customSetup(const ExecFlagType & exec_type)
 void
 SubProblem::residualSetup()
 {
-  for (auto & map : _functors)
+  for (auto & map : _pbblf_functors)
     for (auto & pr : map)
       pr.second->residualSetup();
 }
@@ -1073,7 +1209,7 @@ SubProblem::residualSetup()
 void
 SubProblem::jacobianSetup()
 {
-  for (auto & map : _functors)
+  for (auto & map : _pbblf_functors)
     for (auto & pr : map)
       pr.second->jacobianSetup();
 }
@@ -1088,13 +1224,24 @@ SubProblem::initialSetup()
   }
 
   for (const auto & functors : _functors)
-    for (const auto & pr : functors)
-      if (pr.second->wrapsNull())
-        mooseError("No functor ever provided with name '",
-                   removeSubstring(pr.first, "wraps_"),
-                   "', which was requested by '",
-                   MooseUtils::join(libmesh_map_find(_functor_to_requestors, pr.first), ","),
-                   "'.");
+    for (const auto & [functor_wrapper_name, functor_wrapper] : functors)
+    {
+      const auto & [true_functor_type, non_ad_functor, ad_functor] = functor_wrapper;
+      mooseAssert(non_ad_functor->wrapsNull() == ad_functor->wrapsNull(), "These must agree");
+      const auto functor_name = removeSubstring(functor_wrapper_name, "wraps_");
+      if (non_ad_functor->wrapsNull())
+        mooseError(
+            "No functor ever provided with name '",
+            functor_name,
+            "', which was requested by '",
+            MooseUtils::join(libmesh_map_find(_functor_to_requestors, functor_wrapper_name), ","),
+            "'.");
+      if (true_functor_type == TrueFunctorIs::NONAD ? non_ad_functor->ownsWrappedFunctor()
+                                                    : ad_functor->ownsWrappedFunctor())
+        mooseError("Functor envelopes should not own the functors they wrap, but '",
+                   functor_name,
+                   "' is owned by the wrapper. Please open a MOOSE issue for help resolving this.");
+    }
 }
 
 void
@@ -1134,15 +1281,118 @@ SubProblem::getCoordSystem(SubdomainID sid) const
   return mesh().getCoordSystem(sid);
 }
 
+void
+SubProblem::reinitFVFace(const THREAD_ID tid, const FaceInfo & fi)
+{
+  for (const auto nl : make_range(numNonlinearSystems()))
+    assembly(tid, nl).reinitFVFace(fi);
+}
+
+void
+SubProblem::cacheResidual(const THREAD_ID tid)
+{
+  assembly(tid, currentNlSysNum())
+      .cacheResidual(Assembly::GlobalDataKey{}, currentResidualVectorTags());
+}
+
+void
+SubProblem::cacheResidualNeighbor(const THREAD_ID tid)
+{
+  assembly(tid, currentNlSysNum())
+      .cacheResidualNeighbor(Assembly::GlobalDataKey{}, currentResidualVectorTags());
+}
+
+void
+SubProblem::addCachedResidual(const THREAD_ID tid)
+{
+  assembly(tid, currentNlSysNum())
+      .addCachedResiduals(Assembly::GlobalDataKey{}, currentResidualVectorTags());
+}
+
+void
+SubProblem::cacheJacobian(const THREAD_ID tid)
+{
+  assembly(tid, currentNlSysNum()).cacheJacobian(Assembly::GlobalDataKey{});
+  if (hasNonlocalCoupling())
+    assembly(tid, currentNlSysNum()).cacheJacobianNonlocal(Assembly::GlobalDataKey{});
+}
+
+void
+SubProblem::cacheJacobianNeighbor(const THREAD_ID tid)
+{
+  assembly(tid, currentNlSysNum()).cacheJacobianNeighbor(Assembly::GlobalDataKey{});
+}
+
+void
+SubProblem::addCachedJacobian(const THREAD_ID tid)
+{
+  assembly(tid, currentNlSysNum()).addCachedJacobian(Assembly::GlobalDataKey{});
+}
+
+void
+SubProblem::preparePRefinement()
+{
+  std::unordered_set<FEFamily> disable_families;
+  for (const auto & [family, flag] : _family_for_p_refinement)
+    if (flag)
+      disable_families.insert(family);
+
+  for (const auto tid : make_range(libMesh::n_threads()))
+    for (const auto s : make_range(numNonlinearSystems()))
+      assembly(tid, s).havePRefinement(disable_families);
+
+  auto & eq = es();
+  for (const auto family : disable_families)
+    for (const auto i : make_range(eq.n_systems()))
+    {
+      auto & system = eq.get_system(i);
+      auto & dof_map = system.get_dof_map();
+      for (const auto vg : make_range(system.n_variable_groups()))
+      {
+        const auto & var_group = system.variable_group(vg);
+        if (var_group.type().family == family)
+          dof_map.should_p_refine(vg, false);
+      }
+    }
+
+  _have_p_refinement = true;
+}
+
+bool
+SubProblem::doingPRefinement() const
+{
+  return mesh().doingPRefinement();
+}
+
+void
+SubProblem::markFamilyPRefinement(const InputParameters & params)
+{
+  auto family = Utility::string_to_enum<FEFamily>(params.get<MooseEnum>("family"));
+  bool flag = _default_families_without_p_refinement.count(family);
+  if (params.isParamValid("disable_p_refinement"))
+    flag = params.get<bool>("disable_p_refinement");
+
+  auto [it, inserted] = _family_for_p_refinement.emplace(family, flag);
+  if (!inserted && flag != it->second)
+    mooseError("'disable_p_refinement' not set consistently for variables in ", family);
+}
+
+void
+SubProblem::setCurrentLowerDElem(const Elem * const lower_d_elem, const THREAD_ID tid)
+{
+  for (const auto nl_sys_num : make_range(numNonlinearSystems()))
+    assembly(tid, nl_sys_num).setCurrentLowerDElem(lower_d_elem);
+}
+
 template MooseVariableFEBase &
-SubProblem::getVariableHelper(THREAD_ID tid,
+SubProblem::getVariableHelper(const THREAD_ID tid,
                               const std::string & var_name,
                               Moose::VarKindType expected_var_type,
                               Moose::VarFieldType expected_var_field_type,
-                              const std::vector<std::shared_ptr<NonlinearSystemBase>> & nls,
+                              const std::vector<std::shared_ptr<SolverSystem>> & nls,
                               const SystemBase & aux) const;
 template MooseVariableFEBase &
-SubProblem::getVariableHelper(THREAD_ID tid,
+SubProblem::getVariableHelper(const THREAD_ID tid,
                               const std::string & var_name,
                               Moose::VarKindType expected_var_type,
                               Moose::VarFieldType expected_var_field_type,

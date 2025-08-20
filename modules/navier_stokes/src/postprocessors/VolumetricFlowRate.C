@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,10 +9,10 @@
 
 #include "VolumetricFlowRate.h"
 #include "MathFVUtils.h"
-#include "INSFVRhieChowInterpolator.h"
+#include "RhieChowInterpolatorBase.h"
 #include "NSFVUtils.h"
 
-#include <math.h>
+#include <cmath>
 
 registerMooseObject("NavierStokesApp", VolumetricFlowRate);
 
@@ -38,6 +38,8 @@ VolumetricFlowRate::validParams()
                                     "set the advected quantity when finite volume is being used.");
   params += Moose::FV::interpolationParameters();
   params.addParam<UserObjectName>("rhie_chow_user_object", "The rhie-chow user-object");
+  params.addParam<bool>(
+      "subtract_mesh_velocity", true, "To subract the velocity of the potentially moving mesh.");
   return params;
 }
 
@@ -53,8 +55,9 @@ VolumetricFlowRate::VolumetricFlowRate(const InputParameters & parameters)
     _adv_quant(isParamValid("advected_quantity") ? &getFunctor<ADReal>("advected_quantity")
                                                  : nullptr),
     _rc_uo(isParamValid("rhie_chow_user_object")
-               ? &getUserObject<INSFVRhieChowInterpolator>("rhie_chow_user_object")
-               : nullptr)
+               ? &getUserObject<RhieChowFaceFluxProvider>("rhie_chow_user_object")
+               : nullptr),
+    _subtract_mesh_velocity(getParam<bool>("subtract_mesh_velocity"))
 {
   // Check that at most one advected quantity has been provided
   if (_advected_variable_supplied && _advected_mat_prop_supplied)
@@ -67,6 +70,12 @@ VolumetricFlowRate::VolumetricFlowRate(const InputParameters & parameters)
                  "advected material properties.");
 
   _qp_integration = !getFieldVar("vel_x", 0)->isFV();
+
+  if (_advected_mat_prop_supplied)
+    checkFunctorSupportsSideIntegration<ADReal>("advected_mat_prop", _qp_integration);
+  if (_adv_quant)
+    checkFunctorSupportsSideIntegration<ADReal>("advected_quantity", _qp_integration);
+
   if (!_qp_integration)
   {
     if (!_rc_uo)
@@ -83,21 +92,24 @@ VolumetricFlowRate::VolumetricFlowRate(const InputParameters & parameters)
 void
 VolumetricFlowRate::initialSetup()
 {
-  if (_rc_uo && _rc_uo->velocityInterpolationMethod() == Moose::FV::InterpMethod::RhieChow)
+  const auto * rc_base = dynamic_cast<const RhieChowInterpolatorBase *>(_rc_uo);
+  if (_rc_uo && rc_base &&
+      rc_base->velocityInterpolationMethod() == Moose::FV::InterpMethod::RhieChow &&
+      !rc_base->segregated())
   {
     // We must make sure the A coefficients in the Rhie Chow interpolator are present on
     // both sides of the boundaries so that interpolation coefficients may be computed
     for (const auto bid : boundaryIDs())
-      const_cast<INSFVRhieChowInterpolator *>(_rc_uo)->ghostADataOnBoundary(bid);
+      const_cast<RhieChowInterpolatorBase *>(rc_base)->ghostADataOnBoundary(bid);
 
     // On INITIAL, we cannot compute Rhie Chow coefficients on internal surfaces because
     // - the time integrator is not ready to compute time derivatives
     // - the setup routine is called too early for porosity functions to be initialized
     // We must check that the boundaries requested are all external
-    if (getExecuteOnEnum().contains(EXEC_INITIAL))
+    if (getExecuteOnEnum().isValueSet(EXEC_INITIAL))
       for (const auto bid : boundaryIDs())
       {
-        if (!_mesh.isBoundaryFullyExternalToSubdomains(bid, _rc_uo->blockIDs()))
+        if (!_mesh.isBoundaryFullyExternalToSubdomains(bid, rc_base->blockIDs()))
           paramError(
               "execute_on",
               "Boundary '",
@@ -117,41 +129,33 @@ VolumetricFlowRate::meshChanged()
 }
 
 Real
-VolumetricFlowRate::computeFaceInfoIntegral([[maybe_unused]] const FaceInfo * fi)
+VolumetricFlowRate::computeFaceInfoIntegral(const FaceInfo * fi)
 {
-#ifdef MOOSE_GLOBAL_AD_INDEXING
   mooseAssert(fi, "We should have a face info in " + name());
   mooseAssert(_adv_quant, "We should have an advected quantity in " + name());
+  const auto state = determineState();
 
   // Get face value for velocity
-  const auto vel = MetaPhysicL::raw_value(_rc_uo->getVelocity(_velocity_interp_method, *fi, _tid));
+  const auto face_flux = MetaPhysicL::raw_value(_rc_uo->getVolumetricFaceFlux(
+      _velocity_interp_method, *fi, state, _tid, _subtract_mesh_velocity));
+
   const bool correct_skewness =
       _advected_interp_method == Moose::FV::InterpMethod::SkewCorrectedAverage;
 
-  // External faces for the advected quantity
-  if (!fi->neighborPtr() || !_adv_quant->hasBlocks(fi->neighborPtr()->subdomain_id()))
-  {
-    const auto ssf = Moose::FaceArg({fi,
-                                     limiterType(_advected_interp_method),
-                                     MetaPhysicL::raw_value(vel) * fi->normal() > 0,
-                                     correct_skewness,
-                                     _current_elem});
-    return fi->normal() * MetaPhysicL::raw_value((*_adv_quant)(ssf)) * vel;
-  }
-  else
-  {
-    const auto adv_quant_face = MetaPhysicL::raw_value(
-        (*_adv_quant)(Moose::FaceArg({fi,
-                                      Moose::FV::limiterType(_advected_interp_method),
-                                      MetaPhysicL::raw_value(vel) * fi->normal() > 0,
-                                      correct_skewness,
-                                      nullptr})));
-    return fi->normal() * adv_quant_face * vel;
-  }
+  mooseAssert(_adv_quant->hasFaceSide(*fi, true) || _adv_quant->hasFaceSide(*fi, false),
+              "Advected quantity should be defined on one side of the face!");
 
-#else
-  mooseError("FaceInfo integration is not defined for local AD indexing");
-#endif
+  const auto * elem = _adv_quant->hasFaceSide(*fi, true) ? fi->elemPtr() : fi->neighborPtr();
+
+  const auto adv_quant_face = MetaPhysicL::raw_value(
+      (*_adv_quant)(Moose::FaceArg({fi,
+                                    Moose::FV::limiterType(_advected_interp_method),
+                                    face_flux > 0,
+                                    correct_skewness,
+                                    elem,
+                                    nullptr}),
+                    state));
+  return face_flux * adv_quant_face;
 }
 
 Real
@@ -161,8 +165,8 @@ VolumetricFlowRate::computeQpIntegral()
     return _advected_variable[_qp] * RealVectorValue(_vel_x[_qp], _vel_y[_qp], _vel_z[_qp]) *
            _normals[_qp];
   else if (_advected_mat_prop_supplied)
-    return MetaPhysicL::raw_value(
-               _advected_material_property(std::make_tuple(_current_elem, _qp, _qrule))) *
+    return MetaPhysicL::raw_value(_advected_material_property(
+               Moose::ElemQpArg{_current_elem, _qp, _qrule, _q_point[_qp]}, determineState())) *
            RealVectorValue(_vel_x[_qp], _vel_y[_qp], _vel_z[_qp]) * _normals[_qp];
   else
     return RealVectorValue(_vel_x[_qp], _vel_y[_qp], _vel_z[_qp]) * _normals[_qp];

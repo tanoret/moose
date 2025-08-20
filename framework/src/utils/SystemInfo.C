@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,10 @@
 #include <locale>
 #endif
 
+#ifdef LIBTORCH_ENABLED
+#include <torch/version.h>
+#endif
+
 SystemInfo::SystemInfo(int argc, char * argv[]) : _argc(argc), _argv(argv) {}
 
 std::string
@@ -38,6 +42,9 @@ SystemInfo::getInfo() const
   oss << std::setw(25) << "SLEPc Version: " << LIBMESH_DETECTED_SLEPC_VERSION_MAJOR << '.'
       << LIBMESH_DETECTED_SLEPC_VERSION_MINOR << '.' << LIBMESH_DETECTED_SLEPC_VERSION_SUBMINOR
       << '\n';
+#endif
+#ifdef LIBTORCH_ENABLED
+  oss << std::setw(25) << "Libtorch Version: " << TORCH_VERSION << '\n';
 #endif
 
   // Current Time

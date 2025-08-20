@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -206,7 +206,7 @@ public:
   void printCSV(const std::string & file_name, int interval = 1, bool align = false);
 
   void printEnsight(const std::string & file_name);
-  void writeExodus(ExodusII_IO * ex_out, Real time);
+  void writeExodus(libMesh::ExodusII_IO * ex_out, Real time);
   void makeGnuplot(const std::string & base_file, const std::string & format);
 
   static MooseEnum getWidthModes();
@@ -248,11 +248,6 @@ protected:
                       std::map<std::string, unsigned short> & col_widths,
                       std::vector<std::string>::iterator & col_begin,
                       std::vector<std::string>::iterator & col_end) const;
-
-  /**
-   * Returns the width of the terminal using sys/ioctl
-   */
-  unsigned short getTermWidth(bool use_environment) const;
 
   /**
    * Data structure for the console table:

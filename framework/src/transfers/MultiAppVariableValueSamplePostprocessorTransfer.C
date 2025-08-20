@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,6 +24,8 @@
 
 #include "timpi/parallel_sync.h"
 
+using namespace libMesh;
+
 registerMooseObject("MooseApp", MultiAppVariableValueSamplePostprocessorTransfer);
 
 InputParameters
@@ -41,7 +43,17 @@ MultiAppVariableValueSamplePostprocessorTransfer::validParams()
       "The name of the postprocessor in the MultiApp to transfer the value to.  "
       "This should most likely be a Reciever Postprocessor.");
   params.addRequiredParam<VariableName>("source_variable", "The variable to transfer from.");
-  params.addParam<unsigned int>("source_variable_component", 0, "The component of source variable");
+  params.addParam<unsigned int>(
+      "source_variable_component",
+      0,
+      "The component of source variable, may be non-zero for array variables.");
+  params.addParam<bool>(
+      "map_array_variable_components_to_child_apps",
+      false,
+      "When true, groups of sub-applications will be associated with different components of the "
+      "supplied array variable in 'source_variable'. For instance, if there are 9 sub-applications "
+      "and 3 components in the variable, sub-apps 0-2 will go to component 0, 3-5 will go to 1, "
+      "and 6-8 will go to 2.");
   return params;
 }
 
@@ -52,12 +64,13 @@ MultiAppVariableValueSamplePostprocessorTransfer::MultiAppVariableValueSamplePos
     _postprocessor_name(getParam<PostprocessorName>("postprocessor")),
     _var_name(getParam<VariableName>("source_variable")),
     _comp(getParam<unsigned int>("source_variable_component")),
-    _var(_fe_problem.getVariable(0, _var_name))
+    _var(_fe_problem.getVariable(0, _var_name)),
+    _map_comp_to_child(getParam<bool>("map_array_variable_components_to_child_apps"))
 {
   if (_directions.size() != 1)
     paramError("direction", "This transfer is only unidirectional");
 
-  if (_directions.contains("from_multiapp"))
+  if (_directions.isValueSet("from_multiapp"))
   {
     // Check that the variable is a CONSTANT MONOMIAL.
     auto & fe_type = _var.feType();
@@ -69,15 +82,24 @@ MultiAppVariableValueSamplePostprocessorTransfer::MultiAppVariableValueSamplePos
     if (!_fe_problem.getAuxiliarySystem().hasVariable(_var_name))
       paramError("source_variable", "Variable must be an auxiliary variable");
   }
-  else if (_directions.contains("between_multiapp"))
+  else if (_directions.isValueSet("between_multiapp"))
     mooseError("MultiAppVariableValueSamplePostprocessorTransfer has not been made to support "
                "sibling transfers");
+
+  if (_map_comp_to_child && !_var.isArray())
+    paramError("map_array_variable_components_to_child_apps",
+               "'source_variable' must be an array variable when mapping array variable components "
+               "to child applications.");
+  if (_map_comp_to_child && parameters.isParamSetByUser("source_variable_component"))
+    paramError("map_array_variable_components_to_child_apps",
+               "'source_variable_component' is invalid when mapping array variable components to "
+               "child applications.");
 }
 
 void
 MultiAppVariableValueSamplePostprocessorTransfer::setupPostprocessorCommunication()
 {
-  if (!_directions.contains("from_multiapp"))
+  if (!_directions.isValueSet("from_multiapp"))
     return;
 
   const auto num_global_apps = getFromMultiApp()->numGlobalApps();
@@ -105,7 +127,7 @@ MultiAppVariableValueSamplePostprocessorTransfer::setupPostprocessorCommunicatio
 void
 MultiAppVariableValueSamplePostprocessorTransfer::cacheElemToPostprocessorData()
 {
-  if (!_directions.contains("from_multiapp"))
+  if (!_directions.isValueSet("from_multiapp"))
     return;
 
   // Cache the Multiapp position ID for every element.
@@ -115,34 +137,42 @@ MultiAppVariableValueSamplePostprocessorTransfer::cacheElemToPostprocessorData()
     // Exclude the elements without dofs.
     if (_var.hasBlocks(elem->subdomain_id()))
     {
-      Real distance = std::numeric_limits<Real>::max();
-      unsigned int count = 0;
-      for (unsigned int j = 0; j < getFromMultiApp()->numGlobalApps(); ++j)
+      // The next two loops will loop through all the sub-applications
+      // The first loop is over each component of the source variable we are transferring to/from
+      unsigned int j = 0; // Indicates sub-app index
+      for (unsigned int g = 0; g < getFromMultiApp()->numGlobalApps() / _apps_per_component; ++g)
       {
-        Real current_distance = (getFromMultiApp()->position(j) - elem->true_centroid()).norm();
-        if (MooseUtils::absoluteFuzzyLessThan(current_distance, distance))
+        Real distance = std::numeric_limits<Real>::max();
+        unsigned int count = 0;
+        // The second loop is over all the sub-apps the given component is associated with
+        for (unsigned int c = 0; c < _apps_per_component; ++c, ++j)
         {
-          distance = current_distance;
-          multiapp_pos_id = j;
-          count = 0;
+          Real current_distance = (getFromMultiApp()->position(j) - elem->true_centroid()).norm();
+          if (MooseUtils::absoluteFuzzyLessThan(current_distance, distance))
+          {
+            distance = current_distance;
+            multiapp_pos_id = j;
+            count = 0;
+          }
+          else if (MooseUtils::absoluteFuzzyEqual(current_distance, distance))
+            ++count;
         }
-        else if (MooseUtils::absoluteFuzzyEqual(current_distance, distance))
-          ++count;
-      }
-      if (count > 0)
-        mooseWarning("The distances of an element to more than one sub-applications are too close "
-                     " in transfer '",
-                     name(),
-                     "'. The code chooses the sub-application with the smallest ID to set "
-                     "the variable on the element, which may created undesired variable solutions."
-                     "\nHaving different positions for sub-applications, "
-                     "a centroid-based MultiApp or adding block restriction to the variable can "
-                     "be used to resolve this warning.");
+        if (count > 0)
+          mooseWarning(
+              "The distances of an element to more than one sub-applications are too close "
+              " in transfer '",
+              name(),
+              "'. The code chooses the sub-application with the smallest ID to set "
+              "the variable on the element, which may created undesired variable solutions."
+              "\nHaving different positions for sub-applications, "
+              "a centroid-based MultiApp or adding block restriction to the variable can "
+              "be used to resolve this warning.");
 
-      // Note: in case of count>0, the sub-application with smallest id will be used for the
-      //       transfer.
-      _cached_multiapp_pos_ids.push_back(multiapp_pos_id);
-      _needed_postprocessors.insert(multiapp_pos_id);
+        // Note: in case of count>0, the sub-application with smallest id will be used for the
+        //       transfer.
+        _cached_multiapp_pos_ids.push_back(multiapp_pos_id);
+        _needed_postprocessors.insert(multiapp_pos_id);
+      }
     }
 }
 
@@ -150,6 +180,20 @@ void
 MultiAppVariableValueSamplePostprocessorTransfer::initialSetup()
 {
   MultiAppTransfer::initialSetup();
+
+  unsigned int num_apps = _directions.isValueSet("from_multiapp")
+                              ? getFromMultiApp()->numGlobalApps()
+                              : getToMultiApp()->numGlobalApps();
+  if (_map_comp_to_child && num_apps % _var.count() != 0)
+    paramError("map_array_variable_components_to_child_apps",
+               "The number of sub-applications (",
+               num_apps,
+               ") is not divisible by the number of components in '",
+               _var_name,
+               "' (",
+               _var.count(),
+               ").");
+  _apps_per_component = _map_comp_to_child ? num_apps / _var.count() : num_apps;
 
   setupPostprocessorCommunication();
   cacheElemToPostprocessorData();
@@ -182,6 +226,11 @@ MultiAppVariableValueSamplePostprocessorTransfer::execute()
         mooseError("MultiAppVariableValueSamplePostprocessorTransfer does not support transfer of "
                    "vector variables");
 
+      auto active_tags = _fe_problem.getActiveFEVariableCoupleableVectorTags(/*thread_id=*/0);
+      std::set<unsigned int> solution_tag = {_fe_problem.getVectorTagID(Moose::SOLUTION_TAG)};
+
+      _fe_problem.setActiveFEVariableCoupleableVectorTags(solution_tag, /*thread_id=*/0);
+
       MooseMesh & from_mesh = _fe_problem.mesh();
 
       std::unique_ptr<PointLocatorBase> pl = from_mesh.getPointLocator();
@@ -208,9 +257,9 @@ MultiAppVariableValueSamplePostprocessorTransfer::execute()
 
             if (array_var)
             {
-              value = array_var->sln()[0](_comp);
+              value = array_var->sln()[0](getVariableComponent(i));
               mooseAssert(
-                  _comp < array_var->count(),
+                  getVariableComponent(i) < array_var->count(),
                   "Component must be smaller than the number of components of array variable!");
               mooseAssert(array_var->sln().size() == 1, "No values in u!");
             }
@@ -228,6 +277,8 @@ MultiAppVariableValueSamplePostprocessorTransfer::execute()
           getToMultiApp()->appProblemBase(i).setPostprocessorValueByName(_postprocessor_name,
                                                                          value);
       }
+
+      _fe_problem.setActiveFEVariableCoupleableVectorTags(active_tags, /*thread_id=*/0);
 
       break;
     }
@@ -316,8 +367,12 @@ MultiAppVariableValueSamplePostprocessorTransfer::execute()
                       "The variable must be a constant monomial with one DoF on an element");
           mooseAssert(pp_values[_cached_multiapp_pos_ids[i]] != std::numeric_limits<Real>::max(),
                       "We should have pulled all the data we needed.");
-          solution.set(dof_indices[0] + _comp, pp_values[_cached_multiapp_pos_ids[i]]);
-          ++i;
+          for (unsigned int c = 0; c < n_subapps / _apps_per_component; ++c)
+          {
+            solution.set(dof_indices[0] + getVariableComponent(_cached_multiapp_pos_ids[i]),
+                         pp_values[_cached_multiapp_pos_ids[i]]);
+            ++i;
+          }
         }
       }
       solution.close();

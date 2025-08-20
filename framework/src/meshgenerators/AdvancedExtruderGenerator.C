@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,19 +9,25 @@
 
 #include "AdvancedExtruderGenerator.h"
 #include "MooseUtils.h"
+#include "MooseMeshUtils.h"
 
 #include "libmesh/boundary_info.h"
 #include "libmesh/function_base.h"
 #include "libmesh/cell_prism6.h"
 #include "libmesh/cell_prism18.h"
+#include "libmesh/cell_prism21.h"
 #include "libmesh/cell_hex8.h"
+#include "libmesh/cell_hex20.h"
 #include "libmesh/cell_hex27.h"
-#include "libmesh/cell_tet4.h"
-#include "libmesh/cell_tet10.h"
+#include "libmesh/edge_edge2.h"
+#include "libmesh/edge_edge3.h"
+#include "libmesh/edge_edge4.h"
+#include "libmesh/face_quad4.h"
+#include "libmesh/face_quad8.h"
+#include "libmesh/face_quad9.h"
 #include "libmesh/face_tri3.h"
 #include "libmesh/face_tri6.h"
-#include "libmesh/face_quad4.h"
-#include "libmesh/face_quad9.h"
+#include "libmesh/face_tri7.h"
 #include "libmesh/libmesh_logging.h"
 #include "libmesh/mesh_communication.h"
 #include "libmesh/mesh_modification.h"
@@ -64,20 +70,24 @@ AdvancedExtruderGenerator::validParams()
 
   params.addParam<std::vector<std::vector<subdomain_id_type>>>(
       "subdomain_swaps",
+      {},
       "For each row, every two entries are interpreted as a pair of "
       "'from' and 'to' to remap the subdomains for that elevation");
 
   params.addParam<std::vector<std::vector<boundary_id_type>>>(
       "boundary_swaps",
+      {},
       "For each row, every two entries are interpreted as a pair of "
       "'from' and 'to' to remap the boundaries for that elevation");
 
   params.addParam<std::vector<std::string>>(
       "elem_integer_names_to_swap",
+      {},
       "Array of element extra integer names that need to be swapped during extrusion.");
 
   params.addParam<std::vector<std::vector<std::vector<dof_id_type>>>>(
       "elem_integers_swaps",
+      {},
       "For each row, every two entries are interpreted as a pair of 'from' and 'to' to remap the "
       "element extra integer for that elevation. If multiple element extra integers need to be "
       "swapped, the enties are stacked based on the order provided in "
@@ -88,13 +98,13 @@ AdvancedExtruderGenerator::validParams()
       "A vector that points in the direction to extrude (note, this will be "
       "normalized internally - so don't worry about it here)");
 
-  params.addParam<boundary_id_type>(
+  params.addParam<BoundaryName>(
       "top_boundary",
-      "The boundary ID to set on the top boundary.  If ommitted one will be generated.");
+      "The boundary name to set on the top boundary. If omitted an ID will be generated.");
 
-  params.addParam<boundary_id_type>(
+  params.addParam<BoundaryName>(
       "bottom_boundary",
-      "The boundary ID to set on the bottom boundary.  If omitted one will be generated.");
+      "The boundary name to set on the bottom boundary. If omitted an ID will be generated.");
 
   params.addParam<std::vector<std::vector<subdomain_id_type>>>(
       "upward_boundary_source_blocks", "Block ids used to generate upward interface boundaries.");
@@ -114,7 +124,10 @@ AdvancedExtruderGenerator::validParams()
       "Boundary Assignment");
   params.addParamNamesToGroup(
       "subdomain_swaps boundary_swaps elem_integer_names_to_swap elem_integers_swaps", "ID Swap");
-
+  params.addParam<Real>("twist_pitch",
+                        0,
+                        "Pitch for helicoidal extrusion around an axis going through the origin "
+                        "following the direction vector");
   return params;
 }
 
@@ -132,10 +145,10 @@ AdvancedExtruderGenerator::AdvancedExtruderGenerator(const InputParameters & par
         getParam<std::vector<std::vector<std::vector<dof_id_type>>>>("elem_integers_swaps")),
     _direction(getParam<Point>("direction")),
     _has_top_boundary(isParamValid("top_boundary")),
-    _top_boundary(isParamValid("top_boundary") ? getParam<boundary_id_type>("top_boundary") : 0),
+    _top_boundary(isParamValid("top_boundary") ? getParam<BoundaryName>("top_boundary") : "0"),
     _has_bottom_boundary(isParamValid("bottom_boundary")),
-    _bottom_boundary(isParamValid("bottom_boundary") ? getParam<boundary_id_type>("bottom_boundary")
-                                                     : 0),
+    _bottom_boundary(isParamValid("bottom_boundary") ? getParam<BoundaryName>("bottom_boundary")
+                                                     : "0"),
     _upward_boundary_source_blocks(
         isParamValid("upward_boundary_source_blocks")
             ? getParam<std::vector<std::vector<subdomain_id_type>>>("upward_boundary_source_blocks")
@@ -155,7 +168,8 @@ AdvancedExtruderGenerator::AdvancedExtruderGenerator(const InputParameters & par
         isParamValid("downward_boundary_ids")
             ? getParam<std::vector<std::vector<boundary_id_type>>>("downward_boundary_ids")
             : std::vector<std::vector<boundary_id_type>>(_heights.size(),
-                                                         std::vector<boundary_id_type>()))
+                                                         std::vector<boundary_id_type>())),
+    _twist_pitch(getParam<Real>("twist_pitch"))
 {
   if (!_direction.norm())
     paramError("direction", "Must have some length!");
@@ -170,54 +184,36 @@ AdvancedExtruderGenerator::AdvancedExtruderGenerator(const InputParameters & par
 
   if (_subdomain_swaps.size() && (_subdomain_swaps.size() != num_elevations))
     paramError("subdomain_swaps",
-               "If specified, 'subdomain_swaps' must be the same length as 'heights' in ",
+               "If specified, 'subdomain_swaps' (" + std::to_string(_subdomain_swaps.size()) +
+                   ") must be the same length as 'heights' (" + std::to_string(num_elevations) +
+                   ") in ",
                name());
 
-  _subdomain_swap_pairs.resize(_subdomain_swaps.size());
-
-  // Reprocess the subdomain swaps to make pairs out of them so they are easier to use
-  for (unsigned int i = 0; i < _subdomain_swaps.size(); i++)
+  try
   {
-    const auto & elevation_swaps = _subdomain_swaps[i];
-    auto & elevation_swap_pairs = _subdomain_swap_pairs[i];
-
-    if (elevation_swaps.size() % 2)
-      paramError("subdomain_swaps",
-                 "Row ",
-                 i + 1,
-                 " of subdomain_swaps in ",
-                 name(),
-                 " does not contain an even number of entries! Num entries: ",
-                 elevation_swaps.size());
-
-    for (unsigned int j = 0; j < elevation_swaps.size(); j += 2)
-      elevation_swap_pairs[elevation_swaps[j]] = elevation_swaps[j + 1];
+    MooseMeshUtils::idSwapParametersProcessor(
+        name(), "subdomain_swaps", _subdomain_swaps, _subdomain_swap_pairs);
+  }
+  catch (const MooseException & e)
+  {
+    paramError("subdomain_swaps", e.what());
   }
 
   if (_boundary_swaps.size() && (_boundary_swaps.size() != num_elevations))
     paramError("boundary_swaps",
-               "If specified, 'boundary_swaps' must be the same length as 'heights' in ",
+               "If specified, 'boundary_swaps' (" + std::to_string(_boundary_swaps.size()) +
+                   ") must be the same length as 'heights' (" + std::to_string(num_elevations) +
+                   ") in ",
                name());
 
-  _boundary_swap_pairs.resize(_boundary_swaps.size());
-
-  // Reprocess the boundary swaps to make pairs out of them so they are easier to use
-  for (unsigned int i = 0; i < _boundary_swaps.size(); i++)
+  try
   {
-    const auto & elevation_bdry_swaps = _boundary_swaps[i];
-    auto & elevation_bdry_swap_pairs = _boundary_swap_pairs[i];
-
-    if (elevation_bdry_swaps.size() % 2)
-      paramError("boundary_swaps",
-                 "Row ",
-                 i + 1,
-                 " of boundary_swaps in ",
-                 name(),
-                 " does not contain an even number of entries! Num entries: ",
-                 elevation_bdry_swaps.size());
-
-    for (unsigned int j = 0; j < elevation_bdry_swaps.size(); j += 2)
-      elevation_bdry_swap_pairs[elevation_bdry_swaps[j]] = elevation_bdry_swaps[j + 1];
+    MooseMeshUtils::idSwapParametersProcessor(
+        name(), "boundary_swaps", _boundary_swaps, _boundary_swap_pairs);
+  }
+  catch (const MooseException & e)
+  {
+    paramError("boundary_swaps", e.what());
   }
 
   if (_elem_integers_swaps.size() &&
@@ -232,26 +228,17 @@ AdvancedExtruderGenerator::AdvancedExtruderGenerator(const InputParameters & par
                  "If specified, each element of 'elem_integers_swaps' must have the same length as "
                  "the length of 'heights'.");
 
-  _elem_integers_swap_pairs.resize(num_elevations * _elem_integer_names_to_swap.size());
-  // Reprocess the elem_integers_swaps to make pairs out of them so they are easier to use
-  for (unsigned int i = 0; i < _elem_integer_names_to_swap.size(); i++)
+  try
   {
-    for (unsigned int j = 0; j < num_elevations; j++)
-    {
-      const auto & elevation_extra_swaps = _elem_integers_swaps[i][j];
-      auto & elevation_extra_swap_pairs = _elem_integers_swap_pairs[i * num_elevations + j];
-
-      if (elevation_extra_swaps.size() % 2)
-        paramError("elem_integers_swaps",
-                   "Row ",
-                   i * num_elevations + j + 1,
-                   " of elem_integers_swaps in ",
-                   name(),
-                   " does not contain an even number of entries! Num entries: ",
-                   elevation_extra_swaps.size());
-      for (unsigned int k = 0; k < elevation_extra_swaps.size(); k += 2)
-        elevation_extra_swap_pairs[elevation_extra_swaps[k]] = elevation_extra_swaps[k + 1];
-    }
+    MooseMeshUtils::extraElemIntegerSwapParametersProcessor(name(),
+                                                            num_elevations,
+                                                            _elem_integer_names_to_swap.size(),
+                                                            _elem_integers_swaps,
+                                                            _elem_integers_swap_pairs);
+  }
+  catch (const MooseException & e)
+  {
+    paramError("elem_integers_swaps", e.what());
   }
 
   bool has_negative_entry = false;
@@ -270,25 +257,31 @@ AdvancedExtruderGenerator::AdvancedExtruderGenerator(const InputParameters & par
     paramError("biases", "Size of this parameter, if provided, must be the same as heights.");
 
   if (_upward_boundary_source_blocks.size() != _upward_boundary_ids.size() ||
-      _upward_boundary_ids.size() != _heights.size())
-    paramError(
-        "upward_boundary_ids",
-        "This parameter must have the same length as upward_boundary_source_blocks and heights.");
+      _upward_boundary_ids.size() != num_elevations)
+    paramError("upward_boundary_ids",
+               "This parameter must have the same length (" +
+                   std::to_string(_upward_boundary_ids.size()) +
+                   ") as upward_boundary_source_blocks (" +
+                   std::to_string(_upward_boundary_source_blocks.size()) + ") and heights (" +
+                   std::to_string(num_elevations) + ")");
   for (unsigned int i = 0; i < _upward_boundary_source_blocks.size(); i++)
     if (_upward_boundary_source_blocks[i].size() != _upward_boundary_ids[i].size())
       paramError("upward_boundary_ids",
-                 "Every element of this parameter must have the same length as the corrresponding "
+                 "Every element of this parameter must have the same length as the corresponding "
                  "element of upward_boundary_source_blocks.");
 
   if (_downward_boundary_source_blocks.size() != _downward_boundary_ids.size() ||
-      _downward_boundary_ids.size() != _heights.size())
-    paramError(
-        "downward_boundary_ids",
-        "This parameter must have the same length as downward_boundary_source_blocks and heights.");
+      _downward_boundary_ids.size() != num_elevations)
+    paramError("downward_boundary_ids",
+               "This parameter must have the same length (" +
+                   std::to_string(_downward_boundary_ids.size()) +
+                   ") as downward_boundary_source_blocks (" +
+                   std::to_string(_downward_boundary_source_blocks.size()) + ") and heights (" +
+                   std::to_string(num_elevations) + ")");
   for (unsigned int i = 0; i < _downward_boundary_source_blocks.size(); i++)
     if (_downward_boundary_source_blocks[i].size() != _downward_boundary_ids[i].size())
       paramError("downward_boundary_ids",
-                 "Every element of this parameter must have the same length as the corrresponding "
+                 "Every element of this parameter must have the same length as the corresponding "
                  "element of downward_boundary_source_blocks.");
 }
 
@@ -299,7 +292,7 @@ AdvancedExtruderGenerator::generate()
   // Original copyright: Copyright (C) 2002-2019 Benjamin S. Kirk, John W. Peterson, Roy H. Stogner
   // Original license is LGPL so it can be used here.
 
-  auto mesh = buildMeshBaseObject();
+  auto mesh = buildMeshBaseObject(_input->mesh_dimension() + 1);
   mesh->set_mesh_dimension(_input->mesh_dimension() + 1);
 
   // Check if the element integer names are existent in the input mesh.
@@ -314,7 +307,7 @@ AdvancedExtruderGenerator::generate()
                  " of 'elem_integer_names_to_swap' in is not a valid extra element integer of the "
                  "input mesh.");
 
-  // prepare for transferring extra element integers from orignal mesh to the extruded mesh.
+  // prepare for transferring extra element integers from original mesh to the extruded mesh.
   const unsigned int num_extra_elem_integers = _input->n_elem_integers();
   std::vector<std::string> id_names;
 
@@ -325,10 +318,36 @@ AdvancedExtruderGenerator::generate()
       mesh->add_elem_integer(id_names[i]);
   }
 
-  // retreive subdomain/sideset/nodeset name maps
+  // retrieve subdomain/sideset/nodeset name maps
   const auto & input_subdomain_map = _input->get_subdomain_name_map();
   const auto & input_sideset_map = _input->get_boundary_info().get_sideset_name_map();
   const auto & input_nodeset_map = _input->get_boundary_info().get_nodeset_name_map();
+
+  // Check that the swaps source blocks are present in the mesh
+  for (const auto & swap : _subdomain_swaps)
+    for (const auto i : index_range(swap))
+      if (i % 2 == 0 && !MooseMeshUtils::hasSubdomainID(*_input, swap[i]))
+        paramError("subdomain_swaps", "The block '", swap[i], "' was not found within the mesh");
+
+  // Check that the swaps source boundaries are present in the mesh
+  for (const auto & swap : _boundary_swaps)
+    for (const auto i : index_range(swap))
+      if (i % 2 == 0 && !MooseMeshUtils::hasBoundaryID(*_input, swap[i]))
+        paramError("boundary_swaps", "The boundary '", swap[i], "' was not found within the mesh");
+
+  // Check that the source blocks for layer top/bottom boundaries exist in the mesh
+  for (const auto & layer_vec : _upward_boundary_source_blocks)
+    for (const auto bid : layer_vec)
+      if (!MooseMeshUtils::hasSubdomainID(*_input, bid))
+        paramError(
+            "upward_boundary_source_blocks", "The block '", bid, "' was not found within the mesh");
+  for (const auto & layer_vec : _downward_boundary_source_blocks)
+    for (const auto bid : layer_vec)
+      if (!MooseMeshUtils::hasSubdomainID(*_input, bid))
+        paramError("downward_boundary_source_blocks",
+                   "The block '",
+                   bid,
+                   "' was not found within the mesh");
 
   std::unique_ptr<MeshBase> input = std::move(_input);
 
@@ -353,16 +372,38 @@ AdvancedExtruderGenerator::generate()
   BoundaryInfo & boundary_info = mesh->get_boundary_info();
   const BoundaryInfo & input_boundary_info = input->get_boundary_info();
 
+  // Determine boundary IDs for the new user provided boundary names
+  std::vector<BoundaryName> new_boundary_names;
+  if (_has_bottom_boundary)
+    new_boundary_names.push_back(_bottom_boundary);
+  if (_has_top_boundary)
+    new_boundary_names.push_back(_top_boundary);
+  std::vector<boundary_id_type> new_boundary_ids =
+      MooseMeshUtils::getBoundaryIDs(*input, new_boundary_names, true);
+  const auto user_bottom_boundary_id =
+      _has_bottom_boundary ? new_boundary_ids.front() : libMesh::BoundaryInfo::invalid_id;
+  const auto user_top_boundary_id =
+      _has_top_boundary ? new_boundary_ids.back() : libMesh::BoundaryInfo::invalid_id;
+
   // We know a priori how many elements we'll need
   mesh->reserve_elem(total_num_layers * orig_elem);
 
-  // For straightforward meshes we need one or two additional layers per
-  // element.
-  if (input->elements_begin() != input->elements_end() &&
-      (*input->elements_begin())->default_order() == SECOND)
-    order = 2;
+  // Look for higher order elements which introduce an extra layer
+  std::set<ElemType> higher_orders = {EDGE3, EDGE4, TRI6, TRI7, QUAD8, QUAD9};
+  bool extruding_quad_eights = false;
+  std::vector<ElemType> types;
+  MeshTools::elem_types(*input, types);
+  for (const auto elem_type : types)
+  {
+    if (higher_orders.count(elem_type))
+      order = 2;
+    if (elem_type == QUAD8)
+      extruding_quad_eights = true;
+  }
   mesh->comm().max(order);
+  mesh->comm().max(extruding_quad_eights);
 
+  // Reserve for the max number possibly needed
   mesh->reserve_nodes((order * total_num_layers + 1) * orig_nodes);
 
   // Container to catch the boundary IDs handed back by the BoundaryInfo object
@@ -371,6 +412,7 @@ AdvancedExtruderGenerator::generate()
   Point old_distance;
   Point current_distance;
 
+  // Create translated layers of nodes in the direction of extrusion
   for (const auto & node : input->node_ptr_range())
   {
     unsigned int current_node_layer = 0;
@@ -397,14 +439,34 @@ AdvancedExtruderGenerator::generate()
           // Shift the previous position by a certain fraction of 'height' along the extrusion
           // direction to get the new position.
           auto layer_index = (k - (e == 0 ? 1 : 0)) / order + 1;
-          if (MooseUtils::absoluteFuzzyEqual(bias, 1.0))
-            current_distance =
-                old_distance + _direction * (height / (Real)num_layers / (Real)order);
-          else
-            current_distance =
-                old_distance + _direction * height * std::pow(bias, (Real)(layer_index - 1)) *
-                                   (1.0 - bias) / (1.0 - std::pow(bias, (Real)(num_layers))) /
-                                   (Real)order;
+
+          const auto step_size = MooseUtils::absoluteFuzzyEqual(bias, 1.0)
+                                     ? height / (Real)num_layers / (Real)order
+                                     : height * std::pow(bias, (Real)(layer_index - 1)) *
+                                           (1.0 - bias) /
+                                           (1.0 - std::pow(bias, (Real)(num_layers))) / (Real)order;
+
+          current_distance = old_distance + _direction * step_size;
+
+          // Handle helicoidal extrusion
+          if (!MooseUtils::absoluteFuzzyEqual(_twist_pitch, 0.))
+          {
+            // twist 1 should be 'normal' to the extruded shape
+            RealVectorValue twist1 = _direction.cross(*node);
+            // This happens for any node on the helicoidal extrusion axis
+            if (!MooseUtils::absoluteFuzzyEqual(twist1.norm(), .0))
+              twist1 /= twist1.norm();
+            const RealVectorValue twist2 = twist1.cross(_direction);
+
+            auto twist = (cos(2. * libMesh::pi * layer_index * step_size / _twist_pitch) -
+                          cos(2. * libMesh::pi * (layer_index - 1) * step_size / _twist_pitch)) *
+                             twist2 +
+                         (sin(2. * libMesh::pi * layer_index * step_size / _twist_pitch) -
+                          sin(2. * libMesh::pi * (layer_index - 1) * step_size / _twist_pitch)) *
+                             twist1;
+            twist *= std::sqrt(node->norm_sq() + libMesh::Utility::pow<2>(_direction * (*node)));
+            current_distance += twist;
+          }
         }
 
         Node * new_node = mesh->add_point(*node + current_distance,
@@ -429,10 +491,12 @@ AdvancedExtruderGenerator::generate()
           boundary_info.add_node(new_node, ids_to_copy);
         else
           for (const auto & id_to_copy : ids_to_copy)
+          {
             boundary_info.add_node(new_node,
                                    _boundary_swap_pairs[e].count(id_to_copy)
                                        ? _boundary_swap_pairs[e][id_to_copy]
                                        : id_to_copy);
+          }
 
         old_distance = current_distance;
         current_node_layer++;
@@ -440,7 +504,7 @@ AdvancedExtruderGenerator::generate()
     }
   }
 
-  const std::set<boundary_id_type> & side_ids = input_boundary_info.get_side_boundary_ids();
+  const auto & side_ids = input_boundary_info.get_side_boundary_ids();
 
   boundary_id_type next_side_id =
       side_ids.empty() ? 0 : cast_int<boundary_id_type>(*side_ids.rbegin() + 1);
@@ -465,13 +529,13 @@ AdvancedExtruderGenerator::generate()
 
       for (unsigned int k = 0; k != num_layers; ++k)
       {
-        Elem * new_elem;
-        bool isFlipped(false);
+        std::unique_ptr<Elem> new_elem;
+        bool is_flipped(false);
         switch (etype)
         {
           case EDGE2:
           {
-            new_elem = new Quad4;
+            new_elem = std::make_unique<Quad4>();
             new_elem->set_node(0) =
                 mesh->node_ptr(elem->node_ptr(0)->id() + (current_layer * orig_nodes));
             new_elem->set_node(1) =
@@ -490,7 +554,7 @@ AdvancedExtruderGenerator::generate()
           }
           case EDGE3:
           {
-            new_elem = new Quad9;
+            new_elem = std::make_unique<Quad9>();
             new_elem->set_node(0) =
                 mesh->node_ptr(elem->node_ptr(0)->id() + (2 * current_layer * orig_nodes));
             new_elem->set_node(1) =
@@ -519,7 +583,7 @@ AdvancedExtruderGenerator::generate()
           }
           case TRI3:
           {
-            new_elem = new Prism6;
+            new_elem = std::make_unique<Prism6>();
             new_elem->set_node(0) =
                 mesh->node_ptr(elem->node_ptr(0)->id() + (current_layer * orig_nodes));
             new_elem->set_node(1) =
@@ -542,17 +606,17 @@ AdvancedExtruderGenerator::generate()
 
             if (new_elem->volume() < 0.0)
             {
-              swapNodesInElem(new_elem, 0, 3);
-              swapNodesInElem(new_elem, 1, 4);
-              swapNodesInElem(new_elem, 2, 5);
-              isFlipped = true;
+              MooseMeshUtils::swapNodesInElem(*new_elem, 0, 3);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 1, 4);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 2, 5);
+              is_flipped = true;
             }
 
             break;
           }
           case TRI6:
           {
-            new_elem = new Prism18;
+            new_elem = std::make_unique<Prism18>();
             new_elem->set_node(0) =
                 mesh->node_ptr(elem->node_ptr(0)->id() + (2 * current_layer * orig_nodes));
             new_elem->set_node(1) =
@@ -599,20 +663,87 @@ AdvancedExtruderGenerator::generate()
 
             if (new_elem->volume() < 0.0)
             {
-              swapNodesInElem(new_elem, 0, 3);
-              swapNodesInElem(new_elem, 1, 4);
-              swapNodesInElem(new_elem, 2, 5);
-              swapNodesInElem(new_elem, 6, 12);
-              swapNodesInElem(new_elem, 7, 13);
-              swapNodesInElem(new_elem, 8, 14);
-              isFlipped = true;
+              MooseMeshUtils::swapNodesInElem(*new_elem, 0, 3);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 1, 4);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 2, 5);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 6, 12);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 7, 13);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 8, 14);
+              is_flipped = true;
+            }
+
+            break;
+          }
+          case TRI7:
+          {
+            new_elem = std::make_unique<Prism21>();
+            new_elem->set_node(0) =
+                mesh->node_ptr(elem->node_ptr(0)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(1) =
+                mesh->node_ptr(elem->node_ptr(1)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(2) =
+                mesh->node_ptr(elem->node_ptr(2)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(3) =
+                mesh->node_ptr(elem->node_ptr(0)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(4) =
+                mesh->node_ptr(elem->node_ptr(1)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(5) =
+                mesh->node_ptr(elem->node_ptr(2)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(6) =
+                mesh->node_ptr(elem->node_ptr(3)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(7) =
+                mesh->node_ptr(elem->node_ptr(4)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(8) =
+                mesh->node_ptr(elem->node_ptr(5)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(9) =
+                mesh->node_ptr(elem->node_ptr(0)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(10) =
+                mesh->node_ptr(elem->node_ptr(1)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(11) =
+                mesh->node_ptr(elem->node_ptr(2)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(12) =
+                mesh->node_ptr(elem->node_ptr(3)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(13) =
+                mesh->node_ptr(elem->node_ptr(4)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(14) =
+                mesh->node_ptr(elem->node_ptr(5)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(15) =
+                mesh->node_ptr(elem->node_ptr(3)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(16) =
+                mesh->node_ptr(elem->node_ptr(4)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(17) =
+                mesh->node_ptr(elem->node_ptr(5)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(18) =
+                mesh->node_ptr(elem->node_ptr(6)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(19) =
+                mesh->node_ptr(elem->node_ptr(6)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(20) =
+                mesh->node_ptr(elem->node_ptr(6)->id() + ((2 * current_layer + 1) * orig_nodes));
+
+            if (elem->neighbor_ptr(0) == remote_elem)
+              new_elem->set_neighbor(1, const_cast<RemoteElem *>(remote_elem));
+            if (elem->neighbor_ptr(1) == remote_elem)
+              new_elem->set_neighbor(2, const_cast<RemoteElem *>(remote_elem));
+            if (elem->neighbor_ptr(2) == remote_elem)
+              new_elem->set_neighbor(3, const_cast<RemoteElem *>(remote_elem));
+
+            if (new_elem->volume() < 0.0)
+            {
+              MooseMeshUtils::swapNodesInElem(*new_elem, 0, 3);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 1, 4);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 2, 5);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 6, 12);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 7, 13);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 8, 14);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 18, 19);
+              is_flipped = true;
             }
 
             break;
           }
           case QUAD4:
           {
-            new_elem = new Hex8;
+            new_elem = std::make_unique<Hex8>();
             new_elem->set_node(0) =
                 mesh->node_ptr(elem->node_ptr(0)->id() + (current_layer * orig_nodes));
             new_elem->set_node(1) =
@@ -641,18 +772,86 @@ AdvancedExtruderGenerator::generate()
 
             if (new_elem->volume() < 0.0)
             {
-              swapNodesInElem(new_elem, 0, 4);
-              swapNodesInElem(new_elem, 1, 5);
-              swapNodesInElem(new_elem, 2, 6);
-              swapNodesInElem(new_elem, 3, 7);
-              isFlipped = true;
+              MooseMeshUtils::swapNodesInElem(*new_elem, 0, 4);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 1, 5);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 2, 6);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 3, 7);
+              is_flipped = true;
+            }
+
+            break;
+          }
+          case QUAD8:
+          {
+            new_elem = std::make_unique<Hex20>();
+            new_elem->set_node(0) =
+                mesh->node_ptr(elem->node_ptr(0)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(1) =
+                mesh->node_ptr(elem->node_ptr(1)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(2) =
+                mesh->node_ptr(elem->node_ptr(2)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(3) =
+                mesh->node_ptr(elem->node_ptr(3)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(4) =
+                mesh->node_ptr(elem->node_ptr(0)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(5) =
+                mesh->node_ptr(elem->node_ptr(1)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(6) =
+                mesh->node_ptr(elem->node_ptr(2)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(7) =
+                mesh->node_ptr(elem->node_ptr(3)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(8) =
+                mesh->node_ptr(elem->node_ptr(4)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(9) =
+                mesh->node_ptr(elem->node_ptr(5)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(10) =
+                mesh->node_ptr(elem->node_ptr(6)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(11) =
+                mesh->node_ptr(elem->node_ptr(7)->id() + (2 * current_layer * orig_nodes));
+            new_elem->set_node(12) =
+                mesh->node_ptr(elem->node_ptr(0)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(13) =
+                mesh->node_ptr(elem->node_ptr(1)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(14) =
+                mesh->node_ptr(elem->node_ptr(2)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(15) =
+                mesh->node_ptr(elem->node_ptr(3)->id() + ((2 * current_layer + 1) * orig_nodes));
+            new_elem->set_node(16) =
+                mesh->node_ptr(elem->node_ptr(4)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(17) =
+                mesh->node_ptr(elem->node_ptr(5)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(18) =
+                mesh->node_ptr(elem->node_ptr(6)->id() + ((2 * current_layer + 2) * orig_nodes));
+            new_elem->set_node(19) =
+                mesh->node_ptr(elem->node_ptr(7)->id() + ((2 * current_layer + 2) * orig_nodes));
+
+            if (elem->neighbor_ptr(0) == remote_elem)
+              new_elem->set_neighbor(1, const_cast<RemoteElem *>(remote_elem));
+            if (elem->neighbor_ptr(1) == remote_elem)
+              new_elem->set_neighbor(2, const_cast<RemoteElem *>(remote_elem));
+            if (elem->neighbor_ptr(2) == remote_elem)
+              new_elem->set_neighbor(3, const_cast<RemoteElem *>(remote_elem));
+            if (elem->neighbor_ptr(3) == remote_elem)
+              new_elem->set_neighbor(4, const_cast<RemoteElem *>(remote_elem));
+
+            if (new_elem->volume() < 0.0)
+            {
+              MooseMeshUtils::swapNodesInElem(*new_elem, 0, 4);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 1, 5);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 2, 6);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 3, 7);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 8, 16);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 9, 17);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 10, 18);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 11, 19);
+              is_flipped = true;
             }
 
             break;
           }
           case QUAD9:
           {
-            new_elem = new Hex27;
+            new_elem = std::make_unique<Hex27>();
             new_elem->set_node(0) =
                 mesh->node_ptr(elem->node_ptr(0)->id() + (2 * current_layer * orig_nodes));
             new_elem->set_node(1) =
@@ -719,22 +918,22 @@ AdvancedExtruderGenerator::generate()
 
             if (new_elem->volume() < 0.0)
             {
-              swapNodesInElem(new_elem, 0, 4);
-              swapNodesInElem(new_elem, 1, 5);
-              swapNodesInElem(new_elem, 2, 6);
-              swapNodesInElem(new_elem, 3, 7);
-              swapNodesInElem(new_elem, 8, 16);
-              swapNodesInElem(new_elem, 9, 17);
-              swapNodesInElem(new_elem, 10, 18);
-              swapNodesInElem(new_elem, 11, 19);
-              swapNodesInElem(new_elem, 20, 25);
-              isFlipped = true;
+              MooseMeshUtils::swapNodesInElem(*new_elem, 0, 4);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 1, 5);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 2, 6);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 3, 7);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 8, 16);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 9, 17);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 10, 18);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 11, 19);
+              MooseMeshUtils::swapNodesInElem(*new_elem, 20, 25);
+              is_flipped = true;
             }
 
             break;
           }
           default:
-            libmesh_not_implemented();
+            mooseError("Extrusion is not implemented for element type " + Moose::stringify(etype));
         }
 
         new_elem->set_id(elem->id() + (current_layer * orig_elem));
@@ -766,7 +965,8 @@ AdvancedExtruderGenerator::generate()
           // upward_boundary_source_blocks
           for (unsigned int i = 0; i < _upward_boundary_source_blocks[e].size(); i++)
             if (new_elem->subdomain_id() == _upward_boundary_source_blocks[e][i])
-              boundary_info.add_side(new_elem, isFlipped ? 0 : top_id, _upward_boundary_ids[e][i]);
+              boundary_info.add_side(
+                  new_elem.get(), is_flipped ? 0 : top_id, _upward_boundary_ids[e][i]);
         }
         // define downward boundaries
         if (k == 0)
@@ -776,9 +976,10 @@ AdvancedExtruderGenerator::generate()
           for (unsigned int i = 0; i < _downward_boundary_source_blocks[e].size(); i++)
             if (new_elem->subdomain_id() == _downward_boundary_source_blocks[e][i])
               boundary_info.add_side(
-                  new_elem, isFlipped ? top_id : 0, _downward_boundary_ids[e][i]);
+                  new_elem.get(), is_flipped ? top_id : 0, _downward_boundary_ids[e][i]);
         }
 
+        // perform subdomain swaps
         if (_subdomain_swap_pairs.size())
         {
           auto & elevation_swap_pairs = _subdomain_swap_pairs[e];
@@ -789,11 +990,11 @@ AdvancedExtruderGenerator::generate()
             new_elem->subdomain_id() = new_id_it->second;
         }
 
-        new_elem = mesh->add_elem(new_elem);
+        Elem * added_elem = mesh->add_elem(std::move(new_elem));
 
         // maintain extra integers
         for (unsigned int i = 0; i < num_extra_elem_integers; i++)
-          new_elem->set_extra_integer(i, elem->get_extra_integer(i));
+          added_elem->set_extra_integer(i, elem->get_extra_integer(i));
 
         if (_elem_integers_swap_pairs.size())
         {
@@ -805,8 +1006,8 @@ AdvancedExtruderGenerator::generate()
                 elem->get_extra_integer(_elem_integer_indices_to_swap[i]));
 
             if (new_extra_id_it != elevation_extra_swap_pairs.end())
-              new_elem->set_extra_integer(_elem_integer_indices_to_swap[i],
-                                          new_extra_id_it->second);
+              added_elem->set_extra_integer(_elem_integer_indices_to_swap[i],
+                                            new_extra_id_it->second);
           }
         }
 
@@ -815,17 +1016,17 @@ AdvancedExtruderGenerator::generate()
         {
           input_boundary_info.boundary_ids(elem, s, ids_to_copy);
 
-          if (new_elem->dim() == 3)
+          if (added_elem->dim() == 3)
           {
             // For 2D->3D extrusion, we give the boundary IDs
             // for side s on the old element to side s+1 on the
             // new element.  This is just a happy coincidence as
             // far as I can tell...
             if (_boundary_swap_pairs.empty())
-              boundary_info.add_side(new_elem, cast_int<unsigned short>(s + 1), ids_to_copy);
+              boundary_info.add_side(added_elem, cast_int<unsigned short>(s + 1), ids_to_copy);
             else
               for (const auto & id_to_copy : ids_to_copy)
-                boundary_info.add_side(new_elem,
+                boundary_info.add_side(added_elem,
                                        cast_int<unsigned short>(s + 1),
                                        _boundary_swap_pairs[e].count(id_to_copy)
                                            ? _boundary_swap_pairs[e][id_to_copy]
@@ -840,10 +1041,10 @@ AdvancedExtruderGenerator::generate()
             libmesh_assert_less(s, 2);
             const unsigned short sidemap[2] = {3, 1};
             if (_boundary_swap_pairs.empty())
-              boundary_info.add_side(new_elem, sidemap[s], ids_to_copy);
+              boundary_info.add_side(added_elem, sidemap[s], ids_to_copy);
             else
               for (const auto & id_to_copy : ids_to_copy)
-                boundary_info.add_side(new_elem,
+                boundary_info.add_side(added_elem,
                                        sidemap[s],
                                        _boundary_swap_pairs[e].count(id_to_copy)
                                            ? _boundary_swap_pairs[e][id_to_copy]
@@ -855,11 +1056,15 @@ AdvancedExtruderGenerator::generate()
         if (current_layer == 0)
         {
           const unsigned short top_id =
-              new_elem->dim() == 3 ? cast_int<unsigned short>(elem->n_sides() + 1) : 2;
+              added_elem->dim() == 3 ? cast_int<unsigned short>(elem->n_sides() + 1) : 2;
           if (_has_bottom_boundary)
-            boundary_info.add_side(new_elem, isFlipped ? top_id : 0, _bottom_boundary);
+          {
+            mooseAssert(user_bottom_boundary_id != libMesh::BoundaryInfo::invalid_id,
+                        "We should have retrieved a proper boundary ID");
+            boundary_info.add_side(added_elem, is_flipped ? top_id : 0, user_bottom_boundary_id);
+          }
           else
-            boundary_info.add_side(new_elem, isFlipped ? top_id : 0, next_side_id);
+            boundary_info.add_side(added_elem, is_flipped ? top_id : 0, next_side_id);
         }
 
         if (current_layer == total_num_layers - 1)
@@ -868,13 +1073,17 @@ AdvancedExtruderGenerator::generate()
           // element's number of sides.  For 1D->2D extrusion, the
           // "top" ID is side 2.
           const unsigned short top_id =
-              new_elem->dim() == 3 ? cast_int<unsigned short>(elem->n_sides() + 1) : 2;
+              added_elem->dim() == 3 ? cast_int<unsigned short>(elem->n_sides() + 1) : 2;
 
           if (_has_top_boundary)
-            boundary_info.add_side(new_elem, isFlipped ? 0 : top_id, _top_boundary);
+          {
+            mooseAssert(user_top_boundary_id != libMesh::BoundaryInfo::invalid_id,
+                        "We should have retrieved a proper boundary ID");
+            boundary_info.add_side(added_elem, is_flipped ? 0 : top_id, user_top_boundary_id);
+          }
           else
             boundary_info.add_side(
-                new_elem, isFlipped ? 0 : top_id, cast_int<boundary_id_type>(next_side_id + 1));
+                added_elem, is_flipped ? 0 : top_id, cast_int<boundary_id_type>(next_side_id + 1));
         }
 
         current_layer++;
@@ -882,12 +1091,14 @@ AdvancedExtruderGenerator::generate()
     }
   }
 
+#ifdef LIBMESH_ENABLE_UNIQUE_ID
   // Update the value of next_unique_id based on newly created nodes and elements
   // Note: Number of element layers is one less than number of node layers
   unsigned int total_new_node_layers = total_num_layers * order;
   unsigned int new_unique_ids = orig_unique_ids + (total_new_node_layers - 1) * orig_elem +
                                 total_new_node_layers * orig_nodes;
   mesh->set_next_unique_id(new_unique_ids);
+#endif
 
   // Copy all the subdomain/sideset/nodeset name maps to the extruded mesh
   if (!input_subdomain_map.empty())
@@ -899,17 +1110,16 @@ AdvancedExtruderGenerator::generate()
     mesh->get_boundary_info().set_nodeset_name_map().insert(input_nodeset_map.begin(),
                                                             input_nodeset_map.end());
 
+  if (_has_bottom_boundary)
+    boundary_info.sideset_name(new_boundary_ids.front()) = new_boundary_names.front();
+  if (_has_top_boundary)
+    boundary_info.sideset_name(new_boundary_ids.back()) = new_boundary_names.back();
+
   mesh->set_isnt_prepared();
+  // Creating the layered meshes creates a lot of leftover nodes, notably in the boundary_info,
+  // which will crash both paraview and trigger exodiff. Best to be safe.
+  if (extruding_quad_eights)
+    mesh->prepare_for_use();
 
   return mesh;
-}
-
-void
-AdvancedExtruderGenerator::swapNodesInElem(Elem * elem,
-                                           const unsigned int nd1,
-                                           const unsigned int nd2)
-{
-  Node * n_temp = elem->node_ptr(nd1);
-  elem->set_node(nd1) = elem->node_ptr(nd2);
-  elem->set_node(nd2) = n_temp;
 }

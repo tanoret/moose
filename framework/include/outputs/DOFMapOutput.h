@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,7 +34,7 @@ public:
   /**
    * Write the DOF mapt
    */
-  void output(const ExecFlagType & type) override;
+  void output() override;
 
 protected:
   /**
@@ -75,4 +75,7 @@ protected:
 
   /// Reference to the mesh object
   MooseMesh & _mesh;
+
+  /// The nonlinear system number we should output degree of freedom information for
+  const unsigned int _nl_sys_num;
 };

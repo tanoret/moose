@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,6 +27,7 @@ FunctionValuePostprocessor::validParams()
   params.addParam<Real>("scale_factor", 1, "A scale factor to be applied to the function");
   params.addParam<std::vector<PostprocessorName>>(
       "indirect_dependencies",
+      {},
       "If the evaluated function depends on other postprocessors they must be listed here to "
       "ensure proper dependency resolution");
 
@@ -74,7 +75,7 @@ FunctionValuePostprocessor::execute()
 }
 
 PostprocessorValue
-FunctionValuePostprocessor::getValue()
+FunctionValuePostprocessor::getValue() const
 {
   Point p;
   if (_has_space_pp)

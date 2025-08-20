@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -131,6 +131,10 @@ protected:
 
   /// Physical positions of connected components
   std::vector<Point> _positions;
+  /// Boundary elements of connected components
+  std::vector<const Elem *> _elems;
+  /// Boundary sides of connected components
+  std::vector<unsigned short int> _sides;
   /// Boundary node IDs from connected components
   std::vector<dof_id_type> _nodes;
   /// Boundary IDs of connected components

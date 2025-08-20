@@ -75,6 +75,14 @@ point. Recall that "_diffusivity" is a reference to a `MaterialProperty` type. T
 type is a container that stores the values of a property for each quadrature point. Therefore, this
 container must be indexed by `_qp` to compute the value for a specific quadrature point.
 
+!alert note
+`ExampleMaterial` can call `isPropertyActive(_diffusivity.id())` in its `computeQpProperties` to
+check whether this property is consumed during the run-time. This function provides a capability
+of skipping evaluations of certain material properties within a material when such evaluations are
+costly for performance optimization. MOOSE calls materials to do the evaluations when needed.
+This `isPropertyActive` routine gives code developers a finer control on the material property
+evaluation.
+
 ## Consuming Properties
 
 Objects that require material properties consume them using one of two functions
@@ -199,9 +207,21 @@ vector or tensor value.
 ## Material Property Output
 
 Output of `Material` properties is enabled by setting the "outputs" parameter. The following example
-creates two additional variables called "mat1" and "mat2" that will show up in the output file.
+creates two additional variables called "mat1" and "mat2" that will show up in the output file. In this
+example, the `exodus` name is a special keyword used to signal to MOOSE that the material properties
+should be outputted to the output object created when setting `Outputs/exodus=true`.
 
 !listing output_block.i block=Materials Outputs
+
+If multiple output objects exist in the `[Outputs]` block, one or more names can be provided to the
+"outputs" parameter. Alternatively, the reserved output name `all` can be used to output the material
+property to all output objects in the `[Outputs]` block, while the reserved output name `none` can be
+used to prevent the material property from being outputted to any output object. If `all` or `none`
+is specified in the outputs parameter, no other additional names should be specified. In the following
+example, data from `block_1` will be outputted to both `exodus1` and `exodus2` output [Exodus.md] objects,
+while `block_2` will only be outputted to the `exodus2` object.
+
+!listing output_multiple_files.i block=Materials Outputs
 
 `Material` properties can be of arbitrary (C++) type, but not all types can be output. The following
 table lists the types of properties that are available for automatic output.
@@ -222,142 +242,8 @@ error.
 
 ## Functor Material Properties id=functor-props
 
-Functor material properties are properties that are evaluated
-on-the-fly. E.g. they can be viewed as functions of the current location in
-space (and time). Functor material properties provide several overloads of the
-`operator()` method for different "geometric quantities". One example of a
-"geometric quantity" is a `const Elem *`, e.g. for an `FVElementalKernel`, the
-value of a functor material property in a cell-averaged sense can be obtained by
-the syntax
-
-- `_foo(_current_elem)`
-
-where here `_foo` is a functor material property data member of the kernel. The
-functor material property system introduces APIs very similar to the traditional
-material property system for declaring and getting properties. To declare a
-functor property:
-
-- `declareFunctorProperty<TYPE>`
-
-where `TYPE` can be anything such as `Real, ADReal, RealVectorValue, ADRealVectorValue`
-etc. To get a functor material property:
-
-- `getFunctor<TYPE>`
-
-It's worth noting that whereas the traditional regular material property system
-has different methods to declare/get non-AD and AD properties, the new functor
-system has single APIs for both non-AD and AD property types.
-
-Currently, functor material property evaluations are defined using the API:
-
-```c++
-template <typename T>
-template <typename PolymorphicLambda>
-void FunctorMaterialProperty<T>::
-setFunctor(const MooseMesh & mesh,
-           const std::set<SubdomainID> & block_ids,
-           PolymorphicLambda my_lammy);
-```
-
-where the first two arguments are used to setup block restriction and the last argument is a lambda
-defining the property evaluation. The lambda must be callable with two arguments, the first
-corresponding to space, and the second corresponding to time, and must return the type `T` of the
-`FunctorMaterialProperty`. An example of setting a constant functor material property that returns
-an `ADReal` looks like:
-
-```c++
-    _constant_unity_prop.setFunctor(
-        _mesh, blockIDs(), [](const auto &, const auto &) -> ADReal { return 1.; });
-```
-
-An example of a functor material property that depends on a nonlinear variable would look like
-
-```c++
-    _u_prop.setFunctor(_mesh, blockIDs(), [this](const auto & r, const auto & t) -> ADReal {
-      return _u_var(r, t);
-    });
-```
-
-In the above example, we simply forward the calling arguments along to the variable. Variable
-functor implementation is described in [MooseVariableBase.md#functor-vars]. A test functor material
-class to setup a dummy Euler problem is shown in
-
-!listing test/src/materials/ADCoupledVelocityMaterial.C
-
-In the following subsections, we describe the various spatial arguments that functor (material
-properties) can be evaluated at. Almost no functor material developers should have to concern
-themselves with these details as most material property functions should just appear as functions of
-space and time, e.g. the same lambda defining the property evaluation should apply across all
-spatial and temporal arguments. However, in the case that a functor material developer wishes to
-create specific implementations for specific arguments (as illustrated in `IMakeMyOwnFunctorProps`
-test class) or simply wishes to know more about the system, we give the details below.
-
-Any call to a functor (material property) looks like the following
-`_foo(const SpatialArg & r, const TemporalArg & t)`. Below are the possible type overloads of
-`SpatialArg`.
-
-### FaceArg id=spatial-overloads
-
-A typedef defining a "face" evaluation calling argument. This is composed of
-
-- a face information object which defines our location in space
-- a limiter which defines how the functor evaluated on either side of the face should be
-  interpolated to the face
-- a boolean which states whether the face information element is upwind of the face
-- a pair of subdomain IDs. These do not always correspond to the face info element subdomain
-  ID and face info neighbor subdomain ID. For instance if a flux kernel is operating at a
-  subdomain boundary on which the kernel is defined on one side but not the other, the
-  passed-in subdomain IDs will both correspond to the subdomain ID that the flux kernel is
-  defined on
-
-### ElemQpArg
-
-Argument for requesting functor evaluation at a quadrature point location in an element. Data
-in the argument:
-
-- The element containing the quadrature point
-- The quadrature point index, e.g. if there are `n` quadrature points, we are requesting the
-  evaluation of the ith point
-- The quadrature rule that can be used to initialize the functor on the given element
-
-If functor material properties are functions of nonlinear degrees of freedom, evaluation with this
-argument will likely result in calls to libMesh `FE::reinit`.
-
-### ElemSideQpArg
-
-Argument for requesting functor evaluation at quadrature point locations on an element side.
-Data in the argument:
-
-- The element
-- The element side on which the quadrature points are located
-- The quadrature point index, e.g. if there are `n` quadrature points, we are requesting the
-  evaluation of the ith point
-- The quadrature rule that can be used to initialize the functor on the given element and side
-
-If functor material properties are functions of nonlinear degrees of freedom, evaluation with this
-argument will likely result in calls to libMesh `FE::reinit`.
-
-### Functor caching
-
-By default, functor material properties are always (re-)evaluated every time they are called with
-`operator()`. However, the base class that `FunctorMaterialProperty` inherits from,
-`Moose::Functor`, has a
-`setCacheClearanceSchedule(const std::set<ExecFlagType> & clearance_schedule)` API that allows
-control of evaluations. Supported values for the `clearance_schedule` are any combination of
-`EXEC_ALWAYS`, `EXEC_TIMESTEP_BEGIN`, `EXEC_LINEAR`, and `EXEC_NONLINEAR`. These will cause cached
-evaluations of functor (material properties) to be cleared always (in fact not surprisingly in this
-case we never fill the cache), on `timestepSetup`, on `residualSetup`, and on `jacobianSetup`
-respectively. If a functor is expected to depend on nonlinear degrees of freedom, then the cache
-should be cleared on `EXEC_LINEAR` and `EXEC_NONLINEAR` (the default `EXEC_ALWAYS` would obviously also work) in
-order to achieve a perfect Jacobian. Not surprisingly, if a functor evaluation is cached, then
-memory usage will increase.
-
-!alert note title=Caching Implementations
-Functor caching is only currently implemented for `ElemQpArg` and `ElemSideQpArg` spatial
-overloads. This is with the idea that calls to `FE::reinit` can be fairly expensive whereas for the
-other spatial argument types, evaluation of the functor (material property) may be relatively
-inexpensive compared to the memory expense incurred from caching. We may definitely implement
-caching for other overloads, however, if use cases call for it.
+Functor materials are a special kind of materials used for on-the-fly material property evaluation.
+Please refer to the [syntax page for FunctorMaterials](FunctorMaterials/index.md) for more information.
 
 ## Advanced Topics
 
@@ -381,7 +267,7 @@ Interface materials are often used along with [InterfaceKernel](syntax/Interface
 
 A "[Discrete](http://www.dictionary.com/browse/discrete)" `Material` is an object that may be
 detached from MOOSE and computed explicitly from other objects. An object inheriting from
-[MaterialPropertyInterface](http://www.mooseframework.org/docs/doxygen/moose/classMaterialPropertyInterface.html)
+[MaterialPropertyInterface](https://mooseframework.inl.gov/docs/doxygen/moose/classMaterialPropertyInterface.html)
 may explicitly call the compute methods of a `Material` object via the `getMaterial` method.
 
 The following should be considered when computing `Material` properties explicitly.
@@ -416,7 +302,7 @@ Newton iterations. This material declares a material property (`_p`) which is wh
 iterating on the material properties containing `f` and `f'` from `RecomputeMaterial`. The
 `_discrete` member is a reference to a `Material` object retrieved with `getMaterial`.
 
-!listing NewtonMaterial.C start=MOOSEDOCS_START include-start=Falseg
+!listing NewtonMaterial.C start=MOOSEDOCS_START include-start=False
 
 To create and use a "Discrete" `Material` use the following to guide the process.
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -70,8 +70,8 @@ PorousFlow1PhaseHysP::computeQpProperties()
   if (_dictator.isPorousFlowVariable(_porepressure_varnum))
   {
     // _porepressure is a PorousFlow variable
-    _dporepressure_dvar[_qp][0][_p_var_num] = 1.0;
-    _dsaturation_dvar[_qp][0][_p_var_num] = ds;
+    (*_dporepressure_dvar)[_qp][0][_p_var_num] = 1.0;
+    (*_dsaturation_dvar)[_qp][0][_p_var_num] = ds;
     if (!_nodal_material)
     {
       (*_dgradp_qp_dgradv)[_qp][0][_p_var_num] = 1.0;

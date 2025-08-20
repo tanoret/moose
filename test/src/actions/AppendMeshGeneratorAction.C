@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,7 @@
 #include "MooseApp.h"
 
 registerMooseAction("MooseTestApp", AppendMeshGeneratorAction, "append_mesh_generator");
+registerMooseAction("MooseTestApp", AppendMeshGeneratorAction, "add_mesh_generator");
 
 InputParameters
 AppendMeshGeneratorAction::validParams()
@@ -33,5 +34,7 @@ AppendMeshGeneratorAction::act()
   if (!_mesh)
     mooseError("No mesh file was supplied and no generation block was provided");
 
-  _app.appendMeshGenerator(_type, _name, _moose_object_pars);
+  // This if statement lets us test adding at the wrong time if it's a TestMeshGenerator
+  if (_type == "TestMeshGenerator" || _current_task == "append_mesh_generator")
+    _app.appendMeshGenerator(_type, _name, _moose_object_pars);
 }

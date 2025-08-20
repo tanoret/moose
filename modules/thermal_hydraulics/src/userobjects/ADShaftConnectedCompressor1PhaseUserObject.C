@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,7 +11,7 @@
 #include "SinglePhaseFluidProperties.h"
 #include "VolumeJunction1Phase.h"
 #include "MooseVariableScalar.h"
-#include "THMIndices3Eqn.h"
+#include "THMIndicesVACE.h"
 #include "Function.h"
 #include "Numerics.h"
 #include "metaphysicl/parallel_numberarray.h"
@@ -388,8 +388,7 @@ ADShaftConnectedCompressor1PhaseUserObject::threadJoin(const UserObject & uo)
   ADVolumeJunction1PhaseUserObject::threadJoin(uo);
   ADShaftConnectableUserObjectInterface::threadJoin(uo);
 
-  const ADShaftConnectedCompressor1PhaseUserObject & scpuo =
-      dynamic_cast<const ADShaftConnectedCompressor1PhaseUserObject &>(uo);
+  const auto & scpuo = static_cast<const ADShaftConnectedCompressor1PhaseUserObject &>(uo);
   _isentropic_torque += scpuo._isentropic_torque;
   _dissipation_torque += scpuo._dissipation_torque;
   _friction_torque += scpuo._friction_torque;

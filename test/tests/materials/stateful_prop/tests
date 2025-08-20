@@ -1,5 +1,5 @@
 [Tests]
-  issues = '#1927 #8278 #4268 #5658 #3277 #3414 #808 #8450 #13972 #15956'
+  issues = '#1927 #8278 #4268 #5658 #3277 #3414 #808 #8450 #13972 #15956 #25840'
   design = 'syntax/Materials/index.md'
 
   [stateful_old]
@@ -56,6 +56,11 @@
 
     requirement = 'The system shall be able to promote normal material properties to stateful when '
                   'old/older properties are requested.'
+  []
+  [implicit_stateful_ad]
+    type = 'RunApp'
+    input = 'implicit_stateful_ad.i'
+    requirement = 'The system shall be able to declare a property as AD after the old state has been requested.'
   []
 
   [computing_initial_residual_test]
@@ -116,8 +121,25 @@
       input = 'spatial_adaptivity_test.i'
       exodiff = 'spatial_adaptivity_test_out.e-s004'
 
-      detail = 'when properties vary spatially.'
+      detail = 'when properties vary spatially,'
     []
+
+    [spatially_const_p]
+      type = 'Exodiff'
+      input = 'stateful_prop_adaptivity_test.i'
+      cli_args = 'Adaptivity/switch_h_to_p_refinement=true Variables/u/disable_p_refinement=true Outputs/file_base=stateful_prop_adaptivity_test_p'
+      exodiff = 'stateful_prop_adaptivity_test_p.e-s004'
+      detail = 'when properties are spatially constant and we are performing p-refinement, and'
+    []
+
+    [spatially_varying_p]
+      type = 'Exodiff'
+      input = 'spatial_adaptivity_test.i'
+      exodiff = 'spatial_adaptivity_test_p.e-s004'
+      cli_args = 'Adaptivity/switch_h_to_p_refinement=true Variables/u/disable_p_refinement=true Outputs/file_base=spatial_adaptivity_test_p'
+      detail = 'when properties vary spatially and we are performing p-refinement.'
+    []
+
   []
 
   [many_stateful_props]

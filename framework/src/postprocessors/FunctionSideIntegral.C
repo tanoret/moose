@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,7 +32,7 @@ FunctionSideIntegral::FunctionSideIntegral(const InputParameters & parameters)
 void
 FunctionSideIntegral::threadJoin(const UserObject & y)
 {
-  const FunctionSideIntegral & pps = static_cast<const FunctionSideIntegral &>(y);
+  const auto & pps = static_cast<const FunctionSideIntegral &>(y);
   _integral_value += pps._integral_value;
 }
 

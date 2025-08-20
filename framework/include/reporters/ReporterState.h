@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,6 +12,7 @@
 
 #include "libmesh/parallel.h"
 #include "libmesh/parallel_object.h"
+#include "libmesh/simple_range.h"
 
 #include "ReporterName.h"
 #include "RestartableData.h"
@@ -22,7 +23,7 @@ class MooseObject;
 class ReporterContextBase;
 
 /**
- * The base class for storing a Repoter's state
+ * The base class for storing a Reporter's state
  *
  * The base class is needed in order to store the states without a template
  * parameter so that they can be iterated through to observe the producers
@@ -126,10 +127,19 @@ public:
    */
   void copyValuesBack();
 
+  /**
+   * Restore values to their old values, i.e. value(0) = value(1). This only occurs if old values
+   * have been declared, which happens automatically for postprocessors.
+   *
+   * @return true State was restored
+   * @return false State was NOT restored
+   */
+  bool restoreState();
+
   std::string valueType() const override final { return MooseUtils::prettyCppType<T>(); }
 
   /**
-   * Load the data from stream (e.g., restart)
+   * Loads and stores the data from/to a stream for restart
    *
    * This is a special version that handles the fact that the calls declare/getReporterValue
    * occur within the constructor of objects. As such, the storage list already contains data
@@ -138,8 +148,14 @@ public:
    * The default dataLoad assumes the list being populated is empty and simply uses push_back.
    * Therefore, this function loads the data directly into the container to avoid this problem
    * and unnecessary copies.
+   *
+   * The default dataStore is very similar, but to ensure consistency (because we're re-defining
+   * the load), we implement it again here.
    */
-  void load(std::istream & stream) override final;
+  ///@{
+  void storeInternal(std::ostream & stream) override final;
+  void loadInternal(std::istream & stream) override final;
+  ///@}
 };
 
 template <typename T>
@@ -155,6 +171,15 @@ ReporterState<T>::value(const std::size_t time_index)
   // Initialize the data; the first entry is the "current" data
   if (this->get().empty())
     this->set().resize(1);
+
+  // If we are a postprocessor, we want to always store an old value so that we can restore the data
+  // if needed. See restoreState.
+  // Note: This can easily be extended to other states like vector-postprocessors or any other
+  // reporter value. However, these states have indeterminate sizes and could create significant,
+  // unecessary memory overhead. In the future, we can extend this to other reporter types if
+  // the need justifies the overhead.
+  if (this->getReporterName().isPostprocessor() && time_index == 0 && this->get().size() <= 1)
+    this->set().push_back(this->get().back());
 
   // Initialize old, older, ... data
   if (this->get().size() <= time_index)
@@ -191,18 +216,46 @@ ReporterState<T>::copyValuesBack()
 }
 
 template <typename T>
+bool
+ReporterState<T>::restoreState()
+{
+  if (this->get().size() <= 1)
+    return false;
+
+  this->set().front() = *std::next(this->get().begin());
+  return true;
+}
+
+template <typename T>
 void
-ReporterState<T>::load(std::istream & stream)
+ReporterState<T>::storeInternal(std::ostream & stream)
+{
+  // Store the container size
+  std::size_t size = this->get().size();
+  dataStore(stream, size, nullptr);
+
+  // Store each entry of the list directly into the storage
+  for (auto & val : this->set())
+    storeHelper(stream, val, nullptr);
+}
+
+template <typename T>
+void
+ReporterState<T>::loadInternal(std::istream & stream)
 {
   // Read the container size
-  unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  std::size_t size = 0;
+  dataLoad(stream, size, nullptr);
+
+  auto & values = this->set();
 
   // If the current container is undersized, expand it to fit the loaded data
-  if (this->get().size() < size)
-    this->set().resize(size);
+  if (values.size() < size)
+    values.resize(size);
 
   // Load each entry of the list directly into the storage
-  for (auto & val : this->set())
+  // Because we don't shrink the container if the stored size is smaller than
+  // our declared size, we have the odd iterator combo you see below
+  for (auto & val : as_range(values.begin(), std::next(values.begin(), size)))
     loadHelper(stream, val, nullptr);
 }

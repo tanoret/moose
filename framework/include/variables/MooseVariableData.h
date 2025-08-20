@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,11 +12,13 @@
 #include "MooseArray.h"
 #include "MooseTypes.h"
 #include "MooseVariableDataBase.h"
+#include "Conversion.h"
 
 #include "libmesh/tensor_tools.h"
 #include "libmesh/vector_value.h"
 #include "libmesh/tensor_value.h"
 #include "libmesh/type_n_tensor.h"
+#include "libmesh/enum_fe_family.h"
 #include "libmesh/fe_type.h"
 #include "ADUtils.h"
 
@@ -48,9 +50,9 @@ class MooseVariableData : public MooseVariableDataBase<OutputType>
 {
 public:
   // type for gradient, second and divergence of template class OutputType
-  typedef typename TensorTools::IncrementRank<OutputType>::type OutputGradient;
-  typedef typename TensorTools::IncrementRank<OutputGradient>::type OutputSecond;
-  typedef typename TensorTools::DecrementRank<OutputType>::type OutputDivergence;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputType>::type OutputGradient;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputGradient>::type OutputSecond;
+  typedef typename libMesh::TensorTools::DecrementRank<OutputType>::type OutputDivergence;
 
   // shortcut for types storing values on quadrature points
   typedef MooseArray<OutputType> FieldVariableValue;
@@ -63,9 +65,9 @@ public:
   typedef typename Moose::ShapeType<OutputType>::type OutputShape;
 
   // type for gradient, second and divergence of shape functions of template class OutputType
-  typedef typename TensorTools::IncrementRank<OutputShape>::type OutputShapeGradient;
-  typedef typename TensorTools::IncrementRank<OutputShapeGradient>::type OutputShapeSecond;
-  typedef typename TensorTools::DecrementRank<OutputShape>::type OutputShapeDivergence;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputShape>::type OutputShapeGradient;
+  typedef typename libMesh::TensorTools::IncrementRank<OutputShapeGradient>::type OutputShapeSecond;
+  typedef typename libMesh::TensorTools::DecrementRank<OutputShape>::type OutputShapeDivergence;
 
   // shortcut for types storing shape function values on quadrature points
   typedef MooseArray<std::vector<OutputShape>> FieldVariablePhiValue;
@@ -150,7 +152,7 @@ public:
    */
   const MappedArrayVariablePhiGradient & arrayGradPhi() const
   {
-    mooseAssert(_var.fieldType() == Moose::VarFieldType::VAR_FIELD_ARRAY, "Not an array variable");
+    mooseAssert(var().fieldType() == Moose::VarFieldType::VAR_FIELD_ARRAY, "Not an array variable");
     return _mapped_grad_phi;
   }
 
@@ -164,7 +166,7 @@ public:
    */
   const MappedArrayVariablePhiGradient & arrayGradPhiFace() const
   {
-    mooseAssert(_var.fieldType() == Moose::VarFieldType::VAR_FIELD_ARRAY, "Not an array variable");
+    mooseAssert(var().fieldType() == Moose::VarFieldType::VAR_FIELD_ARRAY, "Not an array variable");
     return _mapped_grad_phi_face;
   }
 
@@ -189,17 +191,24 @@ public:
   const FieldVariablePhiCurl & curlPhiFace() const;
 
   /**
+   * divergence_phi getter
+   */
+  const FieldVariablePhiDivergence & divPhi() const;
+
+  /**
+   * divergence_phi_face getter
+   */
+  const FieldVariablePhiDivergence & divPhiFace() const;
+
+  /**
    * ad_grad_phi getter
    */
-  const ADTemplateVariablePhiGradient<OutputShape> & adGradPhi() const { return *_ad_grad_phi; }
+  const ADTemplateVariablePhiGradient<OutputShape> & adGradPhi() const;
 
   /**
    * ad_grad_phi_face getter
    */
-  const ADTemplateVariablePhiGradient<OutputShape> & adGradPhiFace() const
-  {
-    return *_ad_grad_phi_face;
-  }
+  const ADTemplateVariablePhiGradient<OutputShape> & adGradPhiFace() const;
 
   /**
    * Return phi size
@@ -224,10 +233,16 @@ public:
    */
   bool computingCurl() const { return _need_curl || _need_curl_old; }
 
+  /**
+   * Whether or not this variable is computing the divergence
+   */
+  bool computingDiv() const { return _need_div || _need_div_old; }
+
   //////////////////////////////// Nodal stuff ///////////////////////////////////////////
 
   bool isNodal() const override { return _is_nodal; }
-  bool hasDoFsOnNodes() const override { return _continuity != DISCONTINUOUS; }
+  bool hasDoFsOnNodes() const override { return _continuity != libMesh::DISCONTINUOUS; }
+  libMesh::FEContinuity getContinuity() const override { return _continuity; };
   const Node * const & node() const { return _node; }
   const dof_id_type & nodalDofIndex() const { return _nodal_dof_index; }
   bool isNodalDefined() const { return _has_dof_indices; }
@@ -270,6 +285,12 @@ public:
    * @param state The state of the simulation: current, old, older
    */
   const FieldVariableCurl & curlSln(Moose::SolutionState state) const;
+
+  /**
+   * Local solution divergence getter
+   * @param state The state of the simulation: current, old, older
+   */
+  const FieldVariableDivergence & divSln(Moose::SolutionState state) const;
 
   const ADTemplateVariableValue<OutputType> & adSln() const
   {
@@ -329,6 +350,14 @@ public:
     return _du_dotdot_du;
   }
 
+  const ADTemplateVariableCurl<OutputType> & adCurlSln() const
+  {
+    _need_ad = _need_ad_curl_u = true;
+    curlPhi();
+    curlPhiFace();
+    return _ad_curl_u;
+  }
+
   ///////////////////////// Nodal value getters ///////////////////////////////////////////
 
   const OutputType & nodalValueDot() const;
@@ -355,7 +384,7 @@ public:
   /**
    * Write a nodal value to the passed-in solution vector
    */
-  void insertNodalValue(NumericVector<Number> & residual, const OutputData & v);
+  void insertNodalValue(libMesh::NumericVector<libMesh::Number> & residual, const OutputData & v);
   OutputData getNodalValue(const Node & node, Moose::SolutionState state) const;
   OutputData
   getElementalValue(const Elem * elem, Moose::SolutionState state, unsigned int idx = 0) const;
@@ -391,7 +420,8 @@ public:
   /**
    * Add passed in local DOF values to a solution vector
    */
-  void addSolution(NumericVector<Number> & sol, const DenseVector<Number> & v) const;
+  void addSolution(libMesh::NumericVector<libMesh::Number> & sol,
+                   const DenseVector<libMesh::Number> & v) const;
 
   /////////////////////////// DoF value getters /////////////////////////////////////
 
@@ -399,13 +429,18 @@ public:
   const DoFValue & dofValuesDotOld() const;
   const DoFValue & dofValuesDotDot() const;
   const DoFValue & dofValuesDotDotOld() const;
-  const MooseArray<Number> & dofValuesDuDotDu() const;
-  const MooseArray<Number> & dofValuesDuDotDotDu() const;
+  const MooseArray<libMesh::Number> & dofValuesDuDotDu() const;
+  const MooseArray<libMesh::Number> & dofValuesDuDotDotDu() const;
 
   /**
    * Return the AD dof values
    */
   const MooseArray<ADReal> & adDofValues() const;
+
+  /**
+   * Return the AD time derivative values of degrees of freedom
+   */
+  const MooseArray<ADReal> & adDofValuesDot() const;
 
   /////////////////////////////// Increment stuff ///////////////////////////////////////
 
@@ -418,12 +453,12 @@ public:
   /**
    * Compute and store incremental change in solution at QPs based on increment_vec
    */
-  void computeIncrementAtQps(const NumericVector<Number> & increment_vec);
+  void computeIncrementAtQps(const libMesh::NumericVector<libMesh::Number> & increment_vec);
 
   /**
    * Compute and store incremental change at the current node based on increment_vec
    */
-  void computeIncrementAtNode(const NumericVector<Number> & increment_vec);
+  void computeIncrementAtNode(const libMesh::NumericVector<libMesh::Number> & increment_vec);
 
 private:
   /**
@@ -431,10 +466,19 @@ private:
    * values as they're referred to here in this class). These methods are only truly meaningful
    * for nodal basis families
    */
-  void assignADNodalValue(const DualReal & value, const unsigned int & component);
-  void fetchADDoFValues();
+  void assignADNodalValue(const ADReal & value, const unsigned int & component);
+  void fetchADNodalValues();
 
-  const FEType & _fe_type;
+  /**
+   * Internal method for computeValues() and computeMonomialValues()
+   *
+   * Monomial is a template parameter so that we get compile time optimization
+   * for monomial vs non-monomial
+   */
+  template <bool monomial>
+  void computeValuesInternal();
+
+  const libMesh::FEType & _fe_type;
 
   const unsigned int _var_num;
 
@@ -450,7 +494,7 @@ private:
   dof_id_type _nodal_dof_index;
 
   /// Continuity type of the variable
-  FEContinuity _continuity;
+  libMesh::FEContinuity _continuity;
 
   /// Increment in the variable used in dampers
   FieldVariableValue _increment;
@@ -459,7 +503,7 @@ private:
   typename Moose::ADType<OutputType>::type _ad_nodal_value;
 
   /// A zero AD variable
-  DualReal _ad_zero;
+  ADReal _ad_zero;
 
   /// AD u dot flags
   mutable bool _need_ad_u_dot;
@@ -476,12 +520,18 @@ private:
   mutable bool _need_curl_old;
   mutable bool _need_curl_older;
 
+  /// divergence flags
+  mutable bool _need_div;
+  mutable bool _need_div_old;
+  mutable bool _need_div_older;
+
   /// AD flags
   mutable bool _need_ad;
   mutable bool _need_ad_u;
   mutable bool _need_ad_grad_u;
   mutable bool _need_ad_grad_u_dot;
   mutable bool _need_ad_second_u;
+  mutable bool _need_ad_curl_u;
 
   bool _has_dof_indices;
 
@@ -500,6 +550,11 @@ private:
   FieldVariableCurl _curl_u_old;
   FieldVariableCurl _curl_u_older;
 
+  /// divergence_u
+  FieldVariableDivergence _div_u;
+  FieldVariableDivergence _div_u_old;
+  FieldVariableDivergence _div_u_older;
+
   /// AD u
   ADTemplateVariableValue<OutputType> _ad_u;
   ADTemplateVariableGradient<OutputType> _ad_grad_u;
@@ -510,6 +565,7 @@ private:
   ADTemplateVariableValue<OutputType> _ad_u_dot;
   ADTemplateVariableValue<OutputType> _ad_u_dotdot;
   ADTemplateVariableGradient<OutputType> _ad_grad_u_dot;
+  ADTemplateVariableCurl<OutputType> _ad_curl_u;
 
   // time derivatives
 
@@ -517,19 +573,19 @@ private:
   FieldVariableValue _u_dot;
 
   /// u_dotdot (second time derivative)
-  FieldVariableValue _u_dotdot, _u_dotdot_bak;
+  FieldVariableValue _u_dotdot;
 
   /// u_dot_old (time derivative)
-  FieldVariableValue _u_dot_old, _u_dot_old_bak;
+  FieldVariableValue _u_dot_old;
 
   /// u_dotdot_old (second time derivative)
-  FieldVariableValue _u_dotdot_old, _u_dotdot_old_bak;
+  FieldVariableValue _u_dotdot_old;
 
   /// derivative of u_dot wrt u
   VariableValue _du_dot_du;
 
   /// derivative of u_dotdot wrt u
-  VariableValue _du_dotdot_du, _du_dotdot_du_bak;
+  VariableValue _du_dotdot_du;
 
   /// The current qrule. This has to be a reference because the current qrule will be constantly
   /// changing. If we initialized this to point to one qrule, then in the next calculation we would
@@ -542,6 +598,7 @@ private:
   const FieldVariablePhiGradient * _grad_phi;
   mutable const FieldVariablePhiSecond * _second_phi;
   mutable const FieldVariablePhiCurl * _curl_phi;
+  mutable const FieldVariablePhiDivergence * _div_phi;
 
   // Mapped array phi
   MappedArrayVariablePhiGradient _mapped_grad_phi;
@@ -554,6 +611,7 @@ private:
   const FieldVariablePhiGradient * _grad_phi_face;
   mutable const FieldVariablePhiSecond * _second_phi_face;
   mutable const FieldVariablePhiCurl * _curl_phi_face;
+  mutable const FieldVariablePhiDivergence * _div_phi_face;
 
   const ADTemplateVariablePhiGradient<OutputShape> * _ad_grad_phi;
   const ADTemplateVariablePhiGradient<OutputShape> * _ad_grad_phi_face;
@@ -563,42 +621,53 @@ private:
   const FieldVariablePhiGradient * _current_grad_phi;
   const FieldVariablePhiSecond * _current_second_phi;
   const FieldVariablePhiCurl * _current_curl_phi;
+  const FieldVariablePhiDivergence * _current_div_phi;
   const ADTemplateVariablePhiGradient<OutputShape> * _current_ad_grad_phi;
 
   // dual mortar
   const bool _use_dual;
 
   std::function<const typename OutputTools<OutputType>::VariablePhiValue &(const Assembly &,
-                                                                           FEType)>
+                                                                           libMesh::FEType)>
       _phi_assembly_method;
   std::function<const typename OutputTools<OutputShape>::VariablePhiValue &(const Assembly &,
-                                                                            FEType)>
+                                                                            libMesh::FEType)>
       _phi_face_assembly_method;
 
   std::function<const typename OutputTools<OutputShape>::VariablePhiGradient &(const Assembly &,
-                                                                               FEType)>
+                                                                               libMesh::FEType)>
       _grad_phi_assembly_method;
   std::function<const typename OutputTools<OutputShape>::VariablePhiGradient &(const Assembly &,
-                                                                               FEType)>
+                                                                               libMesh::FEType)>
       _grad_phi_face_assembly_method;
 
   std::function<const typename OutputTools<OutputShape>::VariablePhiSecond &(const Assembly &,
-                                                                             FEType)>
+                                                                             libMesh::FEType)>
       _second_phi_assembly_method;
   std::function<const typename OutputTools<OutputShape>::VariablePhiSecond &(const Assembly &,
-                                                                             FEType)>
+                                                                             libMesh::FEType)>
       _second_phi_face_assembly_method;
 
   std::function<const typename OutputTools<OutputShape>::VariablePhiCurl &(const Assembly &,
-                                                                           FEType)>
+                                                                           libMesh::FEType)>
       _curl_phi_assembly_method;
   std::function<const typename OutputTools<OutputShape>::VariablePhiCurl &(const Assembly &,
-                                                                           FEType)>
+                                                                           libMesh::FEType)>
       _curl_phi_face_assembly_method;
 
-  std::function<const ADTemplateVariablePhiGradient<OutputShape> &(const Assembly &, FEType)>
+  std::function<const typename OutputTools<OutputShape>::VariablePhiDivergence &(const Assembly &,
+                                                                                 libMesh::FEType)>
+      _div_phi_assembly_method;
+
+  std::function<const typename OutputTools<OutputShape>::VariablePhiDivergence &(const Assembly &,
+                                                                                 libMesh::FEType)>
+      _div_phi_face_assembly_method;
+
+  std::function<const ADTemplateVariablePhiGradient<OutputShape> &(const Assembly &,
+                                                                   libMesh::FEType)>
       _ad_grad_phi_assembly_method;
-  std::function<const ADTemplateVariablePhiGradient<OutputShape> &(const Assembly &, FEType)>
+  std::function<const ADTemplateVariablePhiGradient<OutputShape> &(const Assembly &,
+                                                                   libMesh::FEType)>
       _ad_grad_phi_face_assembly_method;
 
   /// Pointer to time integrator
@@ -623,7 +692,7 @@ private:
   /// A dummy ADReal variable
   ADReal _ad_real_dummy = 0;
 
-  using MooseVariableDataBase<OutputType>::_var;
+  using MooseVariableDataBase<OutputType>::var;
   using MooseVariableDataBase<OutputType>::_sys;
   using MooseVariableDataBase<OutputType>::_subproblem;
   using MooseVariableDataBase<OutputType>::_need_vector_tag_dof_u;
@@ -685,6 +754,17 @@ MooseVariableData<OutputType>::adDofValues() const
 }
 
 template <typename OutputType>
+const MooseArray<ADReal> &
+MooseVariableData<OutputType>::adDofValuesDot() const
+{
+  _need_ad = _need_ad_u_dot = true;
+  if (!_time_integrator)
+    // See explanation in adUDot() body
+    _need_u_dot = true;
+  return _ad_dofs_dot;
+}
+
+template <typename OutputType>
 const typename Moose::ADType<OutputType>::type &
 MooseVariableData<OutputType>::adNodalValue() const
 {
@@ -722,4 +802,24 @@ MooseVariableData<OutputType>::adUDotDot() const
     _need_u_dotdot = true;
 
   return _ad_u_dotdot;
+}
+
+template <typename OutputType>
+const ADTemplateVariablePhiGradient<typename MooseVariableData<OutputType>::OutputShape> &
+MooseVariableData<OutputType>::adGradPhi() const
+{
+  if (_element_type == Moose::ElementType::Neighbor || _element_type == Moose::ElementType::Lower)
+    mooseError("Unsupported element type: ", Moose::stringify(_element_type));
+  mooseAssert(_ad_grad_phi, "this should be non-null");
+  return *_ad_grad_phi;
+}
+
+template <typename OutputType>
+const ADTemplateVariablePhiGradient<typename MooseVariableData<OutputType>::OutputShape> &
+MooseVariableData<OutputType>::adGradPhiFace() const
+{
+  if (_element_type == Moose::ElementType::Neighbor || _element_type == Moose::ElementType::Lower)
+    mooseError("Unsupported element type: ", Moose::stringify(_element_type));
+  mooseAssert(_ad_grad_phi_face, "this should be non-null");
+  return *_ad_grad_phi_face;
 }

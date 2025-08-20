@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -99,7 +99,9 @@ RenameBlockGenerator::RenameBlockGenerator(const InputParameters & parameters)
   }
   else
   {
-    _old_block = getParam<std::vector<SubdomainName>>("old_block_name");
+    _old_block = isParamValid("old_block_name")
+                     ? getParam<std::vector<SubdomainName>>("old_block_name")
+                     : std::vector<SubdomainName>{};
     _old_block_param_name = "old_block_name";
   }
 
@@ -125,7 +127,9 @@ RenameBlockGenerator::RenameBlockGenerator(const InputParameters & parameters)
   }
   else
   {
-    _new_block = getParam<std::vector<SubdomainName>>("new_block_name");
+    _new_block = isParamValid("new_block_name")
+                     ? getParam<std::vector<SubdomainName>>("new_block_name")
+                     : std::vector<SubdomainName>{};
     new_block_param_name = "new_block_name";
   }
 
@@ -164,11 +168,7 @@ RenameBlockGenerator::generate()
   // Helper for checking whether or not a SubdomainName (which could be an ID or a name)
   // is really input as an ID
   const auto is_subdomain_id = [](const SubdomainName & subdomain_name)
-  {
-    SubdomainID id = Moose::INVALID_BLOCK_ID;
-    std::istringstream ss(subdomain_name);
-    return !(!(ss >> id));
-  };
+  { return MooseUtils::isDigits(subdomain_name); };
 
   // Get the old block IDs and make sure they exist
   std::vector<SubdomainID> old_block_ids(num_blocks, Moose::INVALID_BLOCK_ID);
@@ -292,5 +292,6 @@ RenameBlockGenerator::generate()
   for (const auto & pair : new_names)
     mesh->subdomain_name(pair.first) = pair.second;
 
+  mesh->set_isnt_prepared();
   return dynamic_pointer_cast<MeshBase>(mesh);
 }

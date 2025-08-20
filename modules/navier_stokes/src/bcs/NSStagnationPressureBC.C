@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,7 +23,6 @@ NSStagnationPressureBC::validParams()
   InputParameters params = NSStagnationBC::validParams();
   params.addClassDescription("This Dirichlet condition imposes the condition p_0 = p_0_desired.");
   params.addRequiredCoupledVar(NS::pressure, "pressure");
-  params.addDeprecatedCoupledVar("p", NS::pressure, "1/1/2022");
   params.addRequiredParam<Real>("desired_stagnation_pressure", "");
   return params;
 }

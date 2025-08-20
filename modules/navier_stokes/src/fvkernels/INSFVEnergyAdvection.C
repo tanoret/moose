@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,6 +9,7 @@
 
 #include "INSFVEnergyAdvection.h"
 #include "INSFVEnergyVariable.h"
+#include "NS.h"
 
 registerMooseObject("NavierStokesApp", INSFVEnergyAdvection);
 
@@ -19,7 +20,7 @@ INSFVEnergyAdvection::validParams()
   params.addClassDescription("Advects energy, e.g. rho*cp*T. A user may still override what "
                              "quantity is advected, but the default is rho*cp*T");
   params.addParam<MooseFunctorName>(
-      "advected_quantity", "rho_cp_temp", "The heat quantity to advect.");
+      "advected_quantity", NS::enthalpy_density, "The heat quantity to advect.");
   return params;
 }
 
@@ -29,19 +30,20 @@ INSFVEnergyAdvection::INSFVEnergyAdvection(const InputParameters & params)
   if (!dynamic_cast<INSFVEnergyVariable *>(&_var))
     mooseError("PINSFVEnergyAdvection may only be used with a fluid temperature variable, "
                "of variable type INSFVEnergyVariable.");
-
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  mooseError("INSFV is not supported by local AD indexing. In order to use INSFV, please run the "
-             "configure script in the root MOOSE directory with the configure option "
-             "'--with-ad-indexing-type=global'");
-#endif
 }
 
 ADReal
 INSFVEnergyAdvection::computeQpResidual()
 {
-  const auto v = _rc_vel_provider.getVelocity(_velocity_interp_method, *_face_info, _tid);
-  const auto adv_quant_face = _adv_quant(makeFace(
-      *_face_info, limiterType(_advected_interp_method), MetaPhysicL::raw_value(v) * _normal > 0));
+  const auto v = velocity();
+  const auto & limiter_time = _subproblem.isTransient()
+                                  ? Moose::StateArg(1, Moose::SolutionIterationType::Time)
+                                  : Moose::StateArg(1, Moose::SolutionIterationType::Nonlinear);
+  const auto adv_quant_face = _adv_quant(makeFace(*_face_info,
+                                                  limiterType(_advected_interp_method),
+                                                  MetaPhysicL::raw_value(v) * _normal > 0,
+                                                  false,
+                                                  &limiter_time),
+                                         determineState());
   return _normal * v * adv_quant_face;
 }

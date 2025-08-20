@@ -14,9 +14,9 @@ conductivity = 20
 scale = 0.8
 
 
-[HeatStructureMaterials]
+[SolidProperties]
   [hs_mat]
-    type = SolidMaterialProperties
+    type = ThermalFunctionSolidProperties
     rho = ${density}
     cp = ${specific_heat_capacity}
     k = ${conductivity}
@@ -34,7 +34,8 @@ scale = 0.8
     depth = ${depth}
     widths = '${thickness}'
     n_part_elems = '10'
-    materials = 'hs_mat'
+    solid_properties = 'hs_mat'
+    solid_properties_T_ref = '300'
     names = 'region'
 
     initial_T = ${T_hs}
@@ -44,15 +45,7 @@ scale = 0.8
     type = HSBoundaryExternalAppConvection
     boundary = 'hs:outer'
     hs = hs
-    scale_pp = bc_scale_pp
-  []
-[]
-
-[Postprocessors]
-  [bc_scale_pp]
-    type = FunctionValuePostprocessor
-    function = ${scale}
-    execute_on = 'INITIAL TIMESTEP_END'
+    scale = ${scale}
   []
 []
 

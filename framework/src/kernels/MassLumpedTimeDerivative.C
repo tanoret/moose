@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -48,9 +48,9 @@ MassLumpedTimeDerivative::computeQpJacobian()
 void
 MassLumpedTimeDerivative::computeJacobian()
 {
-  DenseMatrix<Number> & ke = _assembly.jacobianBlock(_var.number(), _var.number());
-
+  prepareMatrixTag(_assembly, _var.number(), _var.number());
   for (_i = 0; _i < _test.size(); _i++)
     for (_qp = 0; _qp < _qrule->n_points(); _qp++)
-      ke(_i, _i) += _JxW[_qp] * _coord[_qp] * computeQpJacobian();
+      _local_ke(_i, _i) += _JxW[_qp] * _coord[_qp] * computeQpJacobian();
+  accumulateTaggedLocalMatrix();
 }

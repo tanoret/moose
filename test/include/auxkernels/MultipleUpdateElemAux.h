@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,5 +28,7 @@ protected:
   virtual void computeVarValues(std::vector<Real> & values);
 
   unsigned int _n_vars;
-  std::vector<MooseVariable *> _vars;
+  std::vector<MooseWritableVariable *> _vars;
+
+  const bool _use_compute_value;
 };

@@ -9,7 +9,7 @@ This page is part of a set of pages devoted to discussions of numerical stabiliz
 - [Numerical diffusion](numerical_diffusion.md)
 - [A worked example of Kuzmin-Turek stabilization](kt_worked.md)
 
-Kuzmin and Turek [!citep](KuzminTurek2004) describe a method of stabilising advection while minimising artificial numerical diffusion.  In this page "Kuzmin and Turek" is abbreviatved to "KT".   Basic features of KT's approach are detailed in [a worked example](kt_worked.md) and the results are compared with full upwinding, RDG and no stabilization in the [numerical diffusion page](numerical_diffusion.md).
+Kuzmin and Turek [!citep](KuzminTurek2004) describe a method of stabilising advection while minimising artificial numerical diffusion.  In this page "Kuzmin and Turek" is abbreviated to "KT".   Basic features of KT's approach are detailed in [a worked example](kt_worked.md) and the results are compared with full upwinding, RDG and no stabilization in the [numerical diffusion page](numerical_diffusion.md).
 
 This page is for users who want to use KT stabilization in PorousFlow simulations.
 
@@ -72,7 +72,7 @@ Clicking on the links in the above table will provide you with more examples.  F
 !alert note
 For multi-phase situations you will need an advective flux calculator for each phase and each component, unless the phases are immiscible (each component exists in one phase only).
 
-For example, in the case of 2 phases with 2 components, each potentially existing in both phases, there are 2 PorousFlow [governing equations](governing_equations.md): one for each component.  The equation for fluid component zero contains contributions from both phase 0 and phase 1.  The equation for fluid component one contains contributions from both phase 0 and phase 1.  So the Kernels will look like
+For example, in the case of 2 phases with 2 components, each potentially existing in both phases, there are 2 PorousFlow [governing equations](porous_flow/governing_equations.md): one for each component.  The equation for fluid component zero contains contributions from both phase 0 and phase 1.  The equation for fluid component one contains contributions from both phase 0 and phase 1.  So the Kernels will look like
 
 !listing modules/porous_flow/test/tests/pressure_pulse/pressure_pulse_1d_2phasePS_KT.i start=Kernels
 

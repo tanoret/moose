@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,12 +13,12 @@
 // libMesh includes
 #include "libmesh/node_range.h"
 
-class NonlinearSystem;
+class SolverSystem;
 
 class MaxVarNDofsPerNode : public ThreadedNodeLoop<ConstNodeRange, ConstNodeRange::const_iterator>
 {
 public:
-  MaxVarNDofsPerNode(FEProblemBase & feproblem, NonlinearSystemBase & sys);
+  MaxVarNDofsPerNode(FEProblemBase & feproblem, SolverSystem & sys);
 
   // Splitting Constructor
   MaxVarNDofsPerNode(MaxVarNDofsPerNode & x, Threads::split split);
@@ -33,7 +33,7 @@ public:
 
 protected:
   /// The nonlinear system
-  NonlinearSystemBase & _system;
+  SolverSystem & _system;
 
   /// Maximum number of dofs for any one variable on any one node
   size_t _max;

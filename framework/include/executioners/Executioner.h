@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -102,10 +102,16 @@ public:
    * This is an empty string for non-Transient executioners
    * @return A string of giving the TimeStepper name
    */
-  virtual std::string getTimeStepperName() { return std::string(); }
+  virtual std::string getTimeStepperName() const { return std::string(); }
+
+  /** The name of the TimeIntegrator
+   * This is an empty string for non-Transient executioners
+   * @return A string of giving the TimeIntegrator name
+   */
+  virtual std::vector<std::string> getTimeIntegratorNames() const { return {}; }
 
   /**
-   * Can be used by subsclasses to call parentOutputPositionChanged()
+   * Can be used by subclasses to call parentOutputPositionChanged()
    * on the underlying FEProblemBase.
    */
   virtual void parentOutputPositionChanged() {}
@@ -118,7 +124,7 @@ public:
   /// Return underlying PicardSolve object.
   PicardSolve & picardSolve()
   {
-    mooseDeprecated("picardSolve() is deprecated. Use FixedPointSolve() instead.");
+    mooseDeprecated("picardSolve() is deprecated. Use fixedPointSolve() instead.");
     if (_iteration_method == "picard")
       return *(dynamic_cast<PicardSolve *>(_fixed_point_solve.get()));
     else

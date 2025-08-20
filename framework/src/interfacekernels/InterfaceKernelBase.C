@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,7 +30,6 @@ InterfaceKernelBase::validParams()
                         "the case this is true but no displacements "
                         "are provided in the Mesh block the "
                         "undisplaced mesh will still be used.");
-  params.addPrivateParam<bool>("_use_undisplaced_reference_points", false);
   params.addParamNamesToGroup("use_displaced_mesh", "Advanced");
 
   params.declareControllable("enable");
@@ -38,11 +37,13 @@ InterfaceKernelBase::validParams()
   params.set<std::string>("_moose_base") = "InterfaceKernel";
   params.addParam<std::vector<AuxVariableName>>(
       "save_in",
+      {},
       "The name of auxiliary variables to save this Kernel's residual contributions to. "
       " Everything about that variable must match everything about this variable (the "
       "type, what blocks it's on, etc.)");
   params.addParam<std::vector<AuxVariableName>>(
       "diag_save_in",
+      {},
       "The name of auxiliary variables to save this Kernel's diagonal Jacobian "
       "contributions to. Everything about that variable must match everything "
       "about this variable (the type, what blocks it's on, etc.)");
@@ -60,6 +61,8 @@ InterfaceKernelBase::validParams()
       "This parameter must exist if diag_save_in variables are specified and must have the same "
       "length as diag_save_in. This vector specifies whether the corresponding aux_var should "
       "save-in jacobian contributions from the primary ('p') or secondary side ('s').");
+  params.addParamNamesToGroup("diag_save_in save_in save_in_var_side diag_save_in_var_side",
+                              "Residual and Jacobian debug output");
 
   // InterfaceKernels always need one layer of ghosting.
   params.addRelationshipManager("ElementSideNeighborLayers",
@@ -95,7 +98,6 @@ InterfaceKernelBase::InterfaceKernelBase(const InputParameters & parameters)
     _save_in_strings(parameters.get<std::vector<AuxVariableName>>("save_in")),
     _diag_save_in_var_side(parameters.get<MultiMooseEnum>("diag_save_in_var_side")),
     _diag_save_in_strings(parameters.get<std::vector<AuxVariableName>>("diag_save_in"))
-
 {
 }
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,6 +24,8 @@ public:
 
   std::unique_ptr<MeshBase> generate() override;
 
+  void generateData() override{};
+
 protected:
   /// The number of dimension in the mesh
   const MooseEnum _dim;
@@ -35,10 +37,10 @@ protected:
   const Real _assembly_pitch;
 
   ///The heights of the axial regions.
-  const std::vector<Real> _axial_regions;
+  std::vector<Real> _axial_regions;
 
   ///The number of mesh divisions in each axial region.
-  const std::vector<unsigned int> _axial_mesh_intervals;
+  std::vector<unsigned int> _axial_mesh_intervals;
 
   ///Boundary id assigned to top boundary of extruded mesh.
   boundary_id_type _top_boundary;
@@ -48,7 +50,4 @@ protected:
 
   ///Boundary id assigned to outer radial boundary of core mesh.
   boundary_id_type _radial_boundary;
-
-  // Map between RGMB element block names, block ids, and region ids
-  std::map<std::string, std::pair<subdomain_id_type, dof_id_type>> _name_id_map;
 };

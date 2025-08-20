@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -40,7 +40,7 @@ VariableValueVolumeHistogram::VariableValueVolumeHistogram(const InputParameters
     _max_value(getParam<Real>("max_value")),
     _deltaV((_max_value - _min_value) / _nbins),
     _value(coupledValue("variable")),
-    _bin_center(declareVector(getVar("variable", 0)->name())),
+    _bin_center(declareVector(coupledName("variable"))),
     _volume(declareVector("n"))
 {
   if (coupledComponents("variable") != 1)
@@ -83,7 +83,7 @@ VariableValueVolumeHistogram::finalize()
 void
 VariableValueVolumeHistogram::threadJoin(const UserObject & y)
 {
-  const VariableValueVolumeHistogram & uo = static_cast<const VariableValueVolumeHistogram &>(y);
+  const auto & uo = static_cast<const VariableValueVolumeHistogram &>(y);
   mooseAssert(uo._volume.size() == _volume.size(),
               "Inconsistent volume vector lengths across threads.");
 

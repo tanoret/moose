@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,7 @@ SpecificTotalEnthalpyAux::validParams()
   params.addRequiredCoupledVar("p", "Pressure");
   params.addRequiredCoupledVar("A", "Cross-sectional area");
   params.addCoupledVar("alpha", 1., "Volume fraction");
+  params.addClassDescription("Compute the specific total enthalpy");
 
   return params;
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,4 +26,7 @@ protected:
 
   /// Functor for the time derivative of density, material property or variable
   const Moose::Functor<ADReal> & _rho_dot;
+
+  /// The specific enthalpy
+  const Moose::Functor<ADReal> & _h;
 };

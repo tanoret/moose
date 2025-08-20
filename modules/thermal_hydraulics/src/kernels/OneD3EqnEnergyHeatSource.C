@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,7 +18,7 @@ OneD3EqnEnergyHeatSource::validParams()
   InputParameters params = Kernel::validParams();
   params.addRequiredParam<FunctionName>("q", "Volumetric heat source");
   params.addRequiredCoupledVar("A", "Cross sectional area");
-  params.addClassDescription("Volumetric heat source for 1-phase flow channel");
+  params.addClassDescription("Computes a volumetric heat source for 1-phase flow channel");
   return params;
 }
 

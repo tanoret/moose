@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -51,7 +51,7 @@ ConservedNoiseBase::execute()
 void
 ConservedNoiseBase::threadJoin(const UserObject & y)
 {
-  const ConservedNoiseBase & uo = static_cast<const ConservedNoiseBase &>(y);
+  const auto & uo = static_cast<const ConservedNoiseBase &>(y);
 
   _random_data.insert(uo._random_data.begin(), uo._random_data.end());
   _integral += uo._integral;

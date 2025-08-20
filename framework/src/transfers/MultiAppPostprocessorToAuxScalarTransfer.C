@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -150,4 +150,20 @@ MultiAppPostprocessorToAuxScalarTransfer::execute()
       break;
     }
   }
+}
+
+void
+MultiAppPostprocessorToAuxScalarTransfer::checkSiblingsTransferSupported() const
+{
+  // Check that we are in the supported configuration: same number of source and target apps
+  // The allocation of the child apps on the processors must be the same
+  if (getFromMultiApp()->numGlobalApps() == getToMultiApp()->numGlobalApps())
+  {
+    for (const auto i : make_range(getToMultiApp()->numGlobalApps()))
+      if (getFromMultiApp()->hasLocalApp(i) + getToMultiApp()->hasLocalApp(i) == 1)
+        mooseError("Child application allocation on parallel processes must be the same to support "
+                   "siblings postprocessor to scalar variable transfer");
+  }
+  else
+    mooseError("Number of source and target child apps must match for siblings transfer");
 }

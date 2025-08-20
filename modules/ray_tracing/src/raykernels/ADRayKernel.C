@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,7 +36,7 @@ ADRayKernelTempl<T>::ADRayKernelTempl(const InputParameters & params)
     MooseVariableInterface<T>(this,
                               false,
                               "variable",
-                              Moose::VarKindType::VAR_NONLINEAR,
+                              Moose::VarKindType::VAR_SOLVER,
                               std::is_same<T, Real>::value ? Moose::VarFieldType::VAR_FIELD_STANDARD
                                                            : Moose::VarFieldType::VAR_FIELD_VECTOR),
     TaggingInterface(this),
@@ -106,32 +106,7 @@ ADRayKernelTempl<T>::computeJacobian()
     for (_i = 0; _i < _test.size(); _i++)
       _residuals[_i] += _JxW[_qp] * computeQpResidual();
 
-  auto local_functor =
-      [&](const std::vector<ADReal> &, const std::vector<dof_id_type> &, const std::set<TagID> &)
-  {
-    for (const auto & it : _assembly.couplingEntries())
-    {
-      const MooseVariableFEBase & ivariable = *(it.first);
-      const MooseVariableFEBase & jvariable = *(it.second);
-
-      if (ivariable.number() != _var.number() || !jvariable.hasBlocks(_current_subdomain_id))
-        continue;
-
-      const auto ad_offset = Moose::adOffset(
-          jvariable.number(), _nl.getMaxVarNDofsPerElem(), Moose::ElementType::Element);
-
-      prepareMatrixTag(_assembly, _var.number(), jvariable.number());
-
-      for (_i = 0; _i < _test.size(); _i++)
-        for (_j = 0; _j < jvariable.phiSize(); _j++)
-          _local_ke(_i, _j) += _residuals[_i].derivatives()[ad_offset + _j];
-
-      accumulateTaggedLocalMatrix();
-    }
-  };
-
-  _assembly.processJacobian(
-      _residuals, _var.dofIndices(), _matrix_tags, _var.scalingFactor(), local_functor);
+  addJacobian(_assembly, _residuals, _var.dofIndices(), _var.scalingFactor());
 }
 
 template class ADRayKernelTempl<Real>;

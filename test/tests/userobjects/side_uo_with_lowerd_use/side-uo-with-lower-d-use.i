@@ -51,7 +51,7 @@
   [lambda]
     order = CONSTANT
     family = MONOMIAL
-    block = INTERNAL_SIDE_LOWERD_SUBDOMAIN
+    block = INTERNAL_SIDE_LOWERD_SUBDOMAIN_EDGE2
   []
 []
 
@@ -73,6 +73,12 @@
     variable = u
     value = '1'
     block = '1 2 3 4'
+  []
+  [time]
+    type = CoefTimeDerivative
+    variable = u
+    block = '1 2 3 4'
+    Coefficient = 1
   []
 []
 
@@ -119,8 +125,18 @@
   []
 []
 
+[Postprocessors]
+  [unorm]
+    type = ElementL2Norm
+    variable = u
+    block = '1 2 3 4'
+  []
+[]
+
 [Executioner]
-  type = Steady
+  type = Transient
+  nl_abs_tol = 1e-12
+  num_steps = 8
   solve_type = 'NEWTON'
   petsc_options_iname = '-pc_type -snes_linesearch_type -pc_factor_mat_solver_type'
   petsc_options_value = 'lu       basic                 mumps'

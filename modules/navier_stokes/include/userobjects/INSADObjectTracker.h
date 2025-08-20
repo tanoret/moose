@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -80,8 +80,6 @@ private:
   template <typename T>
   static void set(const std::string & name, const T & value, InputParameters & params);
 
-  bool singleMaterialCoverage() const;
-
   const InputParameters & getParams(SubdomainID sub_id) const;
 };
 
@@ -115,14 +113,6 @@ template <typename T>
 void
 INSADObjectTracker::set(const std::string & name, const T & value, const SubdomainID sub_id)
 {
-  if (sub_id == Moose::ANY_BLOCK_ID)
-  {
-    for (auto & pr : _block_id_to_params)
-      INSADObjectTracker::set(name, value, pr.second);
-
-    return;
-  }
-
   INSADObjectTracker::set(name, value, const_cast<InputParameters &>(getParams(sub_id)));
 }
 

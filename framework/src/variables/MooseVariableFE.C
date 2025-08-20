@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,11 @@
 #include "DisplacedSystem.h"
 #include "Assembly.h"
 #include "MooseVariableData.h"
+#include "ArbitraryQuadrature.h"
+
+#include "libmesh/quadrature_monomial.h"
+
+using namespace libMesh;
 
 template <>
 InputParameters
@@ -30,7 +35,8 @@ InputParameters
 MooseVariableFE<RealVectorValue>::validParams()
 {
   auto params = MooseVariableField<RealVectorValue>::validParams();
-  params.addClassDescription("Represents vector field variables, e.g. Vector Lagrange or Nedelec");
+  params.addClassDescription(
+      "Represents vector field variables, e.g. Vector Lagrange, Nedelec or Raviart-Thomas");
   return params;
 }
 
@@ -74,20 +80,6 @@ MooseVariableFE<OutputType>::MooseVariableFE(const InputParameters & parameters)
                                                       this->_assembly.qRuleFace(), // Place holder
                                                       this->_assembly.node(),      // Place holder
                                                       this->_assembly.lowerDElem());
-}
-
-template <typename OutputType>
-Moose::VarFieldType
-MooseVariableFE<OutputType>::fieldType() const
-{
-  if (std::is_same<OutputType, Real>::value)
-    return Moose::VarFieldType::VAR_FIELD_STANDARD;
-  else if (std::is_same<OutputType, RealVectorValue>::value)
-    return Moose::VarFieldType::VAR_FIELD_VECTOR;
-  else if (std::is_same<OutputType, RealEigenVector>::value)
-    return Moose::VarFieldType::VAR_FIELD_ARRAY;
-  else
-    mooseError("Unknown variable field type");
 }
 
 template <typename OutputType>
@@ -214,16 +206,23 @@ MooseVariableFE<OutputType>::getElementalValueOlder(const Elem * elem, unsigned 
 
 template <typename OutputType>
 void
-MooseVariableFE<OutputType>::insert(NumericVector<Number> & residual)
+MooseVariableFE<OutputType>::insert(NumericVector<Number> & vector)
 {
-  _element_data->insert(residual);
+  _element_data->insert(vector);
 }
 
 template <typename OutputType>
 void
-MooseVariableFE<OutputType>::add(NumericVector<Number> & residual)
+MooseVariableFE<OutputType>::insertLower(NumericVector<Number> & vector)
 {
-  _element_data->add(residual);
+  _lower_data->insert(vector);
+}
+
+template <typename OutputType>
+void
+MooseVariableFE<OutputType>::add(NumericVector<Number> & vector)
+{
+  _element_data->add(vector);
 }
 
 template <typename OutputType>
@@ -700,24 +699,17 @@ MooseVariableFE<OutputType>::setDofValues(const DenseVector<OutputData> & values
 
 template <typename OutputType>
 void
+MooseVariableFE<OutputType>::setLowerDofValues(const DenseVector<OutputData> & values)
+{
+  _lower_data->setDofValues(values);
+}
+
+template <typename OutputType>
+void
 MooseVariableFE<OutputType>::insertNodalValue(NumericVector<Number> & residual,
                                               const OutputData & v)
 {
   _element_data->insertNodalValue(residual, v);
-}
-
-template <typename OutputType>
-bool
-MooseVariableFE<OutputType>::isArray() const
-{
-  return std::is_same<OutputType, RealEigenVector>::value;
-}
-
-template <typename OutputType>
-bool
-MooseVariableFE<OutputType>::isVector() const
-{
-  return std::is_same<OutputType, RealVectorValue>::value;
 }
 
 template <typename OutputType>
@@ -735,6 +727,13 @@ MooseVariableFE<OutputType>::curlPhi() const
 }
 
 template <typename OutputType>
+const typename MooseVariableFE<OutputType>::FieldVariablePhiDivergence &
+MooseVariableFE<OutputType>::divPhi() const
+{
+  return _element_data->divPhi();
+}
+
+template <typename OutputType>
 const typename MooseVariableFE<OutputType>::FieldVariablePhiSecond &
 MooseVariableFE<OutputType>::secondPhiFace() const
 {
@@ -746,6 +745,13 @@ const typename MooseVariableFE<OutputType>::FieldVariablePhiCurl &
 MooseVariableFE<OutputType>::curlPhiFace() const
 {
   return _element_data->curlPhiFace();
+}
+
+template <typename OutputType>
+const typename MooseVariableFE<OutputType>::FieldVariablePhiDivergence &
+MooseVariableFE<OutputType>::divPhiFace() const
+{
+  return _element_data->divPhiFace();
 }
 
 template <typename OutputType>
@@ -763,6 +769,13 @@ MooseVariableFE<OutputType>::curlPhiNeighbor() const
 }
 
 template <typename OutputType>
+const typename MooseVariableFE<OutputType>::FieldVariablePhiDivergence &
+MooseVariableFE<OutputType>::divPhiNeighbor() const
+{
+  return _neighbor_data->divPhi();
+}
+
+template <typename OutputType>
 const typename MooseVariableFE<OutputType>::FieldVariablePhiSecond &
 MooseVariableFE<OutputType>::secondPhiFaceNeighbor() const
 {
@@ -774,6 +787,13 @@ const typename MooseVariableFE<OutputType>::FieldVariablePhiCurl &
 MooseVariableFE<OutputType>::curlPhiFaceNeighbor() const
 {
   return _neighbor_data->curlPhiFace();
+}
+
+template <typename OutputType>
+const typename MooseVariableFE<OutputType>::FieldVariablePhiDivergence &
+MooseVariableFE<OutputType>::divPhiFaceNeighbor() const
+{
+  return _neighbor_data->divPhiFace();
 }
 
 template <typename OutputType>
@@ -795,6 +815,13 @@ bool
 MooseVariableFE<OutputType>::computingCurl() const
 {
   return _element_data->computingCurl();
+}
+
+template <typename OutputType>
+bool
+MooseVariableFE<OutputType>::computingDiv() const
+{
+  return _element_data->computingDiv();
 }
 
 template <typename OutputType>
@@ -829,6 +856,524 @@ MooseVariableFE<OutputType>::clearAllDofIndices()
   _element_data->clearDofIndices();
   _neighbor_data->clearDofIndices();
   _lower_data->clearDofIndices();
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::ValueType
+MooseVariableFE<OutputType>::evaluate(const NodeArg & node_arg, const StateArg & state) const
+{
+  mooseAssert(node_arg.node, "Must have a node");
+  const Node & node = *node_arg.node;
+  mooseAssert(node.n_dofs(this->_sys.number(), this->number()),
+              "Our variable must have dofs on the requested node");
+  const auto & soln = this->getSolution(state);
+  if constexpr (std::is_same<OutputType, Real>::value)
+  {
+    const auto dof_number = node.dof_number(this->_sys.number(), this->number(), 0);
+    ValueType ret = soln(dof_number);
+    if (Moose::doDerivatives(_subproblem, _sys))
+      Moose::derivInsert(ret.derivatives(), dof_number, 1);
+    return ret;
+  }
+  else if constexpr (std::is_same<OutputType, RealVectorValue>::value)
+  {
+    ValueType ret;
+    const auto do_derivatives = Moose::doDerivatives(_subproblem, _sys);
+    for (const auto d : make_range(this->_mesh.dimension()))
+    {
+      const auto dof_number = node.dof_number(this->_sys.number(), this->number(), d);
+      auto & component = ret(d);
+      component = soln(dof_number);
+      if (do_derivatives)
+        Moose::derivInsert(component.derivatives(), dof_number, 1);
+    }
+    return ret;
+  }
+  else
+    mooseError("RealEigenVector not yet supported for functors");
+}
+
+namespace
+{
+template <typename OutputType>
+struct FEBaseHelper
+{
+  typedef FEBase type;
+};
+
+template <>
+struct FEBaseHelper<RealVectorValue>
+{
+  typedef FEVectorBase type;
+};
+}
+
+template <typename OutputType>
+template <typename Shapes, typename Solution, typename GradShapes, typename GradSolution>
+void
+MooseVariableFE<OutputType>::computeSolution(const Elem * const elem,
+                                             const unsigned int n_qp,
+                                             const StateArg & state,
+                                             const Shapes & phi,
+                                             Solution & local_soln,
+                                             const GradShapes & grad_phi,
+                                             GradSolution & grad_local_soln,
+                                             Solution & dot_local_soln,
+                                             GradSolution & grad_dot_local_soln) const
+{
+  std::vector<dof_id_type> dof_indices;
+  this->_dof_map.dof_indices(elem, dof_indices, _var_num);
+  std::vector<ADReal> dof_values;
+  std::vector<ADReal> dof_values_dot;
+  dof_values.reserve(dof_indices.size());
+
+  const bool computing_dot = _time_integrator && _time_integrator->dt();
+  if (computing_dot)
+    dof_values_dot.reserve(dof_indices.size());
+
+  const bool do_derivatives = Moose::doDerivatives(_subproblem, _sys);
+  const auto & global_soln = getSolution(state);
+  for (const auto dof_index : dof_indices)
+  {
+    dof_values.push_back(ADReal(global_soln(dof_index)));
+    if (do_derivatives && state.state == 0)
+      Moose::derivInsert(dof_values.back().derivatives(), dof_index, 1.);
+    if (computing_dot)
+    {
+      if (_var_kind == Moose::VAR_SOLVER)
+      {
+        dof_values_dot.push_back(dof_values.back());
+        _time_integrator->computeADTimeDerivatives(
+            dof_values_dot.back(), dof_index, _ad_real_dummy);
+      }
+      else
+        dof_values_dot.push_back((*this->_sys.solutionUDot())(dof_index));
+    }
+  }
+
+  local_soln.resize(n_qp);
+  grad_local_soln.resize(n_qp);
+  if (computing_dot)
+  {
+    dot_local_soln.resize(n_qp);
+    grad_dot_local_soln.resize(n_qp);
+  }
+
+  for (const auto qp : make_range(n_qp))
+  {
+    local_soln[qp] = 0;
+    grad_local_soln[qp] = 0;
+    if (computing_dot)
+    {
+      dot_local_soln[qp] = 0;
+      grad_dot_local_soln[qp] = GradientType{};
+    }
+    for (const auto i : index_range(dof_indices))
+    {
+      local_soln[qp] += dof_values[i] * phi[i][qp];
+      grad_local_soln[qp] += dof_values[i] * grad_phi[i][qp];
+      if (computing_dot)
+      {
+        dot_local_soln[qp] += dof_values_dot[i] * phi[i][qp];
+        grad_dot_local_soln[qp] += dof_values_dot[i] * grad_phi[i][qp];
+      }
+    }
+  }
+}
+
+template <typename OutputType>
+void
+MooseVariableFE<OutputType>::evaluateOnElement(const ElemQpArg & elem_qp,
+                                               const StateArg & state,
+                                               const bool cache_eligible) const
+{
+  mooseAssert(this->hasBlocks(elem_qp.elem->subdomain_id()),
+              "Variable " + this->name() + " doesn't exist on block " +
+                  std::to_string(elem_qp.elem->subdomain_id()));
+
+  const Elem * const elem = elem_qp.elem;
+  if (!cache_eligible || (elem != _current_elem_qp_functor_elem))
+  {
+    const QBase * const qrule_template = elem_qp.qrule;
+
+    using FEBaseType = typename FEBaseHelper<OutputType>::type;
+    std::unique_ptr<FEBaseType> fe(FEBaseType::build(elem->dim(), _fe_type));
+    auto qrule = qrule_template->clone();
+
+    const auto & phi = fe->get_phi();
+    const auto & dphi = fe->get_dphi();
+    fe->attach_quadrature_rule(qrule.get());
+    fe->reinit(elem);
+
+    computeSolution(elem,
+                    qrule->n_points(),
+                    state,
+                    phi,
+                    _current_elem_qp_functor_sln,
+                    dphi,
+                    _current_elem_qp_functor_gradient,
+                    _current_elem_qp_functor_dot,
+                    _current_elem_qp_functor_grad_dot);
+  }
+  if (cache_eligible)
+    _current_elem_qp_functor_elem = elem;
+  else
+    // These evaluations are not eligible for caching, e.g. maybe this is a single point quadrature
+    // rule evaluation at an arbitrary point and we don't want those evaluations to potentially be
+    // re-used when this function is called with a standard quadrature rule or a different point
+    _current_elem_qp_functor_elem = nullptr;
+}
+
+template <>
+void
+MooseVariableFE<RealEigenVector>::evaluateOnElement(const ElemQpArg &, const StateArg &, bool) const
+{
+  mooseError("evaluate not implemented for array variables");
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::ValueType
+MooseVariableFE<OutputType>::evaluate(const ElemQpArg & elem_qp, const StateArg & state) const
+{
+  evaluateOnElement(elem_qp, state, /*query_cache=*/true);
+  const auto qp = elem_qp.qp;
+  mooseAssert(qp < _current_elem_qp_functor_sln.size(),
+              "The requested " << qp << " is outside our solution size");
+  return _current_elem_qp_functor_sln[qp];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::ValueType
+MooseVariableFE<OutputType>::evaluate(const ElemArg & elem_arg, const StateArg & state) const
+{
+  const QMonomial qrule(elem_arg.elem->dim(), CONSTANT);
+  // We can use whatever we want for the point argument since it won't be used
+  const ElemQpArg elem_qp_arg{elem_arg.elem, /*qp=*/0, &qrule, Point(0, 0, 0)};
+  evaluateOnElement(elem_qp_arg, state, /*cache_eligible=*/false);
+  return _current_elem_qp_functor_sln[0];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::ValueType
+MooseVariableFE<OutputType>::faceEvaluate(const FaceArg & face_arg,
+                                          const StateArg & state,
+                                          const std::vector<ValueType> & cache_data) const
+{
+  const QMonomial qrule(face_arg.fi->elem().dim() - 1, CONSTANT);
+  auto side_evaluate =
+      [this, &qrule, &state, &cache_data](const Elem * const elem, const unsigned int side)
+  {
+    // We can use whatever we want for the point argument since it won't be used
+    const ElemSideQpArg elem_side_qp_arg{elem, side, /*qp=*/0, &qrule, Point(0, 0, 0)};
+    evaluateOnElementSide(elem_side_qp_arg, state, /*cache_eligible=*/false);
+    return cache_data[0];
+  };
+
+  const auto continuity = this->getContinuity();
+  bool on_elem;
+  bool on_neighbor;
+  if (!face_arg.face_side)
+  {
+    on_elem = this->hasBlocks(face_arg.fi->elemPtr()->subdomain_id());
+    on_neighbor =
+        face_arg.fi->neighborPtr() && this->hasBlocks(face_arg.fi->neighborPtr()->subdomain_id());
+  }
+  else
+  {
+    on_elem = face_arg.face_side == face_arg.fi->elemPtr();
+    on_neighbor = face_arg.face_side == face_arg.fi->neighborPtr();
+  }
+
+  // Only do multiple evaluations if we are not continuous and we are on an internal face
+  if ((continuity != C_ZERO && continuity != C_ONE) && on_elem && on_neighbor)
+    return (side_evaluate(face_arg.fi->elemPtr(), face_arg.fi->elemSideID()) +
+            side_evaluate(face_arg.fi->neighborPtr(), face_arg.fi->neighborSideID())) /
+           2;
+  else if (on_elem)
+    return side_evaluate(face_arg.fi->elemPtr(), face_arg.fi->elemSideID());
+  else if (on_neighbor)
+    return side_evaluate(face_arg.fi->neighborPtr(), face_arg.fi->neighborSideID());
+  else
+    mooseError(
+        "Attempted to evaluate a moose finite element variable on a face where it is not defined");
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::ValueType
+MooseVariableFE<OutputType>::evaluate(const FaceArg & face_arg, const StateArg & state) const
+{
+  return faceEvaluate(face_arg, state, _current_elem_side_qp_functor_sln);
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::ValueType
+MooseVariableFE<OutputType>::evaluate(const ElemPointArg & elem_point_arg,
+                                      const StateArg & state) const
+{
+  mooseAssert(elem_point_arg.elem, "We need an Elem");
+  const Elem & elem = *elem_point_arg.elem;
+  const auto dim = elem.dim();
+  ArbitraryQuadrature qrule(dim);
+  const std::vector<Point> ref_point = {FEMap::inverse_map(dim, &elem, elem_point_arg.point)};
+  qrule.setPoints(ref_point);
+  // We can use whatever we want for the point argument since it won't be used
+  const ElemQpArg elem_qp_arg{elem_point_arg.elem, /*qp=*/0, &qrule, elem_point_arg.point};
+  evaluateOnElement(elem_qp_arg, state, /*cache_eligible=*/false);
+  return _current_elem_qp_functor_sln[0];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::GradientType
+MooseVariableFE<OutputType>::evaluateGradient(const ElemQpArg & elem_qp,
+                                              const StateArg & state) const
+{
+  evaluateOnElement(elem_qp, state, /*query_cache=*/true);
+  const auto qp = elem_qp.qp;
+  mooseAssert(qp < _current_elem_qp_functor_gradient.size(),
+              "The requested " << qp << " is outside our gradient size");
+  return _current_elem_qp_functor_gradient[qp];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::GradientType
+MooseVariableFE<OutputType>::evaluateGradient(const ElemArg & elem_arg,
+                                              const StateArg & state) const
+{
+  const QMonomial qrule(elem_arg.elem->dim(), CONSTANT);
+  // We can use whatever we want for the point argument since it won't be used
+  const ElemQpArg elem_qp_arg{elem_arg.elem, /*qp=*/0, &qrule, Point(0, 0, 0)};
+  evaluateOnElement(elem_qp_arg, state, /*cache_eligible=*/false);
+  return _current_elem_qp_functor_gradient[0];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::DotType
+MooseVariableFE<OutputType>::evaluateDot(const ElemQpArg & elem_qp, const StateArg & state) const
+{
+  mooseAssert(_time_integrator,
+              "A time derivative is being requested but we do not have a time integrator so we'll "
+              "have no idea how to compute it");
+  mooseAssert(_time_integrator->dt(),
+              "A time derivative is being requested but the time integrator wants to perform a 0s "
+              "time step");
+  evaluateOnElement(elem_qp, state, /*query_cache=*/true);
+  const auto qp = elem_qp.qp;
+  mooseAssert(qp < _current_elem_qp_functor_dot.size(),
+              "The requested " << qp << " is outside our dot size");
+  return _current_elem_qp_functor_dot[qp];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::DotType
+MooseVariableFE<OutputType>::evaluateDot(const ElemArg & elem_arg, const StateArg & state) const
+{
+  mooseAssert(_time_integrator,
+              "A time derivative is being requested but we do not have a time integrator so we'll "
+              "have no idea how to compute it");
+  mooseAssert(_time_integrator->dt(),
+              "A time derivative is being requested but the time integrator wants to perform a 0s "
+              "time step");
+  const QMonomial qrule(elem_arg.elem->dim(), CONSTANT);
+  // We can use whatever we want for the point argument since it won't be used
+  const ElemQpArg elem_qp_arg{elem_arg.elem, /*qp=*/0, &qrule, Point(0, 0, 0)};
+  evaluateOnElement(elem_qp_arg, state, /*cache_eligible=*/false);
+  return _current_elem_qp_functor_dot[0];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::GradientType
+MooseVariableFE<OutputType>::evaluateGradDot(const ElemArg & elem_arg, const StateArg & state) const
+{
+  mooseAssert(_time_integrator,
+              "A time derivative is being requested but we do not have a time integrator so we'll "
+              "have no idea how to compute it");
+  mooseAssert(_time_integrator->dt(),
+              "A time derivative is being requested but the time integrator wants to perform a 0s "
+              "time step");
+  const QMonomial qrule(elem_arg.elem->dim(), CONSTANT);
+  // We can use whatever we want for the point argument since it won't be used
+  const ElemQpArg elem_qp_arg{elem_arg.elem, /*qp=*/0, &qrule, Point(0, 0, 0)};
+  evaluateOnElement(elem_qp_arg, state, /*cache_eligible=*/false);
+  return _current_elem_qp_functor_grad_dot[0];
+}
+
+template <typename OutputType>
+void
+MooseVariableFE<OutputType>::evaluateOnElementSide(const ElemSideQpArg & elem_side_qp,
+                                                   const StateArg & state,
+                                                   const bool cache_eligible) const
+{
+  mooseAssert(this->hasBlocks(elem_side_qp.elem->subdomain_id()),
+              "Variable " + this->name() + " doesn't exist on block " +
+                  std::to_string(elem_side_qp.elem->subdomain_id()));
+
+  const Elem * const elem = elem_side_qp.elem;
+  const auto side = elem_side_qp.side;
+  if (!cache_eligible || elem != _current_elem_side_qp_functor_elem_side.first ||
+      side != _current_elem_side_qp_functor_elem_side.second)
+  {
+    const QBase * const qrule_template = elem_side_qp.qrule;
+
+    using FEBaseType = typename FEBaseHelper<OutputType>::type;
+    std::unique_ptr<FEBaseType> fe(FEBaseType::build(elem->dim(), _fe_type));
+    auto qrule = qrule_template->clone();
+
+    const auto & phi = fe->get_phi();
+    const auto & dphi = fe->get_dphi();
+    fe->attach_quadrature_rule(qrule.get());
+    fe->reinit(elem, side);
+
+    computeSolution(elem,
+                    qrule->n_points(),
+                    state,
+                    phi,
+                    _current_elem_side_qp_functor_sln,
+                    dphi,
+                    _current_elem_side_qp_functor_gradient,
+                    _current_elem_side_qp_functor_dot,
+                    _current_elem_side_qp_functor_grad_dot);
+  }
+  if (cache_eligible)
+    _current_elem_side_qp_functor_elem_side = std::make_pair(elem, side);
+  else
+    // These evaluations are not eligible for caching, e.g. maybe this is a single point quadrature
+    // rule evaluation at an arbitrary point and we don't want those evaluations to potentially be
+    // re-used when this function is called with a standard quadrature rule or a different point
+    _current_elem_side_qp_functor_elem_side = std::make_pair(nullptr, libMesh::invalid_uint);
+}
+
+template <>
+void
+MooseVariableFE<RealEigenVector>::evaluateOnElementSide(const ElemSideQpArg &,
+                                                        const StateArg &,
+                                                        bool) const
+{
+  mooseError("evaluate not implemented for array variables");
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::ValueType
+MooseVariableFE<OutputType>::evaluate(const ElemSideQpArg & elem_side_qp,
+                                      const StateArg & state) const
+{
+  evaluateOnElementSide(elem_side_qp, state, true);
+  const auto qp = elem_side_qp.qp;
+  mooseAssert(qp < _current_elem_side_qp_functor_sln.size(),
+              "The requested " << qp << " is outside our solution size");
+  return _current_elem_side_qp_functor_sln[qp];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::GradientType
+MooseVariableFE<OutputType>::evaluateGradient(const ElemSideQpArg & elem_side_qp,
+                                              const StateArg & state) const
+{
+  evaluateOnElementSide(elem_side_qp, state, true);
+  const auto qp = elem_side_qp.qp;
+  mooseAssert(qp < _current_elem_side_qp_functor_gradient.size(),
+              "The requested " << qp << " is outside our gradient size");
+  return _current_elem_side_qp_functor_gradient[qp];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::DotType
+MooseVariableFE<OutputType>::evaluateDot(const ElemSideQpArg & elem_side_qp,
+                                         const StateArg & state) const
+{
+  mooseAssert(_time_integrator && _time_integrator->dt(),
+              "A time derivative is being requested but we do not have a time integrator so we'll "
+              "have no idea how to compute it");
+  evaluateOnElementSide(elem_side_qp, state, true);
+  const auto qp = elem_side_qp.qp;
+  mooseAssert(qp < _current_elem_side_qp_functor_dot.size(),
+              "The requested " << qp << " is outside our dot size");
+  return _current_elem_side_qp_functor_dot[qp];
+}
+
+template <typename OutputType>
+typename MooseVariableFE<OutputType>::DotType
+MooseVariableFE<OutputType>::evaluateDot(const FaceArg & face_arg, const StateArg & state) const
+{
+  mooseAssert(_time_integrator && _time_integrator->dt(),
+              "A time derivative is being requested but we do not have a time integrator so we'll "
+              "have no idea how to compute it");
+  return faceEvaluate(face_arg, state, _current_elem_side_qp_functor_dot);
+}
+
+template <>
+typename MooseVariableFE<RealEigenVector>::ValueType
+MooseVariableFE<RealEigenVector>::evaluate(const ElemQpArg &, const StateArg &) const
+{
+  mooseError(
+      "MooseVariableFE::evaluate(ElemQpArg &, const StateArg &) overload not implemented for "
+      "array variables");
+}
+
+template <>
+typename MooseVariableFE<RealEigenVector>::ValueType
+MooseVariableFE<RealEigenVector>::evaluate(const ElemSideQpArg &, const StateArg &) const
+{
+  mooseError("MooseVariableFE::evaluate(ElemSideQpArg &, const StateArg &) overload not "
+             "implemented for array variables");
+}
+
+template <>
+typename MooseVariableFE<RealEigenVector>::GradientType
+MooseVariableFE<RealEigenVector>::evaluateGradient(const ElemQpArg &, const StateArg &) const
+{
+  mooseError("MooseVariableFE::evaluateGradient(ElemQpArg &, const StateArg &) overload not "
+             "implemented for array variables");
+}
+
+template <>
+typename MooseVariableFE<RealEigenVector>::GradientType
+MooseVariableFE<RealEigenVector>::evaluateGradient(const ElemSideQpArg &, const StateArg &) const
+{
+  mooseError("MooseVariableFE::evaluateGradient(ElemSideQpArg &, const StateArg &) overload not "
+             "implemented for array variables");
+}
+
+template <>
+typename MooseVariableFE<RealEigenVector>::DotType
+MooseVariableFE<RealEigenVector>::evaluateDot(const ElemQpArg &, const StateArg &) const
+{
+  mooseError("MooseVariableFE::evaluateDot(ElemQpArg &, const StateArg &) overload not "
+             "implemented for array variables");
+}
+
+template <>
+typename MooseVariableFE<RealEigenVector>::DotType
+MooseVariableFE<RealEigenVector>::evaluateDot(const ElemSideQpArg &, const StateArg &) const
+{
+  mooseError("MooseVariableFE::evaluateDot(ElemSideQpArg &, const StateArg &) overload not "
+             "implemented for array variables");
+}
+
+template <typename OutputType>
+void
+MooseVariableFE<OutputType>::meshChanged()
+{
+  _current_elem_qp_functor_elem = nullptr;
+  _current_elem_side_qp_functor_elem_side = std::make_pair(nullptr, libMesh::invalid_uint);
+  MooseVariableField<OutputType>::meshChanged();
+}
+
+template <typename OutputType>
+void
+MooseVariableFE<OutputType>::residualSetup()
+{
+  _current_elem_qp_functor_elem = nullptr;
+  _current_elem_side_qp_functor_elem_side = std::make_pair(nullptr, libMesh::invalid_uint);
+  MooseVariableField<OutputType>::residualSetup();
+}
+
+template <typename OutputType>
+void
+MooseVariableFE<OutputType>::jacobianSetup()
+{
+  _current_elem_qp_functor_elem = nullptr;
+  _current_elem_side_qp_functor_elem_side = std::make_pair(nullptr, libMesh::invalid_uint);
+  MooseVariableField<OutputType>::jacobianSetup();
 }
 
 template class MooseVariableFE<Real>;

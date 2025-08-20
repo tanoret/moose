@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,7 +11,6 @@
 
 #include "MooseTypes.h"
 #include "LeastSquaresFitBase.h"
-#include "DualRealOps.h"
 #include "LinearInterpolation.h"
 
 /**
@@ -50,7 +49,7 @@ public:
                                   const Real no_value = 500.0);
 
   virtual Real sample(Real T) override;
-  DualReal sample(DualReal T);
+  ADReal sample(const ADReal & T);
 
   /**
    * Sample derivative of function at temperature T

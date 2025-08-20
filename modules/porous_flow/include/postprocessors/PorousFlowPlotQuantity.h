@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,7 +28,7 @@ public:
   virtual void execute() override;
 
   /// Returns the value of the PorousFlowSumQuantity
-  virtual PostprocessorValue getValue() override;
+  virtual PostprocessorValue getValue() const override;
 
 protected:
   /// The PorousFlowSumQuantity userobject

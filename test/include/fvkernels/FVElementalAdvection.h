@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,8 +10,6 @@
 #pragma once
 
 #include "FVElementalKernel.h"
-
-#ifdef MOOSE_GLOBAL_AD_INDEXING
 
 class FVElementalAdvection : public FVElementalKernel
 {
@@ -26,5 +24,3 @@ protected:
   const ADMaterialProperty<Real> * const _prop;
   const ADMaterialProperty<RealVectorValue> * const _grad_prop;
 };
-
-#endif

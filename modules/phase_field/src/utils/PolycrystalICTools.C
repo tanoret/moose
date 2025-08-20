@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,10 +12,13 @@
 // MOOSE includes
 #include "MooseMesh.h"
 #include "MooseVariable.h"
+#include "PetscSupport.h"
 
 #include "libmesh/mesh_tools.h"
 #include "libmesh/periodic_boundaries.h"
 #include "libmesh/point_locator_base.h"
+
+using namespace libMesh;
 
 namespace GraphColoring
 {
@@ -321,8 +324,6 @@ PolycrystalICTools::assignOpsToGrains(AdjacencyMatrix<Real> & adjacency_matrix,
                                       unsigned int n_ops,
                                       const MooseEnum & coloring_algorithm)
 {
-  Moose::perf_log.push("assignOpsToGrains()", "PolycrystalICTools");
-
   std::vector<unsigned int> grain_to_op(n_grains, GraphColoring::INVALID_COLOR);
 
   // Use a simple backtracking coloring algorithm
@@ -339,8 +340,6 @@ PolycrystalICTools::assignOpsToGrains(AdjacencyMatrix<Real> & adjacency_matrix,
     Moose::PetscSupport::colorAdjacencyMatrix(
         am_data, n_grains, n_ops, grain_to_op, ca_str.c_str());
   }
-
-  Moose::perf_log.pop("assignOpsToGrains()", "PolycrystalICTools");
 
   return grain_to_op;
 }

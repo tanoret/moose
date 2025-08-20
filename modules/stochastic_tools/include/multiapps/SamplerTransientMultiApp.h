@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,7 +46,7 @@ protected:
   dof_id_type _local_batch_app_index;
 
   /// Override to allow to get correct cli_args
-  virtual std::string getCommandLineArgsParamHelper(unsigned int local_app) override;
+  virtual std::vector<std::string> getCommandLineArgs(const unsigned int local_app) override;
 
 private:
   /**
@@ -75,7 +75,7 @@ private:
   /// Storage for batch-restore mode; the outer vector if for the local stochastic data and the
   /// inner vector is for the number of sub-apps. The later is 1 for this object, but it is included
   /// in case that changes in the future or in child classes
-  std::vector<std::vector<std::shared_ptr<Backup>>> _batch_backup;
+  std::vector<std::vector<std::unique_ptr<Backup>>> _batch_backup;
 
   /// Current row of data updated by updateRowData. Used by transfers and setting command line args
   std::vector<Real> _row_data;

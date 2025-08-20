@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,6 +22,7 @@ MooseObjectAction::validParams()
   params.addRequiredParam<std::string>(
       "type", "A string representing the Moose Object that will be built by this Action");
   params.addParam<bool>("isObjectAction", true, "Indicates that this is a MooseObjectAction.");
+  params.suppressParameter<bool>("isObjectAction");
   params.addClassDescription("Base class for all the actions creating a MOOSE object");
   return params;
 }

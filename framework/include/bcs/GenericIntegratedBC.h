@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,7 +42,6 @@ public:
   using GenericIntegratedBC<is_ad>::_test;                                                         \
   using GenericIntegratedBC<is_ad>::_q_point;                                                      \
   using GenericIntegratedBC<is_ad>::_var;                                                          \
-  using GenericIntegratedBC<is_ad>::_name;                                                         \
   using GenericIntegratedBC<is_ad>::getVar;                                                        \
   using Coupleable::coupled;                                                                       \
   using Coupleable::coupledComponents

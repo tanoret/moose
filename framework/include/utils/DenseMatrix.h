@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,12 +9,11 @@
 
 #pragma once
 
+#include "ADReal.h"
 #include "libmesh/dense_matrix.h"
-
-#include "DualRealOps.h"
 
 namespace libMesh
 {
 template <>
-DenseMatrix<DualReal>::DenseMatrix(const unsigned int new_m, const unsigned int new_n);
+DenseMatrix<ADReal>::DenseMatrix(const unsigned int new_m, const unsigned int new_n);
 }

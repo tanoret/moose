@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,7 +19,7 @@ class TestHarnessTester(TestHarnessTestCase):
             self.runTests('-i', 'timeout')
 
         e = cm.exception
-        self.assertRegex(e.output.decode('utf-8'), 'test_harness\.timeout.*?TIMEOUT')
+        self.assertRegex(e.output, 'test_harness\.timeout.*?TIMEOUT')
 
         # Verify return code is TIMEOUT related (0x1)
         self.assertIs(0x1, e.returncode)
@@ -34,7 +34,7 @@ class TestHarnessTester(TestHarnessTestCase):
             os.environ.pop('MOOSE_TEST_MAX_TIME')
 
         e = cm.exception
-        self.assertRegex(e.output.decode('utf-8'), 'test_harness\.timeout.*?TIMEOUT')
+        self.assertRegex(e.output, 'test_harness\.timeout.*?TIMEOUT')
 
         # Verify return code is TIMEOUT related (0x1)
         self.assertIs(0x1, e.returncode)

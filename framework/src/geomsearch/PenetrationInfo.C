@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,8 +20,9 @@
 
 #include "libmesh/elem.h"
 
-PenetrationInfo::PenetrationInfo(const Node * node,
-                                 const Elem * elem,
+using namespace libMesh;
+
+PenetrationInfo::PenetrationInfo(const Elem * elem,
                                  const Elem * side,
                                  unsigned int side_num,
                                  RealVectorValue norm,
@@ -36,8 +37,7 @@ PenetrationInfo::PenetrationInfo(const Node * node,
                                  const std::vector<RealGradient> & dxyzdxi,
                                  const std::vector<RealGradient> & dxyzdeta,
                                  const std::vector<RealGradient> & d2xyzdxideta)
-  : _node(node),
-    _elem(elem),
+  : _elem(elem),
     _side(side),
     _side_num(side_num),
     _normal(norm),
@@ -75,8 +75,7 @@ PenetrationInfo::PenetrationInfo(const Node * node,
 
 /*
 PenetrationInfo::PenetrationInfo(const PenetrationInfo & p)
-  : _node(p._node),
-    _elem(p._elem),
+  : _elem(p._elem),
     _side(p._side), // Which one now owns _side?  There will be trouble if (when)
                     // both delete _side
     _side_num(p._side_num),
@@ -116,8 +115,7 @@ PenetrationInfo::PenetrationInfo(const PenetrationInfo & p)
 */
 
 PenetrationInfo::PenetrationInfo()
-  : _node(NULL),
-    _elem(NULL),
+  : _elem(NULL),
     _side(NULL),
     _side_num(0),
     _normal(0),
@@ -168,7 +166,6 @@ dataStore(std::ostream & stream, PenetrationInfo *& pinfo, void * context)
     unsigned int i = 1;
     storeHelper(stream, i, context);
 
-    storeHelper(stream, pinfo->_node, context);
     storeHelper(stream, pinfo->_elem, context);
     // Not storing the side element as we will need to recreate it on load
     storeHelper(stream, pinfo->_side_num, context);
@@ -222,7 +219,6 @@ dataLoad(std::istream & stream, PenetrationInfo *& pinfo, void * context)
   {
     pinfo = new PenetrationInfo();
 
-    loadHelper(stream, pinfo->_node, context);
     loadHelper(stream, pinfo->_elem, context);
     loadHelper(stream, pinfo->_side_num, context);
     // Rebuild the side element.

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,7 +10,7 @@
 #pragma once
 
 #include "RestartableData.h"
-
+#include "JsonIO.h"
 #include "MooseUtils.h"
 #include "ReporterState.h"
 #include "ReporterContext.h"
@@ -63,6 +63,7 @@ public:
     friend class Reporter;
     friend class Postprocessor;
     friend class Receiver;
+    friend class ConstantPostprocessor;
     friend class VectorPostprocessor;
     friend class ReporterTransferInterface;
   };
@@ -211,7 +212,7 @@ public:
    *
    * If you recall, the original VectorPostprocessor system included the ability to perform some
    * scatter and broadcast actions via the special call on the storage helper object. This
-   * is a replacement for that method that leverages the RepoorterContext objects to perform
+   * is a replacement for that method that leverages the ReporterContext objects to perform
    * value specific actions, including some automatic operations depending how the data is
    * produced and consumed.
    *
@@ -226,6 +227,14 @@ public:
    * See FEProblemBase::advanceState
    */
   void copyValuesBack();
+
+  /**
+   * When a time step fails, this method is called to revert the current reporter values to their
+   * old state. @see FEProblemBase::restoreSolutions
+   *
+   * @param verbose Set true to print whether the reporters were restored or not.
+   */
+  void restoreState(bool verbose = false);
 
   /**
    * Perform integrity check for get/declare calls
@@ -398,7 +407,7 @@ ReporterData::declareReporterValue(const ReporterName & reporter_name,
 
   // They key in _states (ReporterName) is not unique by special type. This is done on purpose
   // because we want to store reporter names a single name regardless of special type.
-  // Beacuse of this, we have the case where someone could request a reporter value
+  // Because of this, we have the case where someone could request a reporter value
   // that is later declared as a pp or a vpp value. In this case, when it is first
   // requested, the _state entry will have a key and name with a special type of ANY.
   // When it's declared here (later), we will still find the correct entry because
@@ -512,6 +521,36 @@ ReporterContext<T>::transferToVector(ReporterData & r_data,
     mooseError(
         "Requested index ", index, " is outside the bounds of the vector reporter value ", r_name);
   vec[index] = _state.value();
+}
+
+// This is defined here to avoid cyclic includes, see ReporterContext.h
+template <typename T>
+void
+ReporterContext<T>::transferFromVector(ReporterData & r_data,
+                                       const ReporterName & r_name,
+                                       dof_id_type index,
+                                       unsigned int time_index) const
+{
+  if constexpr (is_std_vector<T>::value)
+  {
+    if (index >= _state.value().size())
+      mooseError("Requested index ",
+                 index,
+                 " is outside the bounds of the vector reporter value ",
+                 r_name);
+
+    using R = typename T::value_type;
+    r_data.setReporterValue<R>(r_name, _state.value()[index], time_index);
+  }
+  else
+  {
+    libmesh_ignore(r_data);
+    libmesh_ignore(r_name);
+    libmesh_ignore(index);
+    libmesh_ignore(time_index);
+    mooseError("transferFromVector can only be used for reporter types that are specializatons of "
+               "std::vector.");
+  }
 }
 
 // This is defined here to avoid cyclic includes, see ReporterContext.h

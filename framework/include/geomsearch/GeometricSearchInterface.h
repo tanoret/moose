@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,7 +28,7 @@ public:
   GeometricSearchInterface(const MooseObject * moose_object);
 
   /**
-   * Retrieve the PentrationLocator associated with the two sides.
+   * Retrieve the PenetrationLocator associated with the two sides.
    */
   PenetrationLocator &
   getPenetrationLocator(const BoundaryName & primary, const BoundaryName & secondary, Order order);

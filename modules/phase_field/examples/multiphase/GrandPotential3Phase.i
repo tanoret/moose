@@ -1,6 +1,6 @@
 # This is an example of implementation of the multi-phase, multi-order parameter
 # grand potential based phase-field model described in Phys. Rev. E, 98, 023309
-# (2019). It includes 3 phases with 1 grain of each phase. This example was used
+# (2018). It includes 3 phases with 1 grain of each phase. This example was used
 # to generate the results shown in Fig. 3 of the paper.
 
 [Mesh]
@@ -321,11 +321,11 @@
   [./exodus]
     type = Exodus
     execute_on = 'initial timestep_end final'
-    interval = 1
+    time_step_interval = 1
   [../]
   [./csv]
     type = CSV
     execute_on = 'initial timestep_end final'
-    interval = 1
+    time_step_interval = 1
   [../]
 []

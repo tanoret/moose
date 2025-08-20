@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,9 +23,9 @@ public:
   RayleighNumber(const InputParameters & parameters);
 
 protected:
-  void initialize() override {}
-  void execute() override {}
-  Real getValue() override;
+  virtual void initialize() override {}
+  virtual void execute() override {}
+  virtual Real getValue() const override;
 
   /// Minimum density
   const PostprocessorValue * const _rho_min;

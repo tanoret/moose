@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -148,6 +148,21 @@ class FParserPrinter(CodePrinter):
                     self._print(expr.args[-1].expr)))
         return ",".join(ecpairs) + ")" * (len(ecpairs)-1)
 
+    def _print_Derivative(self, expr):
+        """
+        Derivative functions may contain functions inside it, instead of just
+        symbols. As of sympy version 1.14, CodePrinter requires Derivatives only
+        have symbols inside it, otherwise it will throw an exception. This
+        override bypasses this exception to print a "not supported" version,
+        which is the previous version behavior.
+        """
+        try:
+            return super()._print_Derivative(expr)
+        except ValueError as ee:
+            if self._settings.get('strict', False):
+                raise ee
+            return self._print_not_supported(expr)
+
 
 def fparser(expr, assign_to=None, **kwargs):
     r"""Converts an expr to an FParser expression
@@ -197,13 +212,13 @@ def build_hit(expr, name, **kwargs):
 
     root = pyhit.Node(None, name)
     root['type'] = 'ParsedFunction'
-    root['value'] = "'{}'".format(str(fparser(expr)))
+    root['expression'] = "'{}'".format(str(fparser(expr)))
 
     if kwargs:
         pvars = ' '.join(kwargs.keys())
         pvals = ' '.join([str(v) for v in kwargs.values()])
-        root['vars'] = "'{}'".format(pvars)
-        root['vals'] = "'{}'".format(pvals)
+        root['symbol_names'] = "'{}'".format(pvars)
+        root['symbol_values'] = "'{}'".format(pvals)
 
     return root
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,18 +17,20 @@ HeatTransferFromTemperature1Phase::validParams()
   MooseEnum var_type("nodal elemental", "nodal", false);
   params.addParam<MooseEnum>(
       "var_type", var_type, "The type of wall temperature variable (nodal, elemental).");
+  params.addClassDescription("Heat transfer specified by a wall temperature provided by an "
+                             "external application going into 1-phase flow channel.");
   return params;
 }
 
 HeatTransferFromTemperature1Phase::HeatTransferFromTemperature1Phase(
     const InputParameters & parameters)
   : HeatTransfer1PhaseBase(parameters),
-    _fe_type(getParam<MooseEnum>("var_type") == 0 ? FEType(FIRST, LAGRANGE)
-                                                  : FEType(CONSTANT, MONOMIAL))
+    _fe_type(getParam<MooseEnum>("var_type") == 0 ? libMesh::FEType(FIRST, LAGRANGE)
+                                                  : libMesh::FEType(CONSTANT, MONOMIAL))
 {
 }
 
-const FEType &
+const libMesh::FEType &
 HeatTransferFromTemperature1Phase::getFEType()
 {
   return _fe_type;

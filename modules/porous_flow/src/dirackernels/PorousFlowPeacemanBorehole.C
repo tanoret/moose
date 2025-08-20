@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,7 +30,7 @@ PorousFlowPeacemanBorehole::validParams()
                                         "For function_of=pressure, this function is the "
                                         "pressure at the bottom of the borehole, "
                                         "otherwise it is the temperature at the bottom of "
-                                        "the borehole");
+                                        "the borehole.");
   params.addRequiredParam<RealVectorValue>(
       "unit_weight",
       "(fluid_density*gravitational_acceleration) as a vector pointing downwards.  "
@@ -100,6 +100,15 @@ void
 PorousFlowPeacemanBorehole::initialSetup()
 {
   PorousFlowLineGeometry::initialSetup();
+
+  if (!_point_file.empty() && _zs[0] < _zs.back())
+    mooseError("PorousFlowPeacemanBorehole: The last entry in the point_file needs to be at the "
+               "bottom of the well_bore because this is the point where the function bottom_p_or_t "
+               "is evaluated.  The depth of the first point is z=",
+               _zs[0],
+               " and the last point is z=",
+               _zs.back());
+
   // construct the rotation matrix needed to rotate the permeability
   const unsigned int num_pts = _zs.size();
   _rot_matrix.resize(std::max(num_pts - 1, (unsigned)1));
@@ -225,7 +234,7 @@ PorousFlowPeacemanBorehole::computeQpBaseOutflow(unsigned current_dirac_ptid) co
     return 0.0;
 
   const Real bh_pressure =
-      _p_bot.value(_t, _q_point[_qp]) + _unit_weight * (_q_point[_qp] - _bottom_point);
+      _p_bot.value(_t, _bottom_point) + _unit_weight * (_q_point[_qp] - _bottom_point);
   const Real pp = ptqp();
 
   Real outflow = 0.0; // this is the flow rate from porespace out of the system
@@ -282,7 +291,7 @@ PorousFlowPeacemanBorehole::computeQpBaseOutflowJacobian(unsigned jvar,
   const unsigned pvar = _dictator.porousFlowVariableNum(jvar);
 
   const Real bh_pressure =
-      _p_bot.value(_t, _q_point[_qp]) + _unit_weight * (_q_point[_qp] - _bottom_point);
+      _p_bot.value(_t, _bottom_point) + _unit_weight * (_q_point[_qp] - _bottom_point);
   const Real pp = ptqp();
   const Real pp_prime = dptqp(pvar) * _phi[_j][_qp];
 

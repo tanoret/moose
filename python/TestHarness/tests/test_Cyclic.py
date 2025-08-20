@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,5 +19,5 @@ class TestHarnessTester(TestHarnessTestCase):
             self.runTests('--no-color', '-i', 'cyclic_tests')
 
         e = cm.exception
-        self.assertRegex(e.output.decode('utf-8'), r'tests/test_harness.testC.*? FAILED \(Cyclic or Invalid Dependency Detected!\)')
-        self.assertRegex(e.output.decode('utf-8'), r'tests/test_harness.test[A|B].*? \[SKIPPED DEPENDENCY\] SKIP')
+        self.assertRegex(e.output, r'tests/test_harness.testC.*? FAILED \(Cyclic or Invalid Dependency Detected!\)')
+        self.assertRegex(e.output, r'tests/test_harness.test[A|B].*? \[SKIPPED DEPENDENCY\] SKIP')

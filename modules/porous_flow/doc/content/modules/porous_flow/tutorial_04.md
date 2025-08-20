@@ -4,7 +4,7 @@
 
 # Porous Flow Tutorial Page 04.  Adding solid mechanics
 
-In this Page, solid mechanics is added to the thermo-hydro simulation of preious Pages.  The equations are discussed in [governing equations](porous_flow/governing_equations.md).  Only quasi-static solid mechanics is considered here, without gravity, so the equations read
+In this Page, solid mechanics is added to the thermo-hydro simulation of previous Pages.  The equations are discussed in [governing equations](porous_flow/governing_equations.md).  Only quasi-static solid mechanics is considered here, without gravity, so the equations read
 \begin{equation}
 \sigma_{ij}^{\mathrm{eff}}  = \sigma_{ij}^{\mathrm{tot}} + \alpha_{B}\delta_{ij}P
 \end{equation}
@@ -47,7 +47,7 @@ The boundary conditions used here are roller boundary conditions, as well as bou
 
 !listing modules/porous_flow/examples/tutorial/04.i start=[BCs] end=[AuxVariables]
 
-The `TensorMechanics` module of MOOSE provides some useful `AuxKernels` for extracting effective stresses of interest to this problem (the effective radial stress and the effective hoop stress)
+The `SolidMechanics` module of MOOSE provides some useful `AuxKernels` for extracting effective stresses of interest to this problem (the effective radial stress and the effective hoop stress)
 
 !listing modules/porous_flow/examples/tutorial/04.i start=[AuxVariables] end=[Modules]
 

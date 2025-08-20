@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -54,7 +54,7 @@ NodalDisplacementDifferenceL2NormPD::NodalDisplacementDifferenceL2NormPD(
 }
 
 Real
-NodalDisplacementDifferenceL2NormPD::getValue()
+NodalDisplacementDifferenceL2NormPD::getValue() const
 {
   return std::sqrt(NodalIntegralPostprocessorBasePD::getValue());
 }

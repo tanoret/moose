@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,11 +15,13 @@ NodalBCBase::validParams()
   InputParameters params = BoundaryCondition::validParams();
   params.addParam<std::vector<AuxVariableName>>(
       "save_in",
+      {},
       "The name of auxiliary variables to save this BC's residual contributions to.  "
       "Everything about that variable must match everything about this variable (the "
       "type, what blocks it's on, etc.)");
   params.addParam<std::vector<AuxVariableName>>(
       "diag_save_in",
+      {},
       "The name of auxiliary variables to save this BC's diagonal jacobian "
       "contributions to.  Everything about that variable must match everything "
       "about this variable (the type, what blocks it's on, etc.)");

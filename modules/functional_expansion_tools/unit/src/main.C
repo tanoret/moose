@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,8 +17,6 @@
 #include "gtest/gtest.h"
 
 #include "FunctionalExpansionToolsApp.h"
-
-PerfLog Moose::perf_log("gtest");
 
 MooseEnum single_series_types_1D("Legendre");
 MooseEnum single_series_types_2D("Zernike");

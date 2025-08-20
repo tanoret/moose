@@ -89,7 +89,7 @@
   [../]
 []
 
-[Modules/TensorMechanics/Master/all]
+[Physics/SolidMechanics/QuasiStatic/all]
   add_variables = true
   eigenstrain_names = eigenstrain
 []
@@ -236,6 +236,7 @@
     f_name = Fe
     args = 'eta'
     output_properties = Fe
+    outputs = 'all'
     derivative_order = 2
   [../]
 

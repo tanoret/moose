@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,21 +28,30 @@ ADFParser::JITCompile()
 {
 #if LIBMESH_HAVE_FPARSER_JIT
   std::string includes;
+  const auto type_hash = typeid(ADReal).hash_code();
   bool result;
+
+  std::string fopenmp;
+#if defined(_OPENMP)
+  fopenmp = "-fopenmp";
+#endif
 
   const auto include_path_env = std::getenv("MOOSE_ADFPARSER_JIT_INCLUDE");
   if (include_path_env)
-    result = JITCompileHelper("ADReal", "", "#include \"" + std::string(include_path_env) + "\"\n");
+    result = JITCompileHelper(
+        "ADReal", fopenmp, "#include \"" + std::string(include_path_env) + "\"\n", type_hash);
   else
   {
     // check if we can find an installed version of the monolithic include
-    const auto include_path =
+    const std::string include_path =
         MooseUtils::pathjoin(Moose::getExecutablePath(), "../include/moose/ADRealMonolithic.h");
     if (MooseUtils::checkFileReadable(include_path, false, false, false))
-      result = JITCompileHelper("ADReal", "", "#include \"" + include_path + "\"\n");
+      result =
+          JITCompileHelper("ADReal", fopenmp, "#include \"" + include_path + "\"\n", type_hash);
     else
       // otherwise use the compiled in location from the source tree
-      result = JITCompileHelper("ADReal", ADFPARSER_INCLUDES, "#include \"ADReal.h\"\n");
+      result = JITCompileHelper(
+          "ADReal", fopenmp + " " + ADFPARSER_INCLUDES, "#include \"ADReal.h\"\n", type_hash);
   }
 
   if (!result)

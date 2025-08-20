@@ -8,10 +8,8 @@ Dirichlet boundary conditions impose the boundary condition $u=g$, where $g$ is 
 flux.
 
 Note that an upwinding scheme that may be used by flux kernels will affect how the Dirichlet value is applied to the interface. Upwinding schemes can result in the boundary solution being different than the specified Dirichlet value. In order to
-obtain the desired boundary value, it is necessary to use a FVNeummannBC to specify
+obtain the desired boundary value, it is necessary to use a FVNeumannBC to specify
 the flux.
-
-!syntax description /FVBCs/FVDirichletBC
 
 !syntax parameters /FVBCs/FVDirichletBC
 

@@ -12,7 +12,7 @@
     abs_zero = 2e-6
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce glued, kinematic contact
     for 2D Hertz half-symmetry cylindrical contact problem."
   [../]
@@ -27,7 +27,7 @@
     abs_zero = 1e-6
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce glued, penalty contact
     for 2D Hertz half-symmetry cylindrical contact problem."
   [../]
@@ -46,7 +46,7 @@
     abs_zero = 3e-6
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce frictionless, kinematic contact
     for 2D Hertz half-symmetry cylindrical contact problem."
   [../]
@@ -65,7 +65,7 @@
     abs_zero = 3e-6
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce frictionless, penalty contact
     for 2D Hertz half-symmetry cylindrical contact problem."
   [../]
@@ -87,7 +87,7 @@
     abs_zero = 3e-6
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce frictionless, Augmented
     Lagrange contact for 2D Hertz half-symmetry cylindrical contact problem."
   [../]
@@ -103,7 +103,7 @@
     abs_zero = 1e-4
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce frictional, penalty
     contact for 2D Hertz half-symmetry cylindrical contact problem with friction coefficient
     of 0."
@@ -117,11 +117,11 @@
     Outputs/chkfile2/file_base=hertz_cyl_half_1deg_mu_0_2_pen_check2
     Outputs/chkfile/start_time=5.99'
     max_time = 1500
-    rel_err = 1e-5
+    rel_err = 2e-5
     abs_zero = 3e-5
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce frictional, penalty
     contact for 2D Hertz half-symmetry cylindrical contact problem with friction coefficient
     of 0.2."
@@ -138,7 +138,7 @@
     abs_zero = 1e-6
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce frictional, penalty
     contact for 2D Hertz half-symmetry cylindrical contact problem with friction coefficient
     of 1.0."
@@ -158,7 +158,7 @@
     abs_zero = 3e-5
     max_parallel = 1
     heavy = true
-    superlu = true
+    capabilities = 'superlu'
     requirement = "The Contact system shall enforce frictional, Augmented
     Lagrange contact for 2D Hertz half-symmetry cylindrical contact problem."
   [../]

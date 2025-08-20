@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -71,7 +71,7 @@ CFLTimeStepSizeTempl<is_ad>::initialize()
 
 template <bool is_ad>
 Real
-CFLTimeStepSizeTempl<is_ad>::getValue()
+CFLTimeStepSizeTempl<is_ad>::getValue() const
 {
   return _dt;
 }
@@ -87,7 +87,7 @@ template <bool is_ad>
 void
 CFLTimeStepSizeTempl<is_ad>::threadJoin(const UserObject & y)
 {
-  const CFLTimeStepSizeTempl<is_ad> & pps = static_cast<const CFLTimeStepSizeTempl<is_ad> &>(y);
+  const auto & pps = static_cast<const CFLTimeStepSizeTempl<is_ad> &>(y);
 
   _dt = std::min(_dt, pps._dt);
 }

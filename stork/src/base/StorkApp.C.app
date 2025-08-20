@@ -8,7 +8,8 @@ InputParameters
 StorkApp::validParams()
 {
   InputParameters params = MooseApp::validParams();
-
+  params.set<bool>("use_legacy_material_output") = false;
+  params.set<bool>("use_legacy_initial_residual_evaluation_behavior") = false;
   return params;
 }
 
@@ -22,7 +23,7 @@ StorkApp::~StorkApp() {}
 void
 StorkApp::registerAll(Factory & f, ActionFactory & af, Syntax & syntax)
 {
-  ModulesApp::registerAll(f, af, syntax);
+  ModulesApp::registerAllObjects<StorkApp>(f, af, syntax);
   Registry::registerObjectsTo(f, {"StorkApp"});
   Registry::registerActionsTo(af, {"StorkApp"});
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -35,5 +35,5 @@ INSFVMomentumGravity::INSFVMomentumGravity(const InputParameters & params)
 ADReal
 INSFVMomentumGravity::computeQpResidual()
 {
-  return -_rho(makeElemArg(_current_elem)) * _gravity(_index);
+  return -_rho(makeElemArg(_current_elem), determineState()) * _gravity(_index);
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -52,7 +52,16 @@ class GhostingFunctor;
 class BoundingBox;
 }
 // Useful typedefs
-typedef StoredRange<std::set<Node *>::iterator, Node *> SemiLocalNodeRange;
+typedef libMesh::StoredRange<std::set<Node *>::iterator, Node *> SemiLocalNodeRange;
+
+// List of supported geometrical elements
+const std::string LIST_GEOM_ELEM = "EDGE EDGE2 EDGE3 EDGE4 "
+                                   "QUAD QUAD4 QUAD8 QUAD9 "
+                                   "TRI TRI3 TRI6 TRI7 "
+                                   "HEX HEX8 HEX20 HEX27 "
+                                   "TET TET4 TET10 TET14 "
+                                   "PRISM PRISM6 PRISM15 PRISM18 "
+                                   "PYRAMID PYRAMID5 PYRAMID13 PYRAMID14";
 
 /**
  * Helper object for holding qp mapping info.
@@ -142,6 +151,9 @@ public:
   /// returns MooseMesh partitioning options so other classes can use it
   static MooseEnum partitioning();
 
+  /// returns MooseMesh element type options
+  static MooseEnum elemTypes();
+
   /**
    * Initialize the Mesh object.  Most of the time this will turn around
    * and call build_mesh so the child class can build the Mesh object.
@@ -158,7 +170,7 @@ public:
   virtual void buildMesh() = 0;
 
   /**
-   * Returns MeshBase::mesh_dimsension(), (not
+   * Returns MeshBase::mesh_dimension(), (not
    * MeshBase::spatial_dimension()!) of the underlying libMesh mesh
    * object.
    */
@@ -170,6 +182,11 @@ public:
    * mesh, respectively. Likewise a 2D mesh that has non-zero z coordinates is actually 3D mesh.
    */
   virtual unsigned int effectiveSpatialDimension() const;
+
+  /**
+   * Returns the maximum element dimension on the given blocks
+   */
+  unsigned int getBlocksMaxDimension(const std::vector<SubdomainName> & blocks) const;
 
   /**
    * Returns a vector of boundary IDs for the requested element on the
@@ -409,12 +426,14 @@ public:
    * Return pointers to range objects for various types of ranges
    * (local nodes, boundary elems, etc.).
    */
-  ConstElemRange * getActiveLocalElementRange();
-  NodeRange * getActiveNodeRange();
+  libMesh::ConstElemRange * getActiveLocalElementRange();
+  libMesh::NodeRange * getActiveNodeRange();
   SemiLocalNodeRange * getActiveSemiLocalNodeRange() const;
-  ConstNodeRange * getLocalNodeRange();
-  StoredRange<MooseMesh::const_bnd_node_iterator, const BndNode *> * getBoundaryNodeRange();
-  StoredRange<MooseMesh::const_bnd_elem_iterator, const BndElement *> * getBoundaryElementRange();
+  libMesh::ConstNodeRange * getLocalNodeRange();
+  libMesh::StoredRange<MooseMesh::const_bnd_node_iterator, const BndNode *> *
+  getBoundaryNodeRange();
+  libMesh::StoredRange<MooseMesh::const_bnd_elem_iterator, const BndElement *> *
+  getBoundaryElementRange();
   ///@}
 
   /**
@@ -504,10 +523,21 @@ public:
 
   /**
    * Calls prepare_for_use() if the underlying MeshBase object isn't prepared, then communicates
-   * various boundary information on parallel meshes. Also calls update() internally. We maintain
-   * the boolean parameter in order to maintain backwards compatability but it doesn't do anything
+   * various boundary information on parallel meshes. Also calls update() internally. Instead of
+   * calling \p prepare_for_use on the currently held \p MeshBase object, a \p mesh_to_clone can be
+   * provided. If it is provided (e.g. this method is given a non-null argument), then \p _mesh will
+   * be assigned a clone of the \p mesh_to_clone. The provided \p mesh_to_clone must already be
+   * prepared
+   * @param mesh_to_clone If nonnull, we will clone this mesh instead of preparing our current one
+   * @return Whether the libMesh mesh was prepared. This should really only be relevant in MOOSE
+   * framework contexts where we need to make a decision about what to do with the displaced mesh.
+   * If the reference mesh base object has \p prepare_for_use called (e.g. this method returns \p
+   * true when called for the reference mesh), then we must pass the reference mesh base object into
+   * this method when we call this for the displaced mesh. This is because the displaced mesh \emph
+   * must be an exact clone of the reference mesh. We have seen that \p prepare_for_use called on
+   * two previously identical meshes can result in two different meshes even with Metis partitioning
    */
-  void prepare(bool = false);
+  bool prepare(const MeshBase * mesh_to_clone);
 
   /**
    * Calls buildNodeListFromSideList(), buildNodeList(), and buildBndElemList().
@@ -603,7 +633,7 @@ public:
    * @param inflation_multiplier This amount will be multiplied by the length of the diagonal of the
    * bounding box to find the amount to inflate the bounding box by in all directions.
    */
-  BoundingBox getInflatedProcessorBoundingBox(Real inflation_multiplier = 0.01) const;
+  libMesh::BoundingBox getInflatedProcessorBoundingBox(Real inflation_multiplier = 0.01) const;
 
   /**
    * Implicit conversion operator from MooseMesh -> libMesh::MeshBase.
@@ -615,7 +645,9 @@ public:
    * Accessor for the underlying libMesh Mesh object.
    */
   MeshBase & getMesh();
+  MeshBase & getMesh(const std::string & name);
   const MeshBase & getMesh() const;
+  const MeshBase & getMesh(const std::string & name) const;
   const MeshBase * getMeshPtr() const;
 
   /**
@@ -704,7 +736,7 @@ public:
    * Get the associated subdomainIDs for the subdomain names that are passed in.
    *
    * @param subdomain_name The names of the subdomains
-   * @return The subdomain ids from the passed subdomain name.
+   * @return The subdomain ids from the passed subdomain names.
    */
   std::vector<SubdomainID> getSubdomainIDs(const std::vector<SubdomainName> & subdomain_name) const;
 
@@ -722,7 +754,16 @@ public:
   /**
    * Return the name of a block given an id.
    */
-  const std::string & getSubdomainName(SubdomainID subdomain_id);
+  const std::string & getSubdomainName(SubdomainID subdomain_id) const;
+
+  /**
+   * Get the associated subdomainNames for the subdomain ids that are passed in.
+   *
+   * @param subdomain_ids The ids of the subdomains
+   * @return The subdomain names from the passed subdomain ids.
+   */
+  std::vector<SubdomainName>
+  getSubdomainNames(const std::vector<SubdomainID> & subdomain_ids) const;
 
   /**
    * This method sets the boundary name of the boundary based on the id parameter
@@ -741,14 +782,14 @@ public:
    */
   void buildPeriodicNodeMap(std::multimap<dof_id_type, dof_id_type> & periodic_node_map,
                             unsigned int var_number,
-                            PeriodicBoundaries * pbs) const;
+                            libMesh::PeriodicBoundaries * pbs) const;
 
   /**
    * This routine builds a datastructure of node ids organized by periodic boundary ids
    */
   void buildPeriodicNodeSets(std::map<BoundaryID, std::set<dof_id_type>> & periodic_node_sets,
                              unsigned int var_number,
-                             PeriodicBoundaries * pbs) const;
+                             libMesh::PeriodicBoundaries * pbs) const;
 
   /**
    * Returns the width of the requested dimension
@@ -954,6 +995,11 @@ public:
    */
   void setParallelType(ParallelType parallel_type);
 
+  /**
+   * @return The parallel type
+   */
+  ParallelType getParallelType() const { return _parallel_type; }
+
   /*
    * Set/Get the partitioner name
    */
@@ -981,7 +1027,7 @@ public:
   /**
    * Setter for custom partitioner
    */
-  void setCustomPartitioner(Partitioner * partitioner);
+  void setCustomPartitioner(libMesh::Partitioner * partitioner);
 
   ///@{
   /**
@@ -1001,7 +1047,7 @@ public:
    * Proxy function to get a (sub)PointLocator from either the underlying libMesh mesh (default), or
    * to allow derived meshes to return a custom point locator.
    */
-  virtual std::unique_ptr<PointLocatorBase> getPointLocator() const;
+  virtual std::unique_ptr<libMesh::PointLocatorBase> getPointLocator() const;
 
   /**
    * Returns the name of the mesh file read to produce this mesh if any or an empty string
@@ -1079,6 +1125,9 @@ public:
   std::set<dof_id_type> getElemIDsOnBlocks(unsigned int elem_id_index,
                                            const std::set<SubdomainID> & blks) const;
 
+  std::unordered_map<dof_id_type, std::set<dof_id_type>>
+  getElemIDMapping(const std::string & from_id_name, const std::string & to_id_name) const;
+
   ///@{ accessors for the FaceInfo objects
   unsigned int nFace() const { return _face_info.size(); }
 
@@ -1096,28 +1145,47 @@ public:
   face_info_iterator ownedFaceInfoBegin();
   face_info_iterator ownedFaceInfoEnd();
 
+  /// Need to declare these iterators here to make sure the iterators below work
+  struct elem_info_iterator;
+  struct const_elem_info_iterator;
+
+  /// Iterators to owned faceInfo objects. These faceInfo-s are required for the
+  /// face loops and to filter out the faceInfo-s that are not owned by this processor
+  /// in case we have a distributed mesh and we included FaceInfo objects that
+  /// are on processor boundaries
+  elem_info_iterator ownedElemInfoBegin();
+  elem_info_iterator ownedElemInfoEnd();
+
   /// Accessor for the local FaceInfo object on the side of one element. Returns null if ghosted.
   const FaceInfo * faceInfo(const Elem * elem, unsigned int side) const;
 
   /// Accessor for the elemInfo object for a given element ID
   const ElemInfo & elemInfo(const dof_id_type id) const;
 
+  /// Accessor for the element info objects owned by this process
+  const std::vector<const ElemInfo *> & elemInfoVector() const { return _elem_info; }
+
   /// Accessor for all \p FaceInfo objects.
   const std::vector<FaceInfo> & allFaceInfo() const;
   ///@}
 
   /**
-   * Cache \p elem and \p neighbor dof indices information for variables in all the local \p
-   * FaceInfo objects to save computational expense
+   * Cache if variables live on the elements connected by the FaceInfo objects
    */
-  void cacheVarIndicesByFace(const std::vector<const MooseVariableFieldBase *> & moose_vars);
+  void cacheFaceInfoVariableOwnership() const;
 
   /**
-   * Compute the face coordinate value for all \p FaceInfo objects. 'Coordinate' here means a
-   * coordinate value associated with the coordinate system. For Cartesian coordinate systems,
-   * 'coordinate' is simply '1'; in RZ, '2*pi*r', and in spherical, '4*pi*r^2'
+   * Cache the DoF indices for FV variables on each element. These indices are used to speed up the
+   * setup loops of finite volume systems.
    */
-  void computeFaceInfoFaceCoords();
+  void cacheFVElementalDoFs() const;
+
+  /**
+   * Compute the face coordinate value for all \p FaceInfo and \p ElemInfo objects. 'Coordinate'
+   * here means a coordinate value associated with the coordinate system. For Cartesian coordinate
+   * systems, 'coordinate' is simply '1'; in RZ, '2*pi*r', and in spherical, '4*pi*r^2'
+   */
+  void computeFiniteVolumeCoords() const;
 
   /**
    * Set whether this mesh is displaced
@@ -1141,6 +1209,12 @@ public:
   Moose::CoordinateSystemType getCoordSystem(SubdomainID sid) const;
 
   /**
+   * Get the coordinate system from the mesh, it must be the same in all subdomains otherwise this
+   * will error
+   */
+  Moose::CoordinateSystemType getUniqueCoordSystem() const;
+
+  /**
    * Get the map from subdomain ID to coordinate system type, e.g. xyz, rz, or r-spherical
    */
   const std::map<SubdomainID, Moose::CoordinateSystemType> & getCoordSystem() const;
@@ -1155,6 +1229,36 @@ public:
    * the y-direction the coordinate axis would be y
    */
   void setAxisymmetricCoordAxis(const MooseEnum & rz_coord_axis);
+
+  /**
+   * Sets the general coordinate axes for axisymmetric blocks.
+   *
+   * This method must be used if any of the following are true:
+   * - There are multiple axisymmetric coordinate systems
+   * - Any axisymmetric coordinate system axis/direction is not the +X or +Y axis
+   * - Any axisymmetric coordinate system does not start at (0,0,0)
+   *
+   * @param[in] blocks  Subdomain names
+   * @param[in] axes  Pair of values defining the axisymmetric coordinate axis
+   *                  for each subdomain. The first value is the point on the axis
+   *                  corresponding to the origin. The second value is the direction
+   *                  vector of the axis (normalization not necessary).
+   */
+  void setGeneralAxisymmetricCoordAxes(const std::vector<SubdomainName> & blocks,
+                                       const std::vector<std::pair<Point, RealVectorValue>> & axes);
+
+  /**
+   * Gets the general axisymmetric coordinate axis for a block.
+   *
+   * @param[in] subdomain_id  Subdomain ID for which to get axisymmetric coordinate axis
+   */
+  const std::pair<Point, RealVectorValue> &
+  getGeneralAxisymmetricCoordAxis(SubdomainID subdomain_id) const;
+
+  /**
+   * Returns true if general axisymmetric coordinate axes are being used
+   */
+  bool usingGeneralAxisymmetricCoordAxes() const;
 
   /**
    * Returns the desired radial direction for RZ coordinate transformation
@@ -1177,7 +1281,12 @@ public:
   /**
    * Mark the finite volume information as dirty
    */
-  void finiteVolumeInfoDirty() { _finite_volume_info_dirty = true; }
+  void markFiniteVolumeInfoDirty() { _finite_volume_info_dirty = true; }
+
+  /**
+   * @return whether the finite volume information is dirty
+   */
+  bool isFiniteVolumeInfoDirty() const { return _finite_volume_info_dirty; }
 
   /**
    * @return the coordinate transformation object that describes how to transform this problem's
@@ -1197,12 +1306,100 @@ public:
   const std::unordered_map<std::pair<const Elem *, unsigned short int>, const Elem *> &
   getLowerDElemMap() const;
 
+  /**
+   * @return Whether or not this mesh comes from a split mesh
+   */
+  bool isSplit() const { return _is_split; }
+
+  /**
+   * Builds the face and elem info vectors that store meta-data needed for looping over and doing
+   * calculations based on mesh faces and elements in a finite volume setting. This should only
+   * be called when finite volume variables are used in the problem or when the face and elem info
+   * objects are necessary for functor-based evaluations.
+   */
+  void buildFiniteVolumeInfo() const;
+
+  /**
+   * Sets up the additional data needed for finite volume computations.
+   * This involves building FaceInfo and ElemInfo objects, caching variable associations
+   * and elemental DoF indices for FV variables.
+   */
+  void setupFiniteVolumeMeshData() const;
+
+  /**
+   * Indicate whether the kind of adaptivity we're doing is p-refinement
+   */
+  void doingPRefinement(bool doing_p_refinement) { _doing_p_refinement = doing_p_refinement; }
+
+  /**
+   * Query whether we have p-refinement
+   */
+  [[nodiscard]] bool doingPRefinement() const { return _doing_p_refinement; }
+
+  /**
+   * Returns the maximum p-refinement level of all elements
+   */
+  unsigned int maxPLevel() const { return _max_p_level; }
+
+  /**
+   * Returns the maximum h-refinement level of all elements
+   */
+  unsigned int maxHLevel() const { return _max_h_level; }
+
+  /**
+   * Get the map describing for each volumetric quadrature point (qp) on the refined level which qp
+   * on the previous coarser level the fine qp is closest to
+   */
+  const std::vector<QpMap> & getPRefinementMap(const Elem & elem) const;
+  /**
+   * Get the map describing for each side quadrature point (qp) on the refined level which qp
+   * on the previous coarser level the fine qp is closest to
+   */
+  const std::vector<QpMap> & getPRefinementSideMap(const Elem & elem) const;
+  /**
+   * Get the map describing for each volumetric quadrature point (qp) on the coarse level which qp
+   * on the previous finer level the coarse qp is closest to
+   */
+  const std::vector<QpMap> & getPCoarseningMap(const Elem & elem) const;
+  /**
+   * Get the map describing for each side quadrature point (qp) on the coarse level which qp
+   * on the previous finer level the coarse qp is closest to
+   */
+  const std::vector<QpMap> & getPCoarseningSideMap(const Elem & elem) const;
+
+  void buildPRefinementAndCoarseningMaps(Assembly * assembly);
+
+  /**
+   * @return Whether the subdomain indicated by \p subdomain_id is a lower-dimensional manifold of
+   * some higher-dimensional subdomain, or in implementation speak, whether the elements of this
+   * subdomain have non-null interior parents
+   */
+  bool isLowerD(const SubdomainID subdomain_id) const;
+
+  /**
+   * @return Whether there are any lower-dimensional blocks that are manifolds of higher-dimensional
+   * block faces
+   */
+  bool hasLowerD() const { return _has_lower_d; }
+
+  /**
+   * @return The set of lower-dimensional blocks for interior sides
+   */
+  const std::set<SubdomainID> & interiorLowerDBlocks() const { return _lower_d_interior_blocks; }
+  /**
+   * @return The set of lower-dimensional blocks for boundary sides
+   */
+  const std::set<SubdomainID> & boundaryLowerDBlocks() const { return _lower_d_boundary_blocks; }
+
 protected:
   /// Deprecated (DO NOT USE)
-  std::vector<std::unique_ptr<GhostingFunctor>> _ghosting_functors;
+  std::vector<std::unique_ptr<libMesh::GhostingFunctor>> _ghosting_functors;
 
   /// The list of active geometric relationship managers (bound to the underlying MeshBase object).
   std::vector<std::shared_ptr<RelationshipManager>> _relationship_managers;
+
+  /// Whether or not this mesh was built from another mesh
+  bool _built_from_other_mesh = false;
 
   /// Can be set to DISTRIBUTED, REPLICATED, or DEFAULT.  Determines whether
   /// the underlying libMesh mesh is a ReplicatedMesh or DistributedMesh.
@@ -1223,7 +1420,7 @@ protected:
   bool _partitioner_overridden;
 
   /// The custom partitioner
-  std::unique_ptr<Partitioner> _custom_partitioner;
+  std::unique_ptr<libMesh::Partitioner> _custom_partitioner;
   bool _custom_partitioner_requested;
 
   /// Convenience enums
@@ -1277,13 +1474,14 @@ protected:
    * A range for use with threading.  We do this so that it doesn't have
    * to get rebuilt all the time (which takes time).
    */
-  std::unique_ptr<ConstElemRange> _active_local_elem_range;
+  std::unique_ptr<libMesh::ConstElemRange> _active_local_elem_range;
 
   std::unique_ptr<SemiLocalNodeRange> _active_semilocal_node_range;
-  std::unique_ptr<NodeRange> _active_node_range;
-  std::unique_ptr<ConstNodeRange> _local_node_range;
-  std::unique_ptr<StoredRange<MooseMesh::const_bnd_node_iterator, const BndNode *>> _bnd_node_range;
-  std::unique_ptr<StoredRange<MooseMesh::const_bnd_elem_iterator, const BndElement *>>
+  std::unique_ptr<libMesh::NodeRange> _active_node_range;
+  std::unique_ptr<libMesh::ConstNodeRange> _local_node_range;
+  std::unique_ptr<libMesh::StoredRange<MooseMesh::const_bnd_node_iterator, const BndNode *>>
+      _bnd_node_range;
+  std::unique_ptr<libMesh::StoredRange<MooseMesh::const_bnd_elem_iterator, const BndElement *>>
       _bnd_elem_range;
 
   /// A map of all of the current nodes to the elements that they are connected to.
@@ -1367,19 +1565,26 @@ protected:
   /// A vector holding the paired boundaries for a regular orthogonal mesh
   std::vector<std::pair<BoundaryID, BoundaryID>> _paired_boundary;
 
+  /// Whether or not we are using a (pre-)split mesh (automatically DistributedMesh)
+  const bool _is_split;
+
   void cacheInfo();
   void freeBndNodes();
   void freeBndElems();
   void setPartitionerHelper(MeshBase * mesh = nullptr);
 
 private:
-  /// FaceInfo object storing information for face based loops. This container holds all the \p
-  /// FaceInfo objects accessible from this process
-  mutable std::vector<FaceInfo> _all_face_info;
-
   /// Map connecting elems with their corresponding ElemInfo, we use the element ID as
   /// the key
   mutable std::unordered_map<dof_id_type, ElemInfo> _elem_to_elem_info;
+
+  /// Holds only those \p ElemInfo objects that have \p processor_id equal to this process's id,
+  /// e.g. the local \p ElemInfo objects
+  mutable std::vector<const ElemInfo *> _elem_info;
+
+  /// FaceInfo object storing information for face based loops. This container holds all the \p
+  /// FaceInfo objects accessible from this process
+  mutable std::vector<FaceInfo> _all_face_info;
 
   /// Holds only those \p FaceInfo objects that have \p processor_id equal to this process's id,
   /// e.g. the local \p FaceInfo objects
@@ -1392,18 +1597,10 @@ private:
   // true if the _face_info member needs to be rebuilt/updated.
   mutable bool _finite_volume_info_dirty = true;
 
-  /**
-   * Builds the face info vector that stores meta-data needed for looping over and doing
-   * calculations based on mesh faces and elements in a finite volume setting.
-   * We also build a vector of elem info objects which cache volumes and centroids for elements.
-   * We build finite volume information only upon request and only if the
-   * \p _finite_volume_info_dirty flag is false, either because this method has yet to be called or
-   * because someone called \p update() indicating the mesh has changed. Face information is only
-   * requested by getters that should appear semantically const. Consequently this method must
-   * also be marked const and so we make it and all associated face information data private to
-   * prevent misuse
-   */
-  void buildFiniteVolumeInfo() const;
+  // True if we have cached elemental dofs ids for the linear finite volume variables.
+  // This happens in the first system which has a linear finite volume variable, considering
+  // that currently we only support one variable per linear system.
+  mutable bool _linear_finite_volume_dofs_cached = false;
 
   /**
    * A map of vectors indicating which dimensions are periodic in a regular orthogonal mesh for
@@ -1438,8 +1635,8 @@ private:
    * @param child_side The side number of the child (-1 if not mapping sides)
    */
   void buildRefinementMap(const Elem & elem,
-                          QBase & qrule,
-                          QBase & qrule_face,
+                          libMesh::QBase & qrule,
+                          libMesh::QBase & qrule_face,
                           int parent_side,
                           int child,
                           int child_side);
@@ -1453,7 +1650,10 @@ private:
    * @param qrule_face The current face quadrature rule
    * @param input_side The side to map
    */
-  void buildCoarseningMap(const Elem & elem, QBase & qrule, QBase & qrule_face, int input_side);
+  void buildCoarseningMap(const Elem & elem,
+                          libMesh::QBase & qrule,
+                          libMesh::QBase & qrule_face,
+                          int input_side);
 
   /**
    * Find the closest points that map "from" to "to" and fill up "qp_map".
@@ -1490,13 +1690,22 @@ private:
    * @param child_side - The id of the child's side
    */
   void findAdaptivityQpMaps(const Elem * template_elem,
-                            QBase & qrule,
-                            QBase & qrule_face,
+                            libMesh::QBase & qrule,
+                            libMesh::QBase & qrule_face,
                             std::vector<std::vector<QpMap>> & refinement_map,
                             std::vector<std::pair<unsigned int, QpMap>> & coarsen_map,
                             int parent_side,
                             int child,
                             int child_side);
+
+  void buildHRefinementAndCoarseningMaps(Assembly * assembly);
+
+  const std::vector<QpMap> & getPRefinementMapHelper(
+      const Elem & elem,
+      const std::map<std::pair<libMesh::ElemType, unsigned int>, std::vector<QpMap>> &) const;
+  const std::vector<QpMap> & getPCoarseningMapHelper(
+      const Elem & elem,
+      const std::map<std::pair<libMesh::ElemType, unsigned int>, std::vector<QpMap>> &) const;
 
   /**
    * Update the coordinate transformation object based on our coordinate system data. The coordinate
@@ -1504,30 +1713,90 @@ private:
    */
   void updateCoordTransform();
 
+  /**
+   * Loop through all subdomain IDs and check if there is name duplication used for the subdomains
+   * with same ID. Throw out an error if any name duplication is found.
+   */
+  void checkDuplicateSubdomainNames();
+
   /// Holds mappings for volume to volume and parent side to child side
-  std::map<std::pair<int, ElemType>, std::vector<std::vector<QpMap>>> _elem_type_to_refinement_map;
+  /// Map key:
+  /// - first member corresponds to element side. It's -1 for volume quadrature points
+  /// - second member correponds to the element type
+  /// Map value:
+  /// - Outermost index is the child element index
+  /// - Once we have indexed by the child element index, we have a std::vector of QpMaps. This
+  ///   vector is sized by the number of reference points in the child element. Then for each
+  ///   reference point in the child element we have a QpMap whose \p _from index corresponds to
+  ///   the child element reference point, a \p _to index which corresponds to the reference point
+  ///   on the parent element that the child element reference point is closest to, and a
+  ///   \p _distance member which is the distance between the mapped child and parent reference
+  ///   quadrature points
+  std::map<std::pair<int, libMesh::ElemType>, std::vector<std::vector<QpMap>>>
+      _elem_type_to_refinement_map;
+
+  std::map<std::pair<libMesh::ElemType, unsigned int>, std::vector<QpMap>>
+      _elem_type_to_p_refinement_map;
+  std::map<std::pair<libMesh::ElemType, unsigned int>, std::vector<QpMap>>
+      _elem_type_to_p_refinement_side_map;
 
   /// Holds mappings for "internal" child sides to parent volume.  The second key is (child, child_side).
-  std::map<ElemType, std::map<std::pair<int, int>, std::vector<std::vector<QpMap>>>>
+  std::map<libMesh::ElemType, std::map<std::pair<int, int>, std::vector<std::vector<QpMap>>>>
       _elem_type_to_child_side_refinement_map;
 
   /// Holds mappings for volume to volume and parent side to child side
-  std::map<std::pair<int, ElemType>, std::vector<std::pair<unsigned int, QpMap>>>
+  /// Map key:
+  /// - first member corresponds to element side. It's -1 for volume quadrature points
+  /// - second member correponds to the element type
+  /// Map value:
+  /// - Vector is sized based on the number of quadrature points in the parent (e.g. coarser)
+  ///   element.
+  /// - For each parent quadrature point we store a pair
+  ///   - The first member of the pair identifies which child holds the closest refined-level
+  ///     quadrature point
+  ///   - The second member of the pair is the QpMap. The \p _from data member will correspond to
+  ///     the parent quadrature point index. The \p _to data member will correspond to which child
+  ///     element quadrature point is closest to the parent quadrature point. And \p _distance is
+  ///     the distance between the two
+  std::map<std::pair<int, libMesh::ElemType>, std::vector<std::pair<unsigned int, QpMap>>>
       _elem_type_to_coarsening_map;
 
-  /// Holds a map from subomdain ids to the neighboring subdomain ids
-  std::unordered_map<SubdomainID, std::set<SubdomainID>> _sub_to_neighbor_subs;
+  std::map<std::pair<libMesh::ElemType, unsigned int>, std::vector<QpMap>>
+      _elem_type_to_p_coarsening_map;
+  std::map<std::pair<libMesh::ElemType, unsigned int>, std::vector<QpMap>>
+      _elem_type_to_p_coarsening_side_map;
 
-  /// Holds a map from subomdain ids to the boundary ids that are attached to it
-  std::unordered_map<SubdomainID, std::set<BoundaryID>> _subdomain_boundary_ids;
+  struct SubdomainData
+  {
+    /// Neighboring subdomain ids
+    std::set<SubdomainID> neighbor_subs;
+
+    /// The boundary ids that are attached. This set will include any sideset boundary ID that
+    /// is a side of any part of the subdomain
+    std::set<BoundaryID> boundary_ids;
+
+    /// Whether this subdomain is a lower-dimensional manifold of a higher-dimensional subdomain
+    bool is_lower_d;
+  };
+
+  /// Holds a map from subdomain ids to associated data
+  std::unordered_map<SubdomainID, SubdomainData> _sub_to_data;
 
   /// Holds a map from neighbor subomdain ids to the boundary ids that are attached to it
   std::unordered_map<SubdomainID, std::set<BoundaryID>> _neighbor_subdomain_boundary_ids;
 
+  /// Mesh blocks for interior lower-d elements in different types
+  std::set<SubdomainID> _lower_d_interior_blocks;
+  /// Mesh blocks for boundary lower-d elements in different types
+  std::set<SubdomainID> _lower_d_boundary_blocks;
   /// Holds a map from a high-order element side to its corresponding lower-d element
   std::unordered_map<std::pair<const Elem *, unsigned short int>, const Elem *>
       _higher_d_elem_side_to_lower_d_elem;
   std::unordered_map<const Elem *, unsigned short int> _lower_d_elem_to_higher_d_elem_side;
+
+  /// Whether there are any lower-dimensional blocks that are manifolds of higher-dimensional block
+  /// faces
+  bool _has_lower_d;
 
   /// Whether or not this Mesh is allowed to read a recovery file
   bool _allow_recovery;
@@ -1547,7 +1816,7 @@ private:
   /// A parallel mesh generator such as DistributedRectilinearMeshGenerator
   /// already make everything ready. We do not need to gather all boundaries to
   /// every single processor. In general, we should avoid using ghostGhostedBoundaries
-  /// when posssible since it is not scalable
+  /// when possible since it is not scalable
   bool _need_ghost_ghosted_boundaries;
 
   /// Unique element integer IDs for each subdomain and each extra element integers
@@ -1569,10 +1838,13 @@ private:
   void buildLowerDMesh();
 
   /// Type of coordinate system per subdomain
-  std::map<SubdomainID, Moose::CoordinateSystemType> _coord_sys;
+  std::map<SubdomainID, Moose::CoordinateSystemType> & _coord_sys;
 
   /// Storage for RZ axis selection
   unsigned int _rz_coord_axis;
+
+  /// Map of subdomain ID to general axisymmetric axis
+  std::unordered_map<SubdomainID, std::pair<Point, RealVectorValue>> _subdomain_id_to_rz_coord_axis;
 
   /// A coordinate transformation object that describes how to transform this problem's coordinate
   /// system into the canonical/reference coordinate system
@@ -1583,6 +1855,13 @@ private:
 
   /// Set for holding user-provided coordinate system type block names
   std::vector<SubdomainName> _provided_coord_blocks;
+
+  /// Whether we have p-refinement (as opposed to h-refinement)
+  bool _doing_p_refinement;
+  /// Maximum p-refinement level of all elements
+  unsigned int _max_p_level;
+  /// Maximum h-refinement level of all elements
+  unsigned int _max_h_level;
 
   template <typename T>
   struct MeshType;
@@ -1596,13 +1875,13 @@ MooseMesh::coordTransform()
 }
 
 template <>
-struct MooseMesh::MeshType<ReplicatedMesh>
+struct MooseMesh::MeshType<libMesh::ReplicatedMesh>
 {
   static const ParallelType value = ParallelType::REPLICATED;
 };
 
 template <>
-struct MooseMesh::MeshType<DistributedMesh>
+struct MooseMesh::MeshType<libMesh::DistributedMesh>
 {
   static const ParallelType value = ParallelType::DISTRIBUTED;
 };
@@ -1647,6 +1926,50 @@ struct MooseMesh::const_face_info_iterator : variant_filter_iterator<MeshBase::P
                               const FaceInfo * const,
                               const FaceInfo * const &,
                               const FaceInfo * const *>(rhs)
+  {
+  }
+};
+
+/**
+ * The definition of the elem_info_iterator struct.
+ */
+struct MooseMesh::elem_info_iterator
+  : variant_filter_iterator<MeshBase::Predicate, const ElemInfo *>
+{
+  // Templated forwarding ctor -- forwards to appropriate variant_filter_iterator ctor
+  template <typename PredType, typename IterType>
+  elem_info_iterator(const IterType & d, const IterType & e, const PredType & p)
+    : variant_filter_iterator<MeshBase::Predicate, const ElemInfo *>(d, e, p)
+  {
+  }
+};
+
+/**
+ * The definition of the const_elem_info_iterator struct. It is similar to the
+ * iterator above, but also provides an additional conversion-to-const ctor.
+ */
+struct MooseMesh::const_elem_info_iterator : variant_filter_iterator<MeshBase::Predicate,
+                                                                     const ElemInfo * const,
+                                                                     const ElemInfo * const &,
+                                                                     const ElemInfo * const *>
+{
+  // Templated forwarding ctor -- forwards to appropriate variant_filter_iterator ctor
+  template <typename PredType, typename IterType>
+  const_elem_info_iterator(const IterType & d, const IterType & e, const PredType & p)
+    : variant_filter_iterator<MeshBase::Predicate,
+                              const ElemInfo * const,
+                              const ElemInfo * const &,
+                              const ElemInfo * const *>(d, e, p)
+  {
+  }
+
+  // The conversion-to-const ctor.  Takes a regular iterator and calls the appropriate
+  // variant_filter_iterator copy constructor.  Note that this one is *not* templated!
+  const_elem_info_iterator(const MooseMesh::elem_info_iterator & rhs)
+    : variant_filter_iterator<MeshBase::Predicate,
+                              const ElemInfo * const,
+                              const ElemInfo * const &,
+                              const ElemInfo * const *>(rhs)
   {
   }
 };
@@ -1741,8 +2064,9 @@ struct MooseMesh::const_bnd_elem_iterator : variant_filter_iterator<MeshBase::Pr
  * Some useful StoredRange typedefs.  These are defined *outside* the
  * MooseMesh class to mimic the Const{Node,Elem}Range classes in libmesh.
  */
-typedef StoredRange<MooseMesh::const_bnd_node_iterator, const BndNode *> ConstBndNodeRange;
-typedef StoredRange<MooseMesh::const_bnd_elem_iterator, const BndElement *> ConstBndElemRange;
+typedef libMesh::StoredRange<MooseMesh::const_bnd_node_iterator, const BndNode *> ConstBndNodeRange;
+typedef libMesh::StoredRange<MooseMesh::const_bnd_elem_iterator, const BndElement *>
+    ConstBndElemRange;
 
 template <typename T>
 std::unique_ptr<T>
@@ -1751,11 +2075,23 @@ MooseMesh::buildTypedMesh(unsigned int dim)
   // If the requested mesh type to build doesn't match our current value for _use_distributed_mesh,
   // then we need to make sure to make our state consistent because other objects, like the periodic
   // boundary condition action, will be querying isDistributedMesh()
-  if (_use_distributed_mesh != std::is_same<T, DistributedMesh>::value)
+  if (_use_distributed_mesh != std::is_same<T, libMesh::DistributedMesh>::value)
+  {
+    if (getMeshPtr())
+      mooseError("A MooseMesh object is being asked to build a libMesh mesh that is a different "
+                 "parallel type than the libMesh mesh that it wraps. This is not allowed. Please "
+                 "create another MooseMesh object to wrap the new libMesh mesh");
     setParallelType(MeshType<T>::value);
+  }
 
   if (dim == libMesh::invalid_uint)
-    dim = getParam<MooseEnum>("dim");
+  {
+    if (isParamValid("dim"))
+      dim = getParam<MooseEnum>("dim");
+    else
+      // Legacy selection of the default for the 'dim' parameter
+      dim = 1;
+  }
 
   auto mesh = std::make_unique<T>(_communicator, dim);
 
@@ -1819,14 +2155,12 @@ MooseMesh::areElemIDsIdentical(const std::string & id_name1, const std::string &
 inline const std::vector<const FaceInfo *> &
 MooseMesh::faceInfo() const
 {
-  buildFiniteVolumeInfo();
   return _face_info;
 }
 
 inline const std::vector<FaceInfo> &
 MooseMesh::allFaceInfo() const
 {
-  buildFiniteVolumeInfo();
   return _all_face_info;
 }
 
@@ -1840,4 +2174,10 @@ inline const std::unordered_map<std::pair<const Elem *, unsigned short int>, con
 MooseMesh::getLowerDElemMap() const
 {
   return _higher_d_elem_side_to_lower_d_elem;
+}
+
+inline bool
+MooseMesh::isLowerD(const SubdomainID subdomain_id) const
+{
+  return libmesh_map_find(_sub_to_data, subdomain_id).is_lower_d;
 }

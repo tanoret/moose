@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,7 +27,7 @@ DepletionIDGenerator::validParams()
   params.addParam<std::vector<ExtraElementIDName>>(
       "exclude_id_name", "Extra ID names that need to be excluded in the depletion ID generation");
   params.addParam<std::vector<std::vector<dof_id_type>>>(
-      "exclude_id_value", "Extra ID values correponding to names defined in `exclude_id_name`");
+      "exclude_id_value", "Extra ID values corresponding to names defined in `exclude_id_name`");
   params.addClassDescription("This DepletionIDGenerator source code is to assign depletion IDs for "
                              "elements on a mesh based on material and other extra element IDs.");
   return params;
@@ -52,9 +52,7 @@ DepletionIDGenerator::generate()
                _material_id_name,
                "'is not defined in input mesh!");
   id_names.push_back(_material_id_name);
-  const std::set<SubdomainID> block_ids = {Moose::ANY_BLOCK_ID};
-  std::map<dof_id_type, dof_id_type> parsed_ids =
-      MooseMeshUtils::getExtraIDUniqueCombinationMap(*mesh, block_ids, id_names);
+  auto parsed_ids = MooseMeshUtils::getExtraIDUniqueCombinationMap(*mesh, {}, id_names);
   // re-numbering if exclude_id_name is used
   if (isParamValid("exclude_id_name") && isParamValid("exclude_id_value"))
   {
@@ -96,19 +94,27 @@ DepletionIDGenerator::generate()
         ids.insert(parsed_ids[elem->id()]);
     }
     comm().set_union(ids);
+
+    std::map<dof_id_type, dof_id_type> map_ids;
+    for (auto id : parsed_ids)
+    {
+      dof_id_type new_id = std::distance(ids.begin(), ids.find(id.second)) + 1;
+      map_ids[id.second] = new_id;
+    }
+
     // reassign parsed (depletion) ids
     for (const auto & elem : mesh->active_element_ptr_range())
     {
       dof_id_type id = parsed_ids[elem->id()];
       dof_id_type new_id = 0;
       if (ids.count(id))
-        new_id = std::distance(ids.begin(), std::find(ids.begin(), ids.end(), id)) + 1;
+        new_id = map_ids[id];
       parsed_ids[elem->id()] = new_id;
     }
   }
   // assign depletion id to mesh
   const auto depletion_id = mesh->add_elem_integer("depletion_id");
-  for (auto & elem : mesh->active_element_ptr_range())
+  for (Elem * const elem : mesh->active_element_ptr_range())
     elem->set_extra_integer(depletion_id, parsed_ids.at(elem->id()));
   return mesh;
 }

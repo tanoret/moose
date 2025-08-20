@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,6 +19,7 @@ THMSpecificVolumeAux::validParams()
                                "Density of the phase (conserved), \alpha \rho A for 2-phase model");
   params.addRequiredCoupledVar("A", "Cross-sectional area");
   params.addCoupledVar("alpha", 1., "Volume fraction");
+  params.addClassDescription("Computes the specific volume for the phase.");
 
   return params;
 }

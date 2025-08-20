@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,7 +32,7 @@ FVElementalKernel::FVElementalKernel(const InputParameters & parameters)
     MooseVariableInterface(this,
                            false,
                            "variable",
-                           Moose::VarKindType::VAR_NONLINEAR,
+                           Moose::VarKindType::VAR_SOLVER,
                            Moose::VarFieldType::VAR_FIELD_STANDARD),
     CoupleableMooseVariableDependencyIntermediateInterface(this, false, /*is_fv=*/true),
     MaterialPropertyInterface(this, blockIDs(), Moose::EMPTY_BOUNDARY_IDS),
@@ -54,21 +54,16 @@ void
 FVElementalKernel::computeResidual()
 {
   prepareVectorTag(_assembly, _var.number());
-  _local_re(0) += MetaPhysicL::raw_value(computeQpResidual() * _assembly.elemVolume());
+  _local_re(0) += MetaPhysicL::raw_value(computeQpResidual()) * _assembly.elemVolume();
   accumulateTaggedLocalResidual();
 }
 
 void
 FVElementalKernel::computeResidualAndJacobian()
 {
-#ifdef MOOSE_GLOBAL_AD_INDEXING
   const auto r = computeQpResidual() * _assembly.elemVolume();
-  const auto dof_index = _var.dofIndices()[0];
-  _assembly.processJacobian(r, dof_index, _matrix_tags);
-  _assembly.processResidual(r.value(), dof_index, _vector_tags);
-#else
-  mooseError("computing residual and Jacobian together only supported for global AD indexing");
-#endif
+  addResidualsAndJacobian(
+      _assembly, std::array<ADReal, 1>{{r}}, _var.dofIndices(), _var.scalingFactor());
 }
 
 void
@@ -78,72 +73,13 @@ FVElementalKernel::computeJacobian()
 
   mooseAssert(_var.dofIndices().size() == 1, "We're currently built to use CONSTANT MONOMIALS");
 
-  auto local_functor = [&](const ADReal & residual, dof_id_type, const std::set<TagID> &)
-  {
-    prepareMatrixTag(_assembly, _var.number(), _var.number());
-    auto dofs_per_elem = _sys.getMaxVarNDofsPerElem();
-    auto ad_offset = Moose::adOffset(_var.number(), dofs_per_elem);
-#ifndef MOOSE_SPARSE_AD
-    mooseAssert(ad_offset < MOOSE_AD_MAX_DOFS_PER_ELEM,
-                "Out of bounds access in derivative vector.");
-#endif
-    _local_ke(0, 0) += residual.derivatives()[ad_offset];
-    accumulateTaggedLocalMatrix();
-  };
-
-  _assembly.processJacobian(r, _var.dofIndices()[0], _matrix_tags, local_functor);
+  addJacobian(_assembly, std::array<ADReal, 1>{{r}}, _var.dofIndices(), _var.scalingFactor());
 }
 
 void
 FVElementalKernel::computeOffDiagJacobian()
 {
-  const auto r = computeQpResidual() * _assembly.elemVolume();
-
-  mooseAssert(_var.dofIndices().size() == 1, "We're currently built to use CONSTANT MONOMIALS");
-
-  auto local_functor = [&](const ADReal & residual, dof_id_type, const std::set<TagID> &)
-  {
-    auto & ce = _assembly.couplingEntries();
-    for (const auto & it : ce)
-    {
-      MooseVariableFieldBase & ivariable = *(it.first);
-      MooseVariableFieldBase & jvariable = *(it.second);
-
-      // We currently only support coupling to other FV variables
-      if (!jvariable.isFV() || !jvariable.activeOnSubdomain(_current_elem->subdomain_id()))
-        continue;
-
-      unsigned int ivar = ivariable.number();
-      unsigned int jvar = jvariable.number();
-
-      if (ivar != _var.number())
-        continue;
-
-      auto ad_offset = Moose::adOffset(jvar, _sys.getMaxVarNDofsPerElem());
-
-      prepareMatrixTag(_assembly, ivar, jvar);
-
-      mooseAssert(
-          _local_ke.m() == 1,
-          "We are currently only supporting constant monomials for finite volume calculations");
-      mooseAssert(
-          _local_ke.n() == 1,
-          "We are currently only supporting constant monomials for finite volume calculations");
-      mooseAssert(jvariable.dofIndices().size() == 1,
-                  "The AD derivative indexing below only makes sense for constant monomials, e.g. "
-                  "for a number of dof indices equal to  1");
-
-#ifndef MOOSE_SPARSE_AD
-      mooseAssert(ad_offset < MOOSE_AD_MAX_DOFS_PER_ELEM,
-                  "Out of bounds access in derivative vector.");
-#endif
-      _local_ke(0, 0) = residual.derivatives()[ad_offset];
-
-      accumulateTaggedLocalMatrix();
-    }
-  };
-
-  _assembly.processJacobian(r, _var.dofIndices()[0], _matrix_tags, local_functor);
+  computeJacobian();
 }
 
 void

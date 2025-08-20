@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,10 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ADUtils.h"
+
+// We must include this first for the unity build to see some dataStore template specializations
+// before including DataIO.h through NonlinearSystemBase.h
+#include "PerfGraphRegistry.h"
 
 #include "NonlinearSystemBase.h"
 #include "SubProblem.h"
@@ -69,16 +73,15 @@ globalDofIndexToDerivative(const ADReal & ad_real,
     // Map from global index to derivative
     for (MooseIndex(global_indices) local_index = 0; local_index < global_indices.size();
          ++local_index)
-    {
-#ifndef MOOSE_SPARSE_AD
-      mooseAssert(ad_offset + local_index < MOOSE_AD_MAX_DOFS_PER_ELEM,
-                  "Out of bounds access in derivative vector.");
-#endif
       ret_val[global_indices[local_index]] = ad_real.derivatives()[ad_offset + local_index];
-    }
   }
 
   return ret_val;
 }
 
+bool
+doDerivatives(const SubProblem & subproblem, const SystemBase & sys)
+{
+  return ADReal::do_derivatives && sys.number() == subproblem.currentNlSysNum();
+}
 }

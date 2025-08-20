@@ -11,7 +11,7 @@ several key capabilities in the MOOSE framework including:
 
 ## What is stateful data?
 
-Stateful data is any value, container of values, or complex data structure that cannont be recomputed from other available
+Stateful data is any value, container of values, or complex data structure that cannot be recomputed from other available
 information such as coupled values or field variables. Additionally, it's not any data that is not directly owned by your object.
 
 Here are a couple of examples to consider before defining a dataLoad/dataStore routine:
@@ -36,7 +36,7 @@ The declareRestartableData method is used to tell MOOSE that you would like to s
 object. This method is templated and declared here:
 
 !listing framework/include/restart/Restartable.h
-  re=([^\n]+\n)*[^\n]+declareRestartableData[^,\n]*;
+  re=([^\n]+\n)*[^\n]+declareRestartableData[^\n]*;
 
 This method is templated, so MOOSE will return a reference to the type that you request and manage the data storage for you. For
 all built-in types and combinations of containers and built-in types. This is all that needs to be done. If your type or
@@ -48,7 +48,7 @@ your new type.
 If any object has requested a restartable piece of data that contains or is a custom type, both the dataStore and dataLoad will
 need to be defined. These functions describe how to serialize a custom type.
 
-The declarations for the two methods that may need to be specialized for your application take on on a form similar to this:
+The declarations for the two methods that may need to be specialized for your application take on a form similar to this:
 
 !listing framework/include/restart/DataIO.h
   re=^[^\n]*Global Load Declarations.*?\n\n

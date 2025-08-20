@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -49,5 +49,5 @@ protected:
   const std::vector<std::string> & _param_names;
 
   /// The original cli_args from input
-  std::vector<std::string> _orig_args;
+  std::vector<CLIArgString> _orig_args;
 };

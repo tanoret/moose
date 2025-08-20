@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "libmesh/mesh_base.h"
+#include "libmesh/replicated_mesh.h"
 #include "libmesh/boundary_info.h"
 
 #include "MooseUtils.h"
@@ -18,11 +18,50 @@
 
 namespace MooseMeshUtils
 {
-// Changes the old ID to new ID in the mesh given in parameters
+
+/**
+ * Merges the boundary IDs of boundaries that have the same names
+ * but different IDs.
+ * @param mesh The input mesh whose boundaries we will modify
+ */
+void mergeBoundaryIDsWithSameName(MeshBase & mesh);
+
+/**
+ * Changes the old boundary ID to a new ID in the mesh
+ *
+ * @param mesh the mesh
+ * @param old_id the old boundary id
+ * @param new_id the new boundary id
+ * @param delete_prev whether to delete the previous boundary id from the mesh
+ */
 void changeBoundaryId(MeshBase & mesh,
                       const libMesh::boundary_id_type old_id,
                       const libMesh::boundary_id_type new_id,
                       bool delete_prev);
+
+/**
+ * Changes the old subdomain ID to a new ID in the mesh
+ *
+ * @param mesh the mesh
+ * @param old_id the old subdomain id
+ * @param new_id the new subdomain id
+ */
+void
+changeSubdomainId(MeshBase & mesh, const subdomain_id_type old_id, const subdomain_id_type new_id);
+
+/**
+ * Gets the boundary IDs with their names.
+ *
+ * The ordering of the returned boundary ID vector matches the vector of the boundary
+ * names in \p boundary_name.
+ * When a boundary name is not available in the mesh, if \p generate_unknown is true
+ * a non-existant boundary ID will be returned, otherwise a BoundaryInfo::invalid_id
+ * will be returned.
+ */
+std::vector<BoundaryID> getBoundaryIDs(const libMesh::MeshBase & mesh,
+                                       const std::vector<BoundaryName> & boundary_name,
+                                       bool generate_unknown,
+                                       const std::set<BoundaryID> & mesh_boundary_ids);
 
 /**
  * Gets the boundary IDs with their names.
@@ -67,6 +106,13 @@ BoundaryID getBoundaryID(const BoundaryName & boundary_name, const MeshBase & me
  */
 SubdomainID getSubdomainID(const SubdomainName & subdomain_name, const MeshBase & mesh);
 
+/**
+ * Get the associated subdomainIDs for the subdomain names that are passed in.
+ *
+ * @param mesh The mesh
+ * @param subdomain_name The names of the subdomains
+ * @return The subdomain ids from the passed subdomain names.
+ */
 std::vector<subdomain_id_type> getSubdomainIDs(const libMesh::MeshBase & mesh,
                                                const std::vector<SubdomainName> & subdomain_name);
 
@@ -114,10 +160,41 @@ coordTransformFactor(const P & point,
   }
 }
 
+/**
+ * Computes the distance to a general axis
+ *
+ * @param[in] point  Point for which to compute distance from axis
+ * @param[in] origin  Axis starting point
+ * @param[in] direction  Axis direction
+ */
+template <typename P, typename C>
+C
+computeDistanceToAxis(const P & point, const Point & origin, const RealVectorValue & direction)
+{
+  return (point - origin).cross(direction).norm();
+}
+
+/**
+ * Computes a coordinate transformation factor for a general axisymmetric axis
+ *
+ * @param[in] point  The libMesh \p Point in space where we are evaluating the factor
+ * @param[in] axis  The pair of values defining the general axisymmetric axis.
+ *                  Respectively, the values are the axis starting point and direction.
+ * @param[out] factor  The coordinate transformation factor
+ */
+template <typename P, typename C>
+void
+coordTransformFactorRZGeneral(const P & point,
+                              const std::pair<Point, RealVectorValue> & axis,
+                              C & factor)
+{
+  factor = 2 * M_PI * computeDistanceToAxis<P, C>(point, axis.first, axis.second);
+}
+
 inline void
-computeFaceInfoFaceCoord(FaceInfo & fi,
-                         const Moose::CoordinateSystemType coord_type,
-                         const unsigned int rz_radial_coord = libMesh::invalid_uint)
+computeFiniteVolumeCoords(FaceInfo & fi,
+                          const Moose::CoordinateSystemType coord_type,
+                          const unsigned int rz_radial_coord = libMesh::invalid_uint)
 {
   coordTransformFactor(fi.faceCentroid(), fi.faceCoord(), coord_type, rz_radial_coord);
 }
@@ -126,9 +203,9 @@ computeFaceInfoFaceCoord(FaceInfo & fi,
  * Crate a new set of element-wise IDs by finding unique combinations of existing extra ID values
  *
  * This function finds the unique combinations by recursively calling itself for extra ID inputs. In
- * the recursive calling, the new unique combitnations is determined by combining the extra ID value
+ * the recursive calling, the new unique combinations is determined by combining the extra ID value
  * of current level and the unique combination determined in the previous level in recursion. In the
- * lowest level of recursion, the base combination is set by the unqiue ID values of the
+ * lowest level of recursion, the base combination is set by the unique ID values of the
  * corresponding extra ID.
  *
  * @param mesh input mesh
@@ -136,7 +213,7 @@ computeFaceInfoFaceCoord(FaceInfo & fi,
  * @param extra_ids extra ids
  * @return map of element id to new extra id
  **/
-std::map<dof_id_type, dof_id_type>
+std::unordered_map<dof_id_type, dof_id_type>
 getExtraIDUniqueCombinationMap(const MeshBase & mesh,
                                const std::set<SubdomainID> & block_ids,
                                std::vector<ExtraElementIDName> extra_ids);
@@ -185,26 +262,156 @@ BoundaryID getNextFreeBoundaryID(MeshBase & input_mesh);
  * @param input mesh over which to determine subdomain IDs
  * @param subdomain ID
  */
-bool hasSubdomainID(MeshBase & input_mesh, const SubdomainID & id);
+bool hasSubdomainID(const MeshBase & input_mesh, const SubdomainID & id);
 
 /**
  * Whether a particular subdomain name exists in the mesh
  * @param input mesh over which to determine subdomain names
  * @param subdomain name
  */
-bool hasSubdomainName(MeshBase & input_mesh, const SubdomainName & name);
+bool hasSubdomainName(const MeshBase & input_mesh, const SubdomainName & name);
 
 /**
  * Whether a particular boundary ID exists in the mesh
  * @param input mesh over which to determine boundary IDs
  * @param boundary ID
  */
-bool hasBoundaryID(MeshBase & input_mesh, const BoundaryID & id);
+bool hasBoundaryID(const MeshBase & input_mesh, const BoundaryID id);
 
 /**
  * Whether a particular boundary name exists in the mesh
  * @param input mesh over which to determine boundary names
  * @param boundary name
  */
-bool hasBoundaryName(MeshBase & input_mesh, const BoundaryName & name);
+bool hasBoundaryName(const MeshBase & input_mesh, const BoundaryName & name);
+
+/**
+ * Convert a list of sides in the form of a vector of pairs of node ids into a list of ordered nodes
+ * based on connectivity
+ * @param node_assm vector of pairs of node ids that represent the sides
+ * @param elem_id_list vector of element ids that represent the elements that contain the sides
+ * @param midpoint_node_list vector of node ids that represent the midpoints of the sides for
+ * quadratic sides
+ * @param ordered_node_list vector of node ids that represent the ordered nodes
+ * @param ordered_elem_id_list vector of element corresponding to the ordered nodes
+ * */
+void makeOrderedNodeList(std::vector<std::pair<dof_id_type, dof_id_type>> & node_assm,
+                         std::vector<dof_id_type> & elem_id_list,
+                         std::vector<dof_id_type> & midpoint_node_list,
+                         std::vector<dof_id_type> & ordered_node_list,
+                         std::vector<dof_id_type> & ordered_elem_id_list);
+
+/**
+ * Convert a list of sides in the form of a vector of pairs of node ids into a list of ordered nodes
+ * based on connectivity
+ * @param node_assm vector of pairs of node ids that represent the sides
+ * @param elem_id_list vector of element ids that represent the elements that contain the sides
+ * @param ordered_node_list vector of node ids that represent the ordered nodes
+ * @param ordered_elem_id_list vector of element corresponding to the ordered nodes
+ * */
+void makeOrderedNodeList(std::vector<std::pair<dof_id_type, dof_id_type>> & node_assm,
+                         std::vector<dof_id_type> & elem_id_list,
+                         std::vector<dof_id_type> & ordered_node_list,
+                         std::vector<dof_id_type> & ordered_elem_id_list);
+
+/**
+ * Converts a given name (BoundaryName or SubdomainName) that is known to only contain digits into a
+ * corresponding ID (BoundaryID or SubdomainID) and performs bounds checking to ensure that overflow
+ * doesn't happen.
+ * @param name Name that is to be converted into an ID.
+ * @return ID type corresponding to the type of name.
+ */
+template <typename T, typename Q>
+Q
+getIDFromName(const T & name)
+{
+  if (!MooseUtils::isDigits(name))
+    mooseError(
+        "'name' ", name, " should only contain digits that can be converted to a numerical type.");
+  long long id = std::stoll(name);
+  Q id_Q = Q(id);
+  if (id < std::numeric_limits<Q>::min() || id > std::numeric_limits<Q>::max())
+    mooseError(MooseUtils::prettyCppType<T>(&name),
+               " ",
+               name,
+               " is not within the numeric limits of the expected ID type ",
+               MooseUtils::prettyCppType<Q>(&id_Q),
+               ".");
+
+  return id_Q;
+}
+
+/**
+ * Swap two nodes within an element
+ * @param elem element whose nodes need to be swapped
+ * @param nd1 index of the first node to be swapped
+ * @param nd2 index of the second node to be swapped
+ */
+void swapNodesInElem(Elem & elem, const unsigned int nd1, const unsigned int nd2);
+
+/**
+ * Reprocess the swap related input parameters to make pairs out of them to ease further processing
+ * @param class_name name of the mesh generator class used for exception messages
+ * @param id_name name of the parameter to be swapped used for exception messages
+ * @param id_swaps vector of vectors of the ids to be swapped
+ * @param id_swap_pairs vector of maps of the swapped pairs
+ * @param row_index_shift shift to be applied to the row index in the exception messages (useful
+ * when this method is utilized to process a fraction of a long vector)
+ */
+template <typename T>
+void
+idSwapParametersProcessor(const std::string & class_name,
+                          const std::string & id_name,
+                          const std::vector<std::vector<T>> & id_swaps,
+                          std::vector<std::unordered_map<T, T>> & id_swap_pairs,
+                          const unsigned int row_index_shift = 0)
+{
+  id_swap_pairs.resize(id_swaps.size());
+  for (const auto i : index_range(id_swaps))
+  {
+    const auto & swaps = id_swaps[i];
+    auto & swap_pairs = id_swap_pairs[i];
+
+    if (swaps.size() % 2)
+      throw MooseException("Row ",
+                           row_index_shift + i + 1,
+                           " of ",
+                           id_name,
+                           " in ",
+                           class_name,
+                           " does not contain an even number of entries! Num entries: ",
+                           swaps.size());
+
+    swap_pairs.reserve(swaps.size() / 2);
+    for (unsigned int j = 0; j < swaps.size(); j += 2)
+      swap_pairs[swaps[j]] = swaps[j + 1];
+  }
+}
+
+/**
+ * Reprocess the elem_integers_swaps into maps so they are easier to use
+ * @param class_name name of the mesh generator class used for exception messages
+ * @param num_sections number of sections in the mesh
+ * @param num_integers number of extra element integers in the mesh
+ * @param elem_integers_swaps vector of vectors of vectors of extra element ids to be swapped
+ * @param elem_integers_swap_pairs vector of maps of the swapped pairs
+ */
+void extraElemIntegerSwapParametersProcessor(
+    const std::string & class_name,
+    const unsigned int num_sections,
+    const unsigned int num_integers,
+    const std::vector<std::vector<std::vector<dof_id_type>>> & elem_integers_swaps,
+    std::vector<std::unordered_map<dof_id_type, dof_id_type>> & elem_integers_swap_pairs);
+
+/**
+ * Build a lower-dimensional mesh from a boundary of an input mesh
+ * Note: The lower-dimensional mesh will only have one subdomain and one boundary.
+ *       Error will be thrown if the mesh does not have the boundary.
+ *       This function works only with replicated mesh, for similar functionality with
+ *       distributed meshes, please refer to LowerDBlockFromSidesetGenerator generator.
+ * @param input_mesh  The input mesh
+ * @param boundary_id The boundary id
+ */
+std::unique_ptr<ReplicatedMesh> buildBoundaryMesh(const ReplicatedMesh & input_mesh,
+                                                  const boundary_id_type boundary_id);
 }

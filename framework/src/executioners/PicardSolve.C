@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -53,9 +53,9 @@ PicardSolve::validParams()
                                   "performed based on the Master app's nonlinear "
                                   "residual.",
                                   "Deprecated, use fixed_point_abs_tol");
-  params.addDeprecatedParam<PostprocessorName>("picard_custom_pp",
-                                               "Postprocessor for custom picard convergence check.",
-                                               "Deprecated, use custom_pp");
+  params.addParam<PostprocessorName>("picard_custom_pp",
+                                     "Postprocessor for custom picard convergence check.");
+  params.deprecateParam("picard_custom_pp", "custom_pp", "06/06/2024");
 
   params.addDeprecatedParam<bool>(
       "picard_force_norms",
@@ -124,7 +124,7 @@ PicardSolve::allocateStorage(const bool primary)
   if (relaxation_factor != 1.)
   {
     // Store a copy of the previous solution
-    _nl.addVector(old_tag_id, false, PARALLEL);
+    _solver_sys.addVector(old_tag_id, false, PARALLEL);
 
     // Allocate storage for the previous postprocessor values
     (*transformed_pps_values).resize((*transformed_pps).size());
@@ -152,8 +152,8 @@ PicardSolve::saveVariableValues(const bool primary)
   if (relaxation_factor != 1.)
   {
     // Save variable previous values
-    NumericVector<Number> & solution = _nl.solution();
-    NumericVector<Number> & transformed_old = _nl.getVector(old_tag_id);
+    NumericVector<Number> & solution = _solver_sys.solution();
+    NumericVector<Number> & transformed_old = _solver_sys.getVector(old_tag_id);
     transformed_old = solution;
   }
 }
@@ -243,8 +243,8 @@ PicardSolve::transformVariables(const std::set<dof_id_type> & transformed_dofs, 
     old_tag_id = _secondary_old_tag_id;
   }
 
-  NumericVector<Number> & solution = _nl.solution();
-  NumericVector<Number> & transformed_old = _nl.getVector(old_tag_id);
+  NumericVector<Number> & solution = _solver_sys.solution();
+  NumericVector<Number> & transformed_old = _solver_sys.getVector(old_tag_id);
 
   for (const auto & dof : transformed_dofs)
     solution.set(dof,
@@ -252,7 +252,7 @@ PicardSolve::transformVariables(const std::set<dof_id_type> & transformed_dofs, 
                      (solution(dof) * relaxation_factor));
 
   solution.close();
-  _nl.update();
+  _solver_sys.update();
 }
 
 void
@@ -262,13 +262,14 @@ PicardSolve::printFixedPointConvergenceHistory()
            << Console::outputNorm(std::numeric_limits<Real>::max(), _fixed_point_initial_norm)
            << '\n';
 
+  Real max_norm_old = _fixed_point_initial_norm;
   for (unsigned int i = 0; i <= _fixed_point_it; ++i)
   {
     Real max_norm =
         std::max(_fixed_point_timestep_begin_norm[i], _fixed_point_timestep_end_norm[i]);
     _console << std::setw(2) << i + 1
-             << " Picard |R| = " << Console::outputNorm(_fixed_point_initial_norm, max_norm)
-             << '\n';
+             << " Picard |R| = " << Console::outputNorm(max_norm_old, max_norm) << '\n';
+    max_norm_old = max_norm;
   }
 
   _console << std::endl;

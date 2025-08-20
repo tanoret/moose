@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,7 @@
 #include "PetscSupport.h"
 #include "NonlinearSystem.h"
 
+#include "libmesh/coupling_matrix.h"
 #include "libmesh/numeric_vector.h"
 
 InputParameters
@@ -34,13 +35,16 @@ MoosePreconditioner::validParams()
       "associated with an off-diagonal column from the same position in off_diag_column.");
   params.addParam<std::vector<NonlinearVariableName>>(
       "off_diag_column",
-      "The variable names for the off-diagonal columns you want to add into the matrix; they will "
-      "be associated with an off-diagonal row from the same position in off_diag_row.");
+      "The variable names for the off-diagonal columns you want to add into the matrix; they "
+      "will be associated with an off-diagonal row from the same position in off_diag_row.");
   params.addParam<bool>("full",
                         false,
                         "Set to true if you want the full set of couplings between variables "
                         "simply for convenience so you don't have to set every off_diag_row "
                         "and off_diag_column combination.");
+  params.addParam<NonlinearSystemName>(
+      "nl_sys",
+      "The nonlinear system whose linearization this preconditioner should be applied to.");
 
   params += Moose::PetscSupport::getPetscValidParams();
 
@@ -51,11 +55,14 @@ MoosePreconditioner::MoosePreconditioner(const InputParameters & params)
   : MooseObject(params),
     Restartable(this, "Preconditioners"),
     PerfGraphInterface(this),
-    _fe_problem(*params.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base"))
+    _fe_problem(*params.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
+    _nl_sys_num(
+        isParamValid("nl_sys") ? _fe_problem.nlSysNum(getParam<NonlinearSystemName>("nl_sys")) : 0),
+    _nl(_fe_problem.getNonlinearSystemBase(_nl_sys_num))
 {
-  _fe_problem.getNonlinearSystemBase().setPCSide(getParam<MooseEnum>("pc_side"));
+  _nl.setPCSide(getParam<MooseEnum>("pc_side"));
 
-  _fe_problem.getNonlinearSystemBase().setMooseKSPNormType(getParam<MooseEnum>("ksp_norm"));
+  _nl.setMooseKSPNormType(getParam<MooseEnum>("ksp_norm"));
 
   bool full = getParam<bool>("full");
 
@@ -82,6 +89,10 @@ MoosePreconditioner::MoosePreconditioner(const InputParameters & params)
     paramError("off_diag_column",
                "If off-diagonal columns are specified, matching off-diagonal "
                "rows must be specified as well");
+
+  Moose::PetscSupport::processSingletonMooseWrappedOptions(_fe_problem, params);
+
+  Moose::PetscSupport::storePetscOptions(_fe_problem, _nl.prefix(), *this);
 }
 
 void
@@ -124,4 +135,10 @@ MoosePreconditioner::copyVarValues(MeshBase & mesh,
       to_vector.set(to_dof, from_vector(from_dof));
     }
   }
+}
+
+void
+MoosePreconditioner::setCouplingMatrix(std::unique_ptr<CouplingMatrix> cm)
+{
+  _fe_problem.setCouplingMatrix(std::move(cm), _nl_sys_num);
 }

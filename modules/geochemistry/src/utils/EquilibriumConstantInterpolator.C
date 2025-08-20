@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -167,8 +167,8 @@ EquilibriumConstantInterpolator::sampleDerivative(Real T)
   }
 }
 
-DualReal
-EquilibriumConstantInterpolator::sample(DualReal T)
+ADReal
+EquilibriumConstantInterpolator::sample(const ADReal & T)
 {
   switch (_fit_type)
   {

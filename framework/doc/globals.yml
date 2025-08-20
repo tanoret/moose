@@ -1,6 +1,6 @@
 libMesh: http://libmesh.github.io/
 PETSc: https://www.mcs.anl.gov/petsc/
-MOOSE: http://www.mooseframework.org
+MOOSE: https://mooseframework.inl.gov
 YAML: http://yaml.org/
 python: https://www.python.org/
 AuxVariables: /AuxVariables/index.md
@@ -12,6 +12,8 @@ Kernels: /Kernels/index.md
 Functions: /Functions/index.md
 Postprocessors: /Postprocessors/index.md
 VectorPostprocessors: /VectorPostprocessors/index.md
+Physics: /Physics/index.md
+Positions: /Positions/index.md
 MultiApps: /MultiApps/index.md
 Samplers: /Samplers/index.md
 Markers: /Adaptivity/Markers/index.md
@@ -20,10 +22,13 @@ Transfers: /Transfers/index.md
 Controls: /Controls/index.md
 Distributions: /Distributions/index.md
 Mesh: /Mesh/index.md
+MeshDivisions: /MeshDivisions/index.md
 Outputs: /syntax/Outputs/index.md
 ScalarKernels: /ScalarKernels/index.md
 FVKernels: /FVKernels/index.md
 FVBCs: /FVBCs/index.md
+LinearFVKernels: /LinearFVKernels/index.md
+LinearFVBCs: /LinearFVBCs/index.md
 GitHub: https://github.com
 Gmsh: https://gmsh.info/
 SLEPc: https://slepc.upv.es/

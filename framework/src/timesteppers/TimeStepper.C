@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #include "TimeStepper.h"
 #include "FEProblem.h"
-#include "Transient.h"
+#include "TransientBase.h"
 #include "MooseApp.h"
 
 InputParameters
@@ -23,8 +23,11 @@ TimeStepper::validParams()
       0.5,
       "cutback_factor_at_failure>0 & cutback_factor_at_failure<1",
       "Factor to apply to timestep if a time step fails to converge.");
+  params.addParam<bool>("enable", true, "whether or not to enable the time stepper");
+  params.declareControllable("enable");
 
   params.registerBase("TimeStepper");
+  params.registerSystemAttributeName("TimeStepper");
 
   return params;
 }
@@ -36,7 +39,7 @@ TimeStepper::TimeStepper(const InputParameters & parameters)
     _fe_problem(parameters.have_parameter<FEProblemBase *>("_fe_problem_base")
                     ? *getParam<FEProblemBase *>("_fe_problem_base")
                     : *getParam<FEProblem *>("_fe_problem")),
-    _executioner(*getCheckedPointerParam<Transient *>("_executioner")),
+    _executioner(*getCheckedPointerParam<TransientBase *>("_executioner")),
     _time(_fe_problem.time()),
     _time_old(_fe_problem.timeOld()),
     _t_step(_fe_problem.timeStep()),
@@ -52,7 +55,7 @@ TimeStepper::TimeStepper(const InputParameters & parameters)
     _reset_dt(getParam<bool>("reset_dt")),
     _has_reset_dt(false),
     _failure_count(0),
-    _current_dt(declareRestartableData("current_dt", 1.0))
+    _current_dt(declareRestartableData<Real>("current_dt", 1.0))
 {
 }
 
@@ -90,6 +93,9 @@ TimeStepper::computeStep()
     else
       _current_dt = computeFailedDT();
   }
+  if (_current_dt < -TOLERANCE)
+    mooseError("Negative time step detected :" + std::to_string(_current_dt) +
+               " Investigate the TimeStepper to resolve this error");
 }
 
 bool
@@ -116,7 +122,7 @@ TimeStepper::constrainStep(Real & dt)
   }
 
   // Don't let time go beyond simulation end time (unless we're doing a half transient)
-  if (_time + dt > _end_time && !_app.halfTransient())
+  if (_time + dt > _end_time && !_app.testCheckpointHalfTransient())
   {
     dt = _end_time - _time;
     diag << "Limiting dt for end_time: " << std::setw(9) << std::setprecision(6)

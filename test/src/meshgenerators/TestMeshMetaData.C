@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -68,12 +68,16 @@ template <class T>
 void
 TestMeshMetaData::checkMeshMetaData(const std::string mesh_data_name, const T ref_data)
 {
+  if (hasMeshProperty<float>(mesh_data_name, _input))
+    mooseError("Mesh metadata ", mesh_data_name, " of incorrect type was found");
   if (!hasMeshProperty(mesh_data_name, _input))
-    mooseError("Mesh metadata " + mesh_data_name + " is missing.");
-  else
-  {
-    const T mesh_metadata_value = getMeshProperty<T>(mesh_data_name, _input);
-    if (mesh_metadata_value != ref_data)
-      mooseError("Mesh metadata " + mesh_data_name + " has an incorrect value.");
-  }
+    mooseError("Mesh metadata ", mesh_data_name, " is missing");
+  if (!hasMeshProperty<T>(mesh_data_name, _input))
+    mooseError("Mesh metadata ",
+               mesh_data_name,
+               " of type ",
+               MooseUtils::prettyCppType<T>(),
+               " is missing");
+  if (getMeshProperty<T>(mesh_data_name, _input) != ref_data)
+    mooseError("Mesh metadata " + mesh_data_name + " has an incorrect value.");
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,6 +26,15 @@ protected:
   virtual Real computeValue();
 
   const VariableValue & _nl_u;
-  VariableValue & _var1;
-  VariableValue & _var2;
+
+  /// use deprecated API
+  const bool _deprecated;
+
+  /// current API
+  MooseWritableVariable * _var1;
+  MooseWritableVariable * _var2;
+
+  /// deprectated API
+  VariableValue * _dvar1;
+  VariableValue * _dvar2;
 };

@@ -59,6 +59,7 @@
     connections = 'pipe1:out pipe2:in'
     position = '1 0 0'
     volume = 1e-8
+    use_scalar_variables = false
   []
 
   [pipe2]
@@ -96,6 +97,9 @@
 
   l_tol = 1e-10
   l_max_its = 10
+
+  petsc_options_iname = '-pc_type'
+  petsc_options_value = 'lu'
 
   start_time = 0
   end_time = 3

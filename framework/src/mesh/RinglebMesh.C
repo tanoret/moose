@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "RinglebMesh.h"
+
+#include "MooseApp.h"
 
 #include "libmesh/face_quad4.h"
 #include "libmesh/face_tri3.h"
@@ -64,7 +66,7 @@ RinglebMesh::RinglebMesh(const InputParameters & parameters)
 std::unique_ptr<MooseMesh>
 RinglebMesh::safeClone() const
 {
-  return std::make_unique<RinglebMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 std::vector<Real>

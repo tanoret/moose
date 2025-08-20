@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,13 +10,15 @@
 #include "MortarConstraint.h"
 
 // MOOSE includes
-#include "MooseVariable.h"
 #include "Assembly.h"
+#include "MooseVariable.h"
+#include "SystemBase.h"
 
 InputParameters
 MortarConstraint::validParams()
 {
-  return MortarConstraintBase::validParams();
+  InputParameters params = MortarConstraintBase::validParams();
+  return params;
 }
 
 MortarConstraint::MortarConstraint(const InputParameters & parameters)
@@ -65,7 +67,7 @@ MortarConstraint::computeResidual(Moose::MortarType mortar_type)
 void
 MortarConstraint::computeJacobian(Moose::MortarType mortar_type)
 {
-  size_t test_space_size = 0;
+  std::size_t test_space_size = 0;
   typedef Moose::ConstraintJacobianType JType;
   typedef Moose::MortarType MType;
   std::array<JType, 3> jacobian_types;

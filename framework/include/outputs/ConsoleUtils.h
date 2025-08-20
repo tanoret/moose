@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,7 @@
 // Forward declarations
 class MooseApp;
 class FEProblemBase;
+class MooseObject;
 
 // libMesh forward declarations
 namespace libMesh
@@ -56,7 +57,8 @@ std::string outputAuxiliarySystemInformation(FEProblemBase & problem);
 /**
  * Output the Nonlinear system information
  */
-std::string outputNonlinearSystemInformation(FEProblemBase & problem);
+std::string outputNonlinearSystemInformation(FEProblemBase & problem,
+                                             const unsigned int nl_sys_num);
 
 /**
  * Output action RelationshipManager information
@@ -78,7 +80,12 @@ std::string outputOutputInformation(MooseApp & app);
  * @param system The libMesh system to output
  * @see outputAuxiliarySystemInformation outputNonlinearSystemInformation
  */
-std::string outputSystemInformationHelper(System & system);
+std::string outputSystemInformationHelper(libMesh::System & system);
+
+/**
+ * Output the information about pre-SMO residual evaluation
+ */
+std::string outputPreSMOResidualInformation();
 
 /**
  * Output the legacy flag information
@@ -86,8 +93,33 @@ std::string outputSystemInformationHelper(System & system);
 std::string outputLegacyInformation(MooseApp & app);
 
 /**
+ * Output the registered data paths for searching
+ */
+std::string outputDataFilePaths();
+
+/**
+ * Output the (param path = value) pairs for each DataFileName parameter
+ */
+std::string outputDataFileParams(MooseApp & app);
+
+/**
  * Helper function function for stringstream formatting
  */
 void insertNewline(std::stringstream & oss, std::streampos & begin, std::streampos & curr);
 
+/**
+ * Add new lines and prefixes to a string for pretty display in output
+ * NOTE: This makes a copy of the string, on purpose, to be able to return
+ *       a modified copy
+ * @return the formatted string
+ */
+std::string formatString(std::string message, const std::string & prefix);
+
+/**
+ * Routine to output the name of MooseObjects in a string
+ * @param objs the vector with all the MooseObjects
+ * @param sep a separator in between each object's name
+ */
+std::string mooseObjectVectorToString(const std::vector<MooseObject *> & objs,
+                                      const std::string & sep = " ");
 } // ConsoleUtils namespace

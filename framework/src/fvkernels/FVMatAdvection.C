@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -60,12 +60,14 @@ FVMatAdvection::computeQpResidual()
   const auto v = _vel(makeFace(*_face_info,
                                LimiterType::CentralDifference,
                                true,
-                               _advected_interp_method == InterpMethod::SkewCorrectedAverage));
+                               _advected_interp_method == InterpMethod::SkewCorrectedAverage),
+                      determineState());
   const auto adv_quant_interface =
       _adv_quant(makeFace(*_face_info,
                           limiterType(_advected_interp_method),
                           MetaPhysicL::raw_value(v) * _normal > 0,
-                          _advected_interp_method == InterpMethod::SkewCorrectedAverage));
+                          _advected_interp_method == InterpMethod::SkewCorrectedAverage),
+                 determineState());
 
   return _normal * v * adv_quant_interface;
   ;

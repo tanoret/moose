@@ -58,7 +58,7 @@ This velocity can be computed using the Auxiliary system.
 Solve the transient heat equation using the "heat conduction" module.
 
 !equation
-C \frac{\partial T}{\partial t} - \nabla \cdot k \nabla T = 0
+\rho c_p \frac{\partial T}{\partial t} - \nabla \cdot k \nabla T = 0
 
 !---
 
@@ -70,7 +70,7 @@ to the heat equation.
 !equation
 -\nabla \cdot \frac{\mathbf{K}}{\mu} \nabla p  = 0
 \\
-C\left( \frac{\partial T}{\partial t} + \epsilon \vec{u}\cdot\nabla T \right) - \nabla \cdot k \nabla T = 0
+\rho c_p \left( \frac{\partial T}{\partial t} + \epsilon \vec{u}\cdot\nabla T \right) - \nabla \cdot k \nabla T = 0
 
 !---
 
@@ -92,7 +92,7 @@ within the solution domain.
 ## [#step09]
 
 Thermal expansion of the porous media can be added to the coupled set of equations
-using the "tensor mechanics" module, without adding additional code.
+using the "solid mechanics" module, without adding additional code.
 
 !---
 

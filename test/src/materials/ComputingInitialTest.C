@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -33,6 +33,6 @@ ComputingInitialTest::initQpStatefulProperties()
 void
 ComputingInitialTest::computeQpProperties()
 {
-  if (_subproblem.computingInitialResidual())
+  if (_subproblem.computingPreSMOResidual(0))
     _thermal_conductivity[_qp] = _thermal_conductivity_old[_qp] + 1.0;
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,8 +29,6 @@ protected:
   const std::vector<Real> _emissivities;
   /// View factors for the primary and secondary sides
   std::vector<Real> _view_factors;
-  /// Perimeters for the primary and secondary sides
-  std::vector<Real> _perimeters;
 
 public:
   static InputParameters validParams();

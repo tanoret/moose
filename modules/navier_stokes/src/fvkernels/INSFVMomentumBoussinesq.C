@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,6 +26,7 @@ INSFVMomentumBoussinesq::validParams()
                                     "this is of the form rho = rho*(1-alpha (T-T_ref))");
   params.addRequiredParam<Real>("ref_temperature", "The value for the reference temperature.");
   params.addRequiredParam<MooseFunctorName>(NS::density, "The value for the density");
+  params.addPrivateParam("_override_constant_check", false);
   return params;
 }
 
@@ -38,19 +39,15 @@ INSFVMomentumBoussinesq::INSFVMomentumBoussinesq(const InputParameters & params)
     _ref_temperature(getParam<Real>("ref_temperature")),
     _rho(getFunctor<ADReal>(NS::density))
 {
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  mooseError("INSFV is not supported by local AD indexing. In order to use INSFV, please run the "
-             "configure script in the root MOOSE directory with the configure option "
-             "'--with-ad-indexing-type=global'");
-#endif
-
-  if (!_rho.isConstant())
+  if (!_rho.isConstant() && !getParam<bool>("_override_constant_check"))
     paramError(NS::density, "The density in the boussinesq term is not constant!");
 }
 
 ADReal
 INSFVMomentumBoussinesq::computeQpResidual()
 {
-  auto elem = makeElemArg(_current_elem);
-  return _alpha(elem) * _gravity(_index) * _rho(elem) * (_temperature(elem) - _ref_temperature);
+  const auto elem = makeElemArg(_current_elem);
+  const auto state = determineState();
+  return _alpha(elem, state) * _gravity(_index) * _rho(elem, state) *
+         (_temperature(elem, state) - _ref_temperature);
 }

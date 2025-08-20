@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -108,12 +108,12 @@ TimeExtremeValue::execute()
       break;
 
     default:
-      mooseError("Unrecognzed ExtremeType");
+      mooseError("Unrecognized ExtremeType");
   }
 }
 
 Real
-TimeExtremeValue::getValue()
+TimeExtremeValue::getValue() const
 {
   if (_output_type == OutputType::EXTREME_VALUE)
     return _value;

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,6 +32,7 @@ PorousFlowHystereticRelativePermeabilityBase::validParams()
   params.addRequiredRangeCheckedParam<Real>(
       "m", "m > 0 & m < 1", "van Genuchten m parameter.  Suggested value is around 0.9");
   params.addPrivateParam<std::string>("pf_material_type", "relative_permeability");
+  params.addPrivateParam<bool>("is_ad", false);
   params.addClassDescription("PorousFlow material that computes relative permeability for 1-phase "
                              "or 2-phase models that include hysteresis");
   return params;

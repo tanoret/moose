@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "CoupledConvectionReactionSub.h"
+
+using libMesh::RealGradient;
 
 registerMooseObject("ChemicalReactionsApp", CoupledConvectionReactionSub);
 
@@ -25,6 +27,7 @@ CoupledConvectionReactionSub::validParams()
       "gamma_u", 1.0, "Activity coefficient of primary species that this kernel operates on");
   params.addParam<std::vector<Real>>(
       "sto_v",
+      {},
       "The stoichiometric coefficients of coupled primary species in equilibrium reaction");
   params.addRequiredCoupledVar("p", "Pressure");
   params.addCoupledVar("v", "List of coupled primary species");

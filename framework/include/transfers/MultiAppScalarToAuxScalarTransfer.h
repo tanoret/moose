@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,4 +31,7 @@ protected:
 
   /// The name of the auxiliary scalar variable to which the scalar values are being transfered
   VariableName _to_aux_name;
+
+private:
+  virtual void checkSiblingsTransferSupported() const override;
 };

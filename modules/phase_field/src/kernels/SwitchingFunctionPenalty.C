@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,7 +31,7 @@ SwitchingFunctionPenalty::SwitchingFunctionPenalty(const InputParameters & param
     _h(_num_h),
     _dh(_num_h),
     _penalty(getParam<Real>("penalty")),
-    _number_of_nl_variables(_fe_problem.getNonlinearSystemBase().nVariables()),
+    _number_of_nl_variables(_sys.nVariables()),
     _j_eta(_number_of_nl_variables, -1),
     _a(-1)
 {
@@ -43,7 +43,7 @@ SwitchingFunctionPenalty::SwitchingFunctionPenalty(const InputParameters & param
   for (unsigned int i = 0; i < _num_h; ++i)
   {
     _h[i] = &getMaterialPropertyByName<Real>(_h_names[i]);
-    _dh[i] = &getMaterialPropertyDerivative<Real>(_h_names[i], getVar("etas", i)->name());
+    _dh[i] = &getMaterialPropertyDerivative<Real>(_h_names[i], coupledName("etas", i));
 
     // generate the lookup table from j_var -> eta index
     unsigned int num = coupled("etas", i);

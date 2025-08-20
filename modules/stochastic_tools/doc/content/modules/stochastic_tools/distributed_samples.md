@@ -3,7 +3,7 @@
 Stochastic simulations often require the use of a large number random numbers to compute the
 desired calculation. As such it is important to be mindfull of how these numbers are generated
 in parallel. Within the stochastic tools module it is possible to generate the sample data in
-thre modes: replicated, distributed, or iterative. Each [Sampler](samplers/Sampler.md)-based object
+three modes: replicated, distributed, or iterative. Each [Sampler](samplers/Sampler.md)-based object
 has three methods: `getSamples`, `getLocalSamples`, and `getNextLocalRow`. The first will compute
 a complete dense matrix, the second will only compute the portion of the matrix assigned to the
 current processor, and the last will compute a single row of data within an iterative loop. Sample
@@ -27,7 +27,7 @@ processors utilized. More importantly, for the distributed case is that, the ave
 process ([fig:proc]) decreases in the distributed configuration. Obviously, the iterative method performs the
 best as only a single row of data exists at any time, thus the memory impact is negligible. For
 this reason it is recommend that the `getNextLocalRow` method of sample data retrieval be used
-exclusively, unless the the calculation requires the matrix.
+exclusively, unless the calculation requires the matrix.
 
 !media memory_total.svg style=width:100%; id=fig:total
        caption=Total memory usage for four different configurations for sample data generation.

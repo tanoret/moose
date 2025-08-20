@@ -19,9 +19,9 @@ heat_flux = ${fparse stefan_boltzmann * emissivity * view_factor * (T_ambient^4 
 scale = 0.8
 E_change = ${fparse scale * heat_flux * A * t}
 
-[HeatStructureMaterials]
+[SolidProperties]
   [hs_mat]
-    type = SolidMaterialProperties
+    type = ThermalFunctionSolidProperties
     rho = ${density}
     cp = ${specific_heat_capacity}
     k = ${conductivity}
@@ -39,7 +39,8 @@ E_change = ${fparse scale * heat_flux * A * t}
     depth = ${depth}
     widths = '${thickness}'
     n_part_elems = '10'
-    materials = 'hs_mat'
+    solid_properties = 'hs_mat'
+    solid_properties_T_ref = '300'
     names = 'region'
 
     initial_T = ${T_hs}
@@ -52,16 +53,11 @@ E_change = ${fparse scale * heat_flux * A * t}
     T_ambient = ${T_ambient}
     emissivity = ${emissivity}
     view_factor = ${view_factor}
-    scale_pp = bc_scale_pp
+    scale = ${scale}
   []
 []
 
 [Postprocessors]
-  [bc_scale_pp]
-    type = FunctionValuePostprocessor
-    function = ${scale}
-    execute_on = 'INITIAL TIMESTEP_END'
-  []
   [E_hs]
     type = ADHeatStructureEnergy
     block = 'hs:region'
@@ -90,6 +86,9 @@ E_change = ${fparse scale * heat_flux * A * t}
   dt = ${t}
   num_steps = 1
   abort_on_solve_fail = true
+
+  petsc_options_iname = '-pc_type'
+  petsc_options_value = 'lu'
 []
 
 [Outputs]

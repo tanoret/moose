@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,8 @@ OneDIntegratedBC::validParams()
 {
   InputParameters params = IntegratedBC::validParams();
   params.addRequiredParam<Real>("normal", "Component of outward normal along 1-D direction");
+  params.addClassDescription(
+      "Base class for integrated boundary conditions along a single direction (1D)");
   return params;
 }
 

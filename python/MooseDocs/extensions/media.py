@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -7,11 +7,12 @@
 #* Licensed under LGPL 2.1, please see LICENSE for details
 #* https://www.gnu.org/licenses/lgpl-2.1.html
 import os
+import subprocess
 import logging
 import mooseutils
 from ..common import exceptions
 from ..base import components, Extension, LatexRenderer
-from ..tree import tokens, html, latex
+from ..tree import tokens, html, latex, pages
 from . import command, floats
 
 LOG = logging.getLogger(__name__)
@@ -19,8 +20,8 @@ LOG = logging.getLogger(__name__)
 def make_extension(**kwargs):
     return MediaExtension(**kwargs)
 
-Image = tokens.newToken('Image', src='', tex='', dark='')
-Video = tokens.newToken('Video', src='', tex='', youtube=False,
+Image = tokens.newToken('Image', src='', tex='', dark='', href='')
+Video = tokens.newToken('Video', src='', tex='', quicktime='', youtube=False, dark='',
                         controls=True, poster=None, autoplay=True, loop=True, tstart=None, tstop=None)
 
 class MediaExtension(command.CommandExtension):
@@ -39,10 +40,27 @@ class MediaExtension(command.CommandExtension):
 
     def preRead(self, page):
         page['prefix'] = page[self.name].get('prefix', self.get('prefix'))
+        page['script_files'] = set() # storage for image file created by scripts, see ScriptCommand object
+
+    def preRender(self, page, ast, result):
+
+        # add a page to the local process translator for images created by scripts
+        for extra in page['script_files']:
+            plot_page = pages.File(extra[0], source=extra[1], base=self.translator.destination)
+            if self.translator.findPage(plot_page.local, throw_on_zero=False) is None:
+                self.translator.addPage(plot_page)
+
+    def postWrite(self, page):
+
+        # write (i.e., copy ) the images created by scripts on the current process
+        for extra in page['script_files']:
+            plot_page = pages.File(extra[0], source=extra[1], base=self.translator.destination)
+            self.translator.renderer.write(plot_page)
 
     def extend(self, reader, renderer):
         self.requires(command, floats)
 
+        self.addCommand(reader, ScriptCommand())
         self.addCommand(reader, ImageCommand())
         self.addCommand(reader, VideoCommand())
 
@@ -81,6 +99,7 @@ class ImageCommand(command.CommandComponent):
         settings = command.CommandComponent.defaultSettings()
         settings['latex_src'] = (None, "Image to utilize when rendering with LaTeX")
         settings['dark_src'] = (None, "Image to utilize with dark HTML theme")
+        settings['link'] = (None, "Anchor URL to navigate to upon being clicked")
         settings.update(floats.caption_settings())
         return settings
 
@@ -89,6 +108,52 @@ class ImageCommand(command.CommandComponent):
         flt = floats.create_float(parent, self.extension, self.reader, page, settings,
                                   bottom=True, **self.attributes(settings))
         img = Image(flt, src=info['subcommand'], dark=settings['dark_src'],
+                    tex=settings['latex_src'], href=settings['link'])
+        if flt is parent:
+            img.attributes.update(**self.attributes(settings))
+        return parent
+
+class ScriptCommand(ImageCommand):
+    COMMAND = 'media'
+    SUBCOMMAND = ('py')
+
+    @staticmethod
+    def defaultSettings():
+        settings = ImageCommand.defaultSettings()
+        settings['image_name'] = (None, "Name of image created by the Python plot script, defaults to the name of the script with .png extension")
+        settings.update(floats.caption_settings())
+        return settings
+
+    def createToken(self, parent, info, page, settings):
+        # Find the plot script
+        script_page = self.translator.findPage(info['subcommand'])
+        script_path = script_page.source
+        script_localname = script_page.local
+        script_absdir, script_name = os.path.split(script_path)
+        script_localdir, script_name = os.path.split(script_localname)
+
+        # Generate the plot
+        LOG.info("Executing plot script %s", script_path)
+        result = subprocess.run(["python", script_path], capture_output=True, text=True)
+        if result.returncode != 0:
+            msg = "Failed to execute python script '{}':\n{}"
+            raise exceptions.MooseDocsException(msg, script_path, result.stderr)
+
+        # Currently the plot is assumed to reside in the same directory as the plot script.
+        plot_name = settings['image_name'] or os.path.basename(script_path).replace('.py', '.png')
+        plot_path = os.path.join(script_absdir, plot_name)
+        plot_localname = os.path.join(script_localdir, plot_name)
+
+        # Throw error if the expected plot does not exist
+        if not os.path.isfile(plot_path):
+            LOG.error("The plot script '%s' must generate the plot '%s'", script_localname, plot_localname)
+
+        # Add plot page information to the global page data for processing by the extension, see MediaExtension object
+        page['script_files'].add((plot_localname, plot_path))
+
+        flt = floats.create_float(parent, self.extension, self.reader, page, settings,
+                                  bottom=True, **self.attributes(settings))
+        img = Image(flt, src=plot_name, dark=settings['dark_src'],
                     tex=settings['latex_src'])
         if flt is parent:
             img.attributes.update(**self.attributes(settings))
@@ -96,7 +161,7 @@ class ImageCommand(command.CommandComponent):
 
 class VideoCommand(command.CommandComponent):
     COMMAND = 'media'
-    SUBCOMMAND = ('ogv', 'webm', 'mp4', 'm4v', None)
+    SUBCOMMAND = ('ogv', 'webm', 'mp4', 'm4v', 'quicktime', None)
 
     @staticmethod
     def defaultSettings():
@@ -108,6 +173,8 @@ class VideoCommand(command.CommandComponent):
         settings['tstart'] = (None, "Time (sec) to start video.")
         settings['tstop'] = (None, "Time (sec) to stop video.")
         settings['poster'] = (None, "Add a 'poster' image the the video")
+        settings['quicktime'] = (None, "Video to utilize Macintosh codecs (for alpha transparencies)")
+        settings['dark_src'] = (None, "Image to utilize with dark HTML theme")
         settings.update(floats.caption_settings())
         return settings
 
@@ -124,7 +191,9 @@ class VideoCommand(command.CommandComponent):
                     loop=settings['loop'],
                     autoplay=settings['autoplay'],
                     tstart=settings['tstart'],
-                    tstop=settings['tstop'])
+                    tstop=settings['tstop'],
+                    dark=settings['dark_src'],
+                    quicktime=settings['quicktime'])
 
         if flt is parent:
             vid.attributes.update(**self.attributes(settings))
@@ -141,7 +210,12 @@ class RenderImage(components.RenderComponent):
             node = self.translator.findPage(src)
             src = str(node.relativeSource(page))
 
-        pic = html.Tag(parent, 'picture')
+        if token['href']:
+            # Remove any styles being set for the img tag so it does not pollute the anchor tag
+            pic_link = html.Tag(parent, 'a', token, href=token["href"], style=None)
+            pic = html.Tag(pic_link, 'picture')
+        else:
+            pic = html.Tag(parent, 'picture')
         if token['dark']:
             html.Tag(pic, 'source', srcset=token['dark'], media='(prefers-color-scheme: dark)')
         html.Tag(pic, 'img', token, src=src)
@@ -149,7 +223,8 @@ class RenderImage(components.RenderComponent):
 
     def createMaterialize(self, parent, token, page):
         tag = self.createHTML(parent, token, page)
-        tag.addClass('materialboxed', 'moose-image')
+        if not token['href']:
+            tag.addClass('materialboxed', 'moose-image')
         return tag
 
     def createLatex(self, parent, token, page):
@@ -217,9 +292,16 @@ class RenderVideo(components.RenderComponent):
         div = html.Tag(parent, 'div', token, class_='moose-video-div')
         video = html.Tag(div, 'video', class_='moose-video')
         _, ext = os.path.splitext(src)
+
+        if token['dark']:
+            html.Tag(video, 'source', src=token['dark'], media='(prefers-color-scheme: dark)')
+
+        if token['quicktime']:
+            html.Tag(video, 'source', src=token['quicktime'], type='video/quicktime')
+
         source = html.Tag(video, 'source', src=src)
 
-        source["type"] = "video/{}".format(ext[1:])
+        source["type"] = f"video/{ext[1:]}"
 
         # Set attributes for HTML video element
         video['width'] = '100%'

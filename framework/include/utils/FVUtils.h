@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,6 +19,9 @@
 
 template <typename>
 class MooseVariableFV;
+
+template <typename>
+class MooseLinearVariableFV;
 
 namespace Moose
 {
@@ -86,10 +89,14 @@ loopOverElemFaceInfo(const Elem & elem,
       mooseAssert(fi, "We should have found a FaceInfo");
       mooseAssert(elem_has_info ? &elem == &fi->elem() : &elem == fi->neighborPtr(),
                   "Doesn't seem like we understand how this FaceInfo thing is working");
-      mooseAssert(neighbor
-                      ? (elem_has_info ? neighbor == fi->neighborPtr() : neighbor == &fi->elem())
-                      : true,
-                  "Doesn't seem like we understand how this FaceInfo thing is working");
+      if (neighbor)
+      {
+        mooseAssert(neighbor != libMesh::remote_elem,
+                    "Remote element detected. This indicates that you have insufficient geometric "
+                    "ghosting. Please contact your application developers.");
+        mooseAssert(elem_has_info ? neighbor == fi->neighborPtr() : neighbor == &fi->elem(),
+                    "Doesn't seem like we understand how this FaceInfo thing is working");
+      }
 
       const Point elem_normal = elem_has_info ? fi->normal() : Point(-fi->normal());
 
@@ -118,8 +125,40 @@ loopOverElemFaceInfo(const Elem & elem,
  * @return A tuple, where the first item is elem1, the second item is elem2, and the third item is
  * a boolean indicating whether elem1 corresponds to the FaceInfo elem
  */
-template <typename OutputType>
+template <typename FVVar>
 std::tuple<const Elem *, const Elem *, bool>
-determineElemOneAndTwo(const FaceInfo & fi, const MooseVariableFV<OutputType> & var);
+determineElemOneAndTwo(const FaceInfo & fi, const FVVar & var)
+{
+  auto ft = fi.faceType(std::make_pair(var.number(), var.sys().number()));
+  mooseAssert(ft == FaceInfo::VarFaceNeighbors::BOTH
+                  ? var.hasBlocks(fi.elem().subdomain_id()) && fi.neighborPtr() &&
+                        var.hasBlocks(fi.neighborPtr()->subdomain_id())
+                  : true,
+              "Finite volume variable " << var.name()
+                                        << " does not exist on both sides of the face despite "
+                                           "what the FaceInfo is telling us.");
+  mooseAssert(ft == FaceInfo::VarFaceNeighbors::ELEM
+                  ? var.hasBlocks(fi.elem().subdomain_id()) &&
+                        (!fi.neighborPtr() || !var.hasBlocks(fi.neighborPtr()->subdomain_id()))
+                  : true,
+              "Finite volume variable " << var.name()
+                                        << " does not exist on or only on the elem side of the "
+                                           "face despite what the FaceInfo is telling us.");
+  mooseAssert(ft == FaceInfo::VarFaceNeighbors::NEIGHBOR
+                  ? fi.neighborPtr() && var.hasBlocks(fi.neighborPtr()->subdomain_id()) &&
+                        !var.hasBlocks(fi.elem().subdomain_id())
+                  : true,
+              "Finite volume variable " << var.name()
+                                        << " does not exist on or only on the neighbor side of the "
+                                           "face despite what the FaceInfo is telling us.");
+
+  const bool one_is_elem =
+      ft == FaceInfo::VarFaceNeighbors::BOTH || ft == FaceInfo::VarFaceNeighbors::ELEM;
+  const Elem * const elem_one = one_is_elem ? &fi.elem() : fi.neighborPtr();
+  mooseAssert(elem_one, "This elem should be non-null!");
+  const Elem * const elem_two = one_is_elem ? fi.neighborPtr() : &fi.elem();
+
+  return std::make_tuple(elem_one, elem_two, one_is_elem);
+}
 }
 }

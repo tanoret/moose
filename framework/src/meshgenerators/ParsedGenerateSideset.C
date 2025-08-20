@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,39 +27,23 @@ ParsedGenerateSideset::validParams()
   InputParameters params = SideSetsGeneratorBase::validParams();
   params += FunctionParserUtils<false>::validParams();
 
-  params.addRequiredParam<MeshGeneratorName>("input", "The mesh we want to modify");
   params.addRequiredParam<std::string>("combinatorial_geometry",
                                        "Function expression encoding a combinatorial geometry");
   params.addRequiredParam<BoundaryName>("new_sideset_name", "The name of the new sideset");
-  params.addParam<std::vector<SubdomainName>>(
-      "included_subdomains",
-      "A set of subdomain names or ids whose sides will be included in the new sidesets");
-  params.addDeprecatedParam<std::vector<subdomain_id_type>>(
-      "included_subdomain_ids",
-      "A set of subdomain ids whose sides will be included in the new sidesets",
-      "included_subdomain_ids is deprecated, use included_subdomains with names or ids");
-  params.addParam<std::vector<SubdomainName>>("included_neighbors",
-                                              "A set of neighboring subdomain names or ids. A face "
-                                              "is only added if the subdomain id of the "
-                                              "neighbor is in this set");
-  params.addDeprecatedParam<std::vector<subdomain_id_type>>(
-      "included_neighbor_ids",
-      "A set of neighboring subdomain ids. A face is only added if the subdomain id of the "
-      "neighbor is in this set",
-      "included_neighbor_ids is deprecated, use included_neighbors with names or ids");
-  params.addParam<Point>(
-      "normal",
-      Point(),
-      "If provided specifies the normal vector on sides that are added to the new ");
-  params.addParam<std::vector<std::string>>("constant_names",
-                                            "Vector of constants used in the parsed function");
+
+  params.addParam<std::vector<std::string>>(
+      "constant_names", {}, "Vector of constants used in the parsed function");
   params.addParam<std::vector<std::string>>(
       "constant_expressions",
+      {},
       "Vector of values for the constants in constant_names (can be an FParser expression)");
-  params.addClassDescription("A MeshGenerator that adds element sides to a sideset if the "
-                             "centroid satisfies the `combinatorial_geometry` expression. "
-                             "Optionally, element sides are also added if they are included in "
-                             "`included_subdomain_ids` and if they feature the designated normal.");
+
+  // This sideset generator can only handle a single new sideset name, not a vector of names
+  params.suppressParameter<std::vector<BoundaryName>>("new_boundary");
+
+  params.addClassDescription(
+      "A MeshGenerator that adds element sides to a sideset if the centroid of the side satisfies "
+      "the `combinatorial_geometry` expression.");
 
   return params;
 }
@@ -67,29 +51,9 @@ ParsedGenerateSideset::validParams()
 ParsedGenerateSideset::ParsedGenerateSideset(const InputParameters & parameters)
   : SideSetsGeneratorBase(parameters),
     FunctionParserUtils<false>(parameters),
-    _input(getMesh("input")),
-    _function(parameters.get<std::string>("combinatorial_geometry")),
-    _sideset_name(getParam<BoundaryName>("new_sideset_name")),
-    _check_subdomains(isParamValid("included_subdomain_ids") ||
-                      isParamValid("included_subdomains")),
-    _check_neighbor_subdomains(isParamValid("included_neighbor_ids") ||
-                               isParamValid("included_neighbors")),
-    _check_normal(parameters.isParamSetByUser("normal")),
-    _included_ids(isParamValid("included_subdomain_ids")
-                      ? parameters.get<std::vector<SubdomainID>>("included_subdomain_ids")
-                      : std::vector<SubdomainID>()),
-    _included_neighbor_ids(isParamValid("included_neighbor_ids")
-                               ? parameters.get<std::vector<SubdomainID>>("included_neighbor_ids")
-                               : std::vector<SubdomainID>()),
-    _normal(getParam<Point>("normal"))
+    _function(parameters.get<std::string>("combinatorial_geometry"))
 {
-  // Handle deprecated parameters
-  if (isParamValid("included_subdomain_ids") && isParamValid("included_subdomains"))
-    paramError("included_subdomain_ids",
-               "included_subdomain_ids is deprecated, only specify included_subdomains");
-  if (isParamValid("included_neighbor_ids") && isParamValid("included_neighbors"))
-    paramError("included_neighbor_ids",
-               "included_neighbor_ids is deprecated, only specify included_neighbors");
+  _boundary_names.push_back(getParam<BoundaryName>("new_sideset_name"));
 
   // base function object
   _func_F = std::make_shared<SymFunction>();
@@ -104,12 +68,8 @@ ParsedGenerateSideset::ParsedGenerateSideset(const InputParameters & parameters)
 
   // parse function
   if (_func_F->Parse(_function, "x,y,z") >= 0)
-    mooseError("Invalid function\n",
-               _function,
-               "\nin ParsedAddSideset ",
-               name(),
-               ".\n",
-               _func_F->ErrorMsg());
+    paramError(
+        "combinatorial_geometry", "Invalid function\n", _function, "\n", _func_F->ErrorMsg());
 
   _func_params.resize(3);
 }
@@ -128,67 +88,24 @@ ParsedGenerateSideset::generate()
   // Get a reference to our BoundaryInfo object for later use
   BoundaryInfo & boundary_info = mesh->get_boundary_info();
 
-  // Get the boundary ids from the names
-  if (parameters().isParamValid("included_subdomains"))
-  {
-    // check that the subdomains exist in the mesh
-    const auto subdomains = getParam<std::vector<SubdomainName>>("included_subdomains");
-    for (const auto & name : subdomains)
-      if (!MooseMeshUtils::hasSubdomainName(*mesh, name))
-        paramError("included_subdomains", "The block '", name, "' was not found in the mesh");
-
-    _included_ids = MooseMeshUtils::getSubdomainIDs(*mesh, subdomains);
-  }
-
-  if (parameters().isParamValid("included_neighbors"))
-  {
-    // check that the subdomains exist in the mesh
-    const auto subdomains = getParam<std::vector<SubdomainName>>("included_neighbors");
-    for (const auto & name : subdomains)
-      if (!MooseMeshUtils::hasSubdomainName(*mesh, name))
-        paramError("included_neighbors", "The block '", name, "' was not found in the mesh");
-
-    _included_neighbor_ids = MooseMeshUtils::getSubdomainIDs(*mesh, subdomains);
-  }
-
   // Get the BoundaryIDs from the mesh
   std::vector<boundary_id_type> boundary_ids =
-      MooseMeshUtils::getBoundaryIDs(*mesh, {_sideset_name}, true);
+      MooseMeshUtils::getBoundaryIDs(*mesh, _boundary_names, true);
   mooseAssert(boundary_ids.size() == 1, "Length of boundary_ids should be one");
 
   for (const auto & elem : mesh->active_element_ptr_range())
   {
-    subdomain_id_type curr_subdomain = elem->subdomain_id();
-
     // check if the element is included
-    if (_check_subdomains &&
-        std::find(_included_ids.begin(), _included_ids.end(), curr_subdomain) ==
-            _included_ids.end())
+    if (_check_subdomains && !elementSubdomainIdInList(elem, _included_subdomain_ids))
       continue;
 
-    for (unsigned int side = 0; side < elem->n_sides(); ++side)
+    for (const auto side : make_range(elem->n_sides()))
     {
-      const std::vector<Point> & normals = _fe_face->get_normals();
       _fe_face->reinit(elem, side);
+      // We'll just use the normal of the first qp
+      const Point & face_normal = _fe_face->get_normals()[0];
 
-      // check if the neighboring elems subdomain is included
-      if (_check_neighbor_subdomains)
-      {
-        const Elem * neighbor = elem->neighbor_ptr(side);
-        // if the neighbor does not exist, then skip this face; we only add sidesets
-        // between existing elems if _check_neighbor_subdomains is true
-        if (!neighbor)
-          continue;
-
-        subdomain_id_type curr_neighbor_subdomain = neighbor->subdomain_id();
-        if (std::find(_included_neighbor_ids.begin(),
-                      _included_neighbor_ids.end(),
-                      curr_neighbor_subdomain) == _included_neighbor_ids.end())
-          continue;
-      }
-
-      // check normal if requested
-      if (_check_normal && std::abs(1.0 - _normal * normals[0]) > _variance)
+      if (!elemSideSatisfiesRequirements(elem, side, *mesh, _normal, face_normal))
         continue;
 
       // check expression
@@ -197,12 +114,16 @@ ParsedGenerateSideset::generate()
       _func_params[1] = curr_side->vertex_average()(1);
       _func_params[2] = curr_side->vertex_average()(2);
       if (evaluate(_func_F))
+      {
+        if (_replace)
+          boundary_info.remove_side(elem, side);
         boundary_info.add_side(elem, side, boundary_ids[0]);
+      }
     }
   }
   finalize();
-  boundary_info.sideset_name(boundary_ids[0]) = _sideset_name;
-  boundary_info.nodeset_name(boundary_ids[0]) = _sideset_name;
+  boundary_info.sideset_name(boundary_ids[0]) = _boundary_names[0];
 
+  mesh->set_isnt_prepared();
   return dynamic_pointer_cast<MeshBase>(mesh);
 }

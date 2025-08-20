@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -49,6 +49,9 @@ public:
    * Return the name of the object and data as object_name/data_name
    */
   const std::string getCombinedName() const;
+
+  /// The prefix for reporter data in the restartable system
+  static const std::string REPORTER_RESTARTABLE_DATA_PREFIX;
 
   /**
    * Return the name used for registration of this Reporter in the restartable data system.

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -111,8 +111,8 @@ VectorEMRobinBC::computeQpResidual()
     // Creating vector, curl for field_inc before residual and Jacobian contributions
     RealVectorValue inc_real_value = _inc_real.vectorValue(_t, _q_point[_qp]);
     RealVectorValue inc_imag_value = _inc_imag.vectorValue(_t, _q_point[_qp]);
-    RealVectorValue inc_real_curl = _inc_real.vectorCurl(_t, _q_point[_qp]);
-    RealVectorValue inc_imag_curl = _inc_imag.vectorCurl(_t, _q_point[_qp]);
+    RealVectorValue inc_real_curl = _inc_real.curl(_t, _q_point[_qp]);
+    RealVectorValue inc_imag_curl = _inc_imag.curl(_t, _q_point[_qp]);
 
     std::complex<double> field_inc_0(inc_real_value(0), inc_imag_value(0));
     std::complex<double> field_inc_1(inc_real_value(1), inc_imag_value(1));

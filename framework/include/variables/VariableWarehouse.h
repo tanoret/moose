@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,7 @@
 
 #include "MooseTypes.h"
 #include "HashMap.h"
+#include "MooseError.h"
 
 #include <vector>
 #include <map>
@@ -36,6 +37,10 @@ typedef MooseVariableFE<RealEigenVector> ArrayMooseVariable;
 template <typename>
 class MooseVariableFV;
 typedef MooseVariableFV<Real> MooseVariableFVReal;
+
+template <typename>
+class MooseLinearVariableFV;
+typedef MooseLinearVariableFV<Real> MooseLinearVariableFVReal;
 
 class MooseVariableScalar;
 
@@ -224,11 +229,17 @@ protected:
   /// map of non-vector finite element variables with name keys
   HashMap<std::string, MooseVariableFVReal *> _fv_vars_by_name;
 
+  /// map of non-vector linear finite volume variables with name keys
+  HashMap<std::string, MooseLinearVariableFVReal *> _linear_fv_vars_by_name;
+
   /// map of non-vector finite element variables with name keys
   HashMap<std::string, MooseVariable *> _regular_vars_by_name;
 
   /// map of non-vector finite element variables with unsigned keys
   HashMap<unsigned, MooseVariableFVReal *> _fv_vars_by_number;
+
+  /// map of non-vector finite element variables with unsigned keys
+  HashMap<unsigned, MooseLinearVariableFVReal *> _linear_fv_vars_by_number;
 
   /// map of vector finite element variables with name keys
   HashMap<std::string, VectorMooseVariable *> _vector_vars_by_name;

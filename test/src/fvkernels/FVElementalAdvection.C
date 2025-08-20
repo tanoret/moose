@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,8 +8,6 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "FVElementalAdvection.h"
-
-#ifdef MOOSE_GLOBAL_AD_INDEXING
 
 registerMooseObject("MooseTestApp", FVElementalAdvection);
 
@@ -52,7 +50,8 @@ ADReal
 FVElementalAdvection::computeQpResidual()
 {
   auto resid =
-      _velocity * (_grad_prop ? (*_grad_prop)[_qp] : _var.gradient(makeElemArg(_current_elem)));
+      _velocity * (_grad_prop ? (*_grad_prop)[_qp]
+                              : _var.gradient(makeElemArg(_current_elem), Moose::currentState()));
 
   if (_subproblem.getCoordSystem(_current_elem->subdomain_id()) == Moose::COORD_RZ)
   {
@@ -63,5 +62,3 @@ FVElementalAdvection::computeQpResidual()
 
   return resid;
 }
-
-#endif

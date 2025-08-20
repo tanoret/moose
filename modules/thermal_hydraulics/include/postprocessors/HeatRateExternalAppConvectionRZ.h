@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,6 +30,8 @@ protected:
   const VariableValue & _T_ext;
   /// Heat transfer coefficient from external application
   const VariableValue & _htc_ext;
+  /// Function by which to scale the heat flux
+  const Function & _scale_fn;
 
 public:
   static InputParameters validParams();

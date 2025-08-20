@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,11 +42,11 @@ FVFluxBC::FVFluxBC(const InputParameters & parameters)
 }
 
 void
-FVFluxBC::computeResidual(const FaceInfo & fi)
+FVFluxBC::updateCurrentFace(const FaceInfo & fi)
 {
   _face_info = &fi;
   _normal = fi.normal();
-  _face_type = fi.faceType(_var.name());
+  _face_type = fi.faceType(std::make_pair(_var.number(), _var.sys().number()));
 
   // For FV flux kernels, the normal is always oriented outward from the lower-id
   // element's perspective.  But for BCs, there is only a residual
@@ -57,6 +57,12 @@ FVFluxBC::computeResidual(const FaceInfo & fi)
   // the FaceInfo normal polarity is always oriented with respect to the lower-id element.
   if (_face_type == FaceInfo::VarFaceNeighbors::NEIGHBOR)
     _normal = -_normal;
+}
+
+void
+FVFluxBC::computeResidual(const FaceInfo & fi)
+{
+  updateCurrentFace(fi);
 
   if (_face_type == FaceInfo::VarFaceNeighbors::BOTH)
     mooseError("A FVFluxBC is being triggered on an internal face with centroid: ",
@@ -84,68 +90,7 @@ FVFluxBC::computeResidual(const FaceInfo & fi)
 void
 FVFluxBC::computeResidualAndJacobian(const FaceInfo & fi)
 {
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  mooseError("computeResidualAndJacobian not supported for ", name());
-#endif
   computeJacobian(fi);
-}
-
-void
-FVFluxBC::computeJacobian(Moose::DGJacobianType type, const ADReal & residual)
-{
-  auto & ce = _assembly.couplingEntries();
-  for (const auto & it : ce)
-  {
-    MooseVariableFieldBase & ivariable = *(it.first);
-    MooseVariableFieldBase & jvariable = *(it.second);
-
-    // We currently only support coupling to other FV variables
-    // Remove this when we enable support for it.
-    if (!jvariable.isFV())
-      continue;
-
-    if (type == Moose::ElementElement &&
-        !jvariable.activeOnSubdomain(_face_info->elemSubdomainID()))
-      continue;
-    else if (type == Moose::NeighborNeighbor &&
-             !jvariable.activeOnSubdomain(_face_info->neighborSubdomainID()))
-      continue;
-
-    unsigned int ivar = ivariable.number();
-    unsigned int jvar = jvariable.number();
-
-    if (ivar != _var.number())
-      continue;
-
-    mooseAssert(_var.kind() == Moose::VAR_NONLINEAR,
-                "This is a predicate for the next line...and since this is a residual/Jacobian "
-                "object, this better well be a nonlinear variable");
-    SystemBase & sys = _subproblem.systemBaseNonlinear(_var.sys().number());
-    auto dofs_per_elem = sys.getMaxVarNDofsPerElem();
-
-    auto ad_offset = Moose::adOffset(jvar, dofs_per_elem, type, sys.system().n_vars());
-
-    prepareMatrixTagNeighbor(_assembly, ivar, jvar, type);
-
-    mooseAssert(
-        _local_ke.m() == 1,
-        "We are currently only supporting constant monomials for finite volume calculations");
-    mooseAssert(
-        _local_ke.n() == 1,
-        "We are currently only supporting constant monomials for finite volume calculations");
-    mooseAssert(type == Moose::ElementElement ? jvariable.dofIndices().size() == 1
-                                              : jvariable.dofIndicesNeighbor().size() == 1,
-                "The AD derivative indexing below only makes sense for constant monomials, e.g. "
-                "for a number of dof indices equal to  1");
-
-#ifndef MOOSE_SPARSE_AD
-    mooseAssert(ad_offset < MOOSE_AD_MAX_DOFS_PER_ELEM,
-                "Out of bounds access in derivative vector.");
-#endif
-    _local_ke(0, 0) = residual.derivatives()[ad_offset];
-
-    accumulateTaggedLocalMatrix();
-  }
 }
 
 void
@@ -153,7 +98,7 @@ FVFluxBC::computeJacobian(const FaceInfo & fi)
 {
   _face_info = &fi;
   _normal = fi.normal();
-  _face_type = fi.faceType(_var.name());
+  _face_type = fi.faceType(std::make_pair(_var.number(), _var.sys().number()));
 
   // For FV flux kernels, the normal is always oriented outward from the lower-id
   // element's perspective.  But for BCs, there is only a Jacobian
@@ -173,43 +118,14 @@ FVFluxBC::computeJacobian(const FaceInfo & fi)
 
   mooseAssert(dof_indices.size() == 1, "We're currently built to use CONSTANT MONOMIALS");
 
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-  _assembly.processResidualAndJacobian(r, dof_indices[0], _vector_tags, _matrix_tags);
-#else
-
-  auto local_functor = [&](const ADReal & residual, dof_id_type, const std::set<TagID> &)
-  {
-    // Even though the elem element is always the non-null pointer on mesh
-    // external boundary faces, this could be an "internal" boundary - one
-    // created by variable block restriction where the var is only defined on
-    // one side of the face (either elem or neighbor).  We need to make sure
-    // that we add the residual contribution to only the correct side - the one
-    // where the variable is defined.
-    // Also, we don't need to worry about ElementNeighbor or NeighborElement
-    // contributions here because, once again, this is a boundary face with the
-    // variable only defined on one side.
-    if (_face_type == FaceInfo::VarFaceNeighbors::ELEM)
-      computeJacobian(Moose::ElementElement, residual);
-    else if (_face_type == FaceInfo::VarFaceNeighbors::NEIGHBOR)
-      computeJacobian(Moose::NeighborNeighbor, residual);
-    else if (_face_type == FaceInfo::VarFaceNeighbors::BOTH)
-      mooseError("A FVFluxBC is being triggered on an internal face with centroid: ",
-                 fi.faceCentroid());
-    else
-      mooseError("A FVFluxBC is being triggered on a face which does not connect to a block ",
-                 "with the relevant finite volume variable. Its centroid: ",
-                 fi.faceCentroid());
-  };
-
-  _assembly.processJacobian(r, dof_indices[0], _matrix_tags, local_functor);
-#endif
+  addResidualsAndJacobian(_assembly, std::array<ADReal, 1>{{r}}, dof_indices, _var.scalingFactor());
 }
 
 const ADReal &
 FVFluxBC::uOnUSub() const
 {
   mooseAssert(_face_info, "The face info has not been set");
-  const auto ft = _face_info->faceType(_var.name());
+  const auto ft = _face_info->faceType(std::make_pair(_var.number(), _var.sys().number()));
   mooseAssert(
       ft == FaceInfo::VarFaceNeighbors::ELEM || ft == FaceInfo::VarFaceNeighbors::NEIGHBOR,
       "The variable " << _var.name()
@@ -230,7 +146,7 @@ const ADReal &
 FVFluxBC::uOnGhost() const
 {
   mooseAssert(_face_info, "The face info has not been set");
-  const auto ft = _face_info->faceType(_var.name());
+  const auto ft = _face_info->faceType(std::make_pair(_var.number(), _var.sys().number()));
   mooseAssert(
       ft == FaceInfo::VarFaceNeighbors::ELEM || ft == FaceInfo::VarFaceNeighbors::NEIGHBOR,
       "The variable " << _var.name()

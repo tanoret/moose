@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,7 +36,7 @@ MaterialPropertyDebugOutput::MaterialPropertyDebugOutput(const InputParameters &
 }
 
 void
-MaterialPropertyDebugOutput::output(const ExecFlagType & /*type*/)
+MaterialPropertyDebugOutput::output()
 {
   // Write out objects that consume properties
   std::stringstream consumed;

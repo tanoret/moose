@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #include "ADOneD3EqnEnergyHeatFluxFromHeatStructure3D.h"
 #include "ADHeatFluxFromHeatStructureBaseUserObject.h"
-#include "THMIndices3Eqn.h"
+#include "THMIndicesVACE.h"
 #include "FlowModelSinglePhase.h"
 #include "HeatConductionModel.h"
 
@@ -24,6 +24,8 @@ ADOneD3EqnEnergyHeatFluxFromHeatStructure3D::validParams()
   params.addRequiredParam<MaterialPropertyName>("T", "Fluid temperature");
   params.addRequiredParam<MaterialPropertyName>("Hw", "Convective heat transfer coefficient");
   params.addRequiredCoupledVar("P_hf", "Heat flux perimeter");
+  params.addClassDescription(
+      "Computes a heat flux term from a 3D heat structure in the energy equation for 1-phase flow");
   return params;
 }
 

@@ -26,7 +26,7 @@ the literature.
 
 - Currently limited to parabolic, ideal solution, dilute solution chemical free energies
 
-  - Need free energy to be convex, and and the relationship between composition and chemical potential needs to be analytically invertible
+  - Need free energy to be convex, and the relationship between composition and chemical potential needs to be analytically invertible
 
 - Evolution equation for chemical potential less intuitive compared to evolution equation for composition
 
@@ -62,7 +62,7 @@ where $\eta_{\alpha i}$ is an order parameter representing grain $i$ of phase $\
 \begin{equation}
 \omega_{grad} = \frac{\kappa}{2} \sum_{\alpha=1}^N \sum_{i=1}^{p_\alpha} | \nabla \eta_{\alpha i} |^2
 \end{equation}
-where $\kappa$ is the gradient energy cofficient, which has dimensions of energy per unit length.
+where $\kappa$ is the gradient energy coefficient, which has dimensions of energy per unit length.
 
 ## Evolution equations
 

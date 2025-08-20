@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,8 @@
 #include "NonlinearSystemBase.h"
 #include "FEProblem.h"
 #include "PetscSupport.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", LStableDirk4);
 
@@ -44,7 +46,7 @@ LStableDirk4::LStableDirk4(const InputParameters & parameters)
   {
     std::ostringstream oss;
     oss << "residual_stage" << stage + 1;
-    _stage_residuals[stage] = &(_nl.addVector(oss.str(), false, GHOSTED));
+    _stage_residuals[stage] = addVector(oss.str(), false, GHOSTED);
   }
 }
 
@@ -62,13 +64,13 @@ LStableDirk4::computeTimeDerivatives()
   u_dot = *_solution;
   computeTimeDerivativeHelper(u_dot, _solution_old);
   u_dot.close();
-  _du_dot_du = 1. / _dt;
+  computeDuDotDu();
 }
 
 void
-LStableDirk4::computeADTimeDerivatives(DualReal & ad_u_dot,
+LStableDirk4::computeADTimeDerivatives(ADReal & ad_u_dot,
                                        const dof_id_type & dof,
-                                       DualReal & /*ad_u_dotdot*/) const
+                                       ADReal & /*ad_u_dotdot*/) const
 {
   computeTimeDerivativeHelper(ad_u_dot, _solution_old(dof));
 }
@@ -93,22 +95,29 @@ LStableDirk4::solve()
     // This ensures that all the Output objects in the OutputWarehouse
     // have had solveSetup() called, and sets the default solver
     // parameters for PETSc.
-    _fe_problem.initPetscOutput();
+    _fe_problem.initPetscOutputAndSomeSolverSettings();
 
     _console << "Stage " << _stage << std::endl;
 
     // Set the time for this stage
     _fe_problem.time() = time_old + _c[_stage - 1] * _dt;
 
+    // If we previously used coloring, destroy the old object so it doesn't leak when we allocate a
+    // new object in the following lines
+    _nl->destroyColoring();
+
+    // Potentially setup finite differencing contexts for the solve
+    _nl->potentiallySetupFiniteDifferencing();
+
     // Do the solve
-    _fe_problem.getNonlinearSystemBase().system().solve();
+    _nl->system().solve();
 
     // Update the iteration counts
     _n_nonlinear_iterations += getNumNonlinearIterationsLastSolve();
     _n_linear_iterations += getNumLinearIterationsLastSolve();
 
     // Abort time step immediately on stage failure - see TimeIntegrator doc page
-    if (!_fe_problem.converged())
+    if (!_fe_problem.converged(_nl->number()))
       return;
   }
 }
@@ -137,10 +146,10 @@ LStableDirk4::postResidual(NumericVector<Number> & residual)
 
   // Store this stage's non-time residual.  We are calling operator=
   // here, and that calls close().
-  *_stage_residuals[_stage - 1] = _Re_non_time;
+  *_stage_residuals[_stage - 1] = *_Re_non_time;
 
   // Build up the residual for this stage.
-  residual.add(1., _Re_time);
+  residual.add(1., *_Re_time);
   for (unsigned int j = 0; j < _stage; ++j)
     residual.add(_a[_stage - 1][j], *_stage_residuals[j]);
   residual.close();

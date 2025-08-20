@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -35,7 +35,9 @@ INSAD3Eqn::INSAD3Eqn(const InputParameters & parameters)
     _temperature_ambient_convection_strong_residual(
         declareADProperty<Real>("temperature_ambient_convection_strong_residual")),
     _temperature_source_strong_residual(
-        declareADProperty<Real>("temperature_source_strong_residual"))
+        declareADProperty<Real>("temperature_source_strong_residual")),
+    _temperature_advected_mesh_strong_residual(
+        declareADProperty<Real>("temperature_advected_mesh_strong_residual"))
 {
 }
 
@@ -124,4 +126,8 @@ INSAD3Eqn::computeQpProperties()
       _temperature_source_strong_residual[_qp] = -_heat_source_function->value(_t, _q_point[_qp]);
     }
   }
+
+  if (_has_advected_mesh)
+    _temperature_advected_mesh_strong_residual[_qp] =
+        -_rho[_qp] * _cp[_qp] * _mesh_velocity[_qp] * _grad_temperature[_qp];
 }

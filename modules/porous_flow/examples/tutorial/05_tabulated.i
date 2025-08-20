@@ -34,7 +34,7 @@
   [injection_area]
     type = ParsedGenerateSideset
     combinatorial_geometry = 'x*x+y*y<1.01'
-    included_subdomain_ids = 1
+    included_subdomains = 1
     new_sideset_name = 'injection_area'
     input = 'aquifer'
   []
@@ -92,7 +92,9 @@
     fp = true_water
     temperature_min = 275
     interpolated_properties = 'density viscosity enthalpy internal_energy'
-    fluid_property_file = water97_tabulated.csv
+    fluid_property_output_file = water97_tabulated.csv
+    # Comment out the fp parameter and uncomment below to use the newly generated tabulation
+    # fluid_property_file = water97_tabulated.csv
   []
 []
 

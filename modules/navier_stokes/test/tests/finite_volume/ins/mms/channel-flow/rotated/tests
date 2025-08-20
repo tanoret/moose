@@ -5,9 +5,8 @@
     type = PythonUnitTest
     input = test.py
     test_case = TestPlanePoiseuilleAverage
-    method = '!dbg'
+    capabilities = 'method!=dbg'
     requirement = 'The system shall demonstrate global second order convergence for all variables on a rotated mesh when using an average interpolation for the velocity and a two term Taylor series expansion for face values on non-Dirichlet boundaries.'
-    ad_indexing_type = 'global'
     required_python_packages = 'pandas matplotlib'
     min_parallel = 8
     heavy = true
@@ -16,9 +15,8 @@
     type = PythonUnitTest
     input = test.py
     test_case = TestPlanePoiseuilleRC
-    method = '!dbg'
+    capabilities = 'method!=dbg'
     requirement = 'The system shall demonstrate global second order convergence for all variables on a rotated mesh when using an RC interpolation for the velocity and a two term Taylor series expansion for face values on non-Dirichlet boundaries.'
-    ad_indexing_type = 'global'
     required_python_packages = 'pandas matplotlib'
     min_parallel = 8
     heavy = true
@@ -27,8 +25,7 @@
     type = PythonUnitTest
     input = test.py
     test_case = TestPlanePoiseuilleAverageFirst
-    method = '!dbg'
-    ad_indexing_type = 'global'
+    capabilities = 'method!=dbg'
     required_python_packages = 'pandas matplotlib'
     min_parallel = 8
     heavy = true
@@ -38,9 +35,8 @@
     type = PythonUnitTest
     input = test.py
     test_case = TestPlanePoiseuilleRCFirst
-    method = '!dbg'
+    capabilities = 'method!=dbg'
     requirement = 'The system shall demonstrate global second order convergence for all variables on a rotated mesh when using an RC interpolation for the velocity and a one term Taylor series expansion for face values on non-Dirichlet boundaries.'
-    ad_indexing_type = 'global'
     required_python_packages = 'pandas matplotlib'
     min_parallel = 8
     heavy = true

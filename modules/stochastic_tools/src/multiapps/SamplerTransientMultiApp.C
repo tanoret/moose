@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,7 +39,11 @@ SamplerTransientMultiApp::validParams()
       "mode",
       modes,
       "The operation mode, 'normal' creates one sub-application for each row in the Sampler and "
-      "'batch' creates on sub-application for each processor and re-executes for each row.");
+      "'batch-reset' and 'batch-restore' creates N sub-applications, where N is the minimum of "
+      "'num_rows' in the Sampler and floor(number of processes / min_procs_per_app). To run "
+      "the rows in the Sampler, 'batch-reset' will destroy and re-create sub-apps as needed, "
+      "whereas the 'batch-restore' will backup and restore sub-apps to the initial state prior "
+      "to execution, without destruction.");
 
   return params;
 }
@@ -145,23 +149,35 @@ SamplerTransientMultiApp::solveStepBatch(Real dt, Real target_time, bool auto_ad
 
     if (_mode == StochasticTools::MultiAppMode::BATCH_RESTORE)
       for (MooseIndex(_my_num_apps) j = 0; j < _my_num_apps; j++)
-        _apps[j]->restore(_batch_backup[_local_batch_app_index][j]);
+      {
+        _apps[j]->restore(std::move(_batch_backup[_local_batch_app_index][j]), false);
+        _apps[j]->finalizeRestore();
+      }
 
-    for (auto & transfer : to_transfers)
+    SamplerFullSolveMultiApp::execBatchTransfers(to_transfers,
+                                                 i,
+                                                 _row_data,
+                                                 MultiAppTransfer::TO_MULTIAPP,
+                                                 _fe_problem.verboseMultiApps(),
+                                                 _console);
+
+    // Set the file base based on the current row
+    for (unsigned int ai = 0; ai < _my_num_apps; ++ai)
     {
-      transfer->setGlobalRowIndex(i);
-      transfer->setCurrentRow(_row_data);
-      transfer->executeToMultiapp();
+      const std::string mname = getMultiAppName(name(), i, _number_of_sampler_rows);
+      _apps[ai]->setOutputFileBase(_app.getOutputFileBase() + "_" + mname);
     }
 
-    last_solve_converged = TransientMultiApp::solveStep(dt, target_time, auto_advance);
+    const bool curr_last_solve_converged =
+        TransientMultiApp::solveStep(dt, target_time, auto_advance);
+    last_solve_converged = last_solve_converged && curr_last_solve_converged;
 
-    for (auto & transfer : from_transfers)
-    {
-      transfer->setGlobalRowIndex(i);
-      transfer->setCurrentRow(_row_data);
-      transfer->executeFromMultiapp();
-    }
+    SamplerFullSolveMultiApp::execBatchTransfers(from_transfers,
+                                                 i,
+                                                 _row_data,
+                                                 MultiAppTransfer::FROM_MULTIAPP,
+                                                 _fe_problem.verboseMultiApps(),
+                                                 _console);
 
     incrementTStep(target_time);
 
@@ -198,10 +214,10 @@ SamplerTransientMultiApp::getActiveStochasticToolsTransfers(Transfer::DIRECTION 
   return output;
 }
 
-std::string
-SamplerTransientMultiApp::getCommandLineArgsParamHelper(unsigned int local_app)
+std::vector<std::string>
+SamplerTransientMultiApp::getCommandLineArgs(const unsigned int local_app)
 {
-  std::string args;
+  std::vector<std::string> args;
 
   // With multiple processors per app, there are no local rows for non-root processors
   if (isRootProcessor())
@@ -210,9 +226,8 @@ SamplerTransientMultiApp::getCommandLineArgsParamHelper(unsigned int local_app)
     // sampler data and combine them to get full command line option strings.
     updateRowData(_mode == StochasticTools::MultiAppMode::NORMAL ? local_app
                                                                  : _local_batch_app_index);
-    const std::vector<std::string> & cli_args_name =
-        MooseUtils::split(TransientMultiApp::getCommandLineArgsParamHelper(local_app), ";");
-    args = SamplerFullSolveMultiApp::sampledCommandLineArgs(_row_data, cli_args_name);
+    args = SamplerFullSolveMultiApp::sampledCommandLineArgs(
+        _row_data, TransientMultiApp::getCommandLineArgs(local_app));
   }
 
   _my_communicator.broadcast(args);

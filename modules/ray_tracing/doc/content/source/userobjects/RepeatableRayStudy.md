@@ -37,7 +37,7 @@ The definition of [Ray.md] trajectory is considered advanced use because the use
 - Killing it with a [RayBC](RayBCs/index.md) (example: [KillRayBC.md]).
 - Killing it with a [RayKernel](RayKernels/index.md).
 - Setting a maximum distance that it is allowed to travel via the [!param](/UserObjects/RepeatableRayStudy/max_distances) parameter.
-- Setting a maximum distance that all rays are allowed to travel via the the [!param](/UserObjects/RepeatableRayStudy/ray_distance) parameter.
+- Setting a maximum distance that all rays are allowed to travel via the [!param](/UserObjects/RepeatableRayStudy/ray_distance) parameter.
 
 To define the trajectory by directions, provide the directions at which you want the rays to travel in the [!param](/UserObjects/RepeatableRayStudy/directions) parameter. These directions do not need to be normalized.
 
@@ -45,7 +45,7 @@ If the [Ray.md] intersects an external boundary and is not set to be killed and 
 
 ## Setting Ray Data
 
-For more advanced use, one can also register [Ray.md] data/auxiliary data and initialize it as desired. It is important that this is not necessary when using [RayKernels/index.md] that contribute to residuals or integrate along lones, as the [Ray.md] data mangement in those cases is handled under the hood.
+For more advanced use, one can also register [Ray.md] data/auxiliary data and initialize it as desired. It is important that this is not necessary when using [RayKernels/index.md] that contribute to residuals or integrate along lines, as the [Ray.md] data management in those cases is handled under the hood.
 
 !syntax parameters /UserObjects/RepeatableRayStudy
   visible=Required Trajectory

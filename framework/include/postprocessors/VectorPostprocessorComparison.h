@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -37,7 +37,7 @@ public:
 
   virtual void initialize() override;
   virtual void execute() override;
-  virtual PostprocessorValue getValue() override;
+  virtual PostprocessorValue getValue() const override;
 
 protected:
   /// Values of the first vector post-processor to compare

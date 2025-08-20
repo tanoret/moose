@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,25 +16,28 @@
 InputParameters
 INSFVTimeKernel::validParams()
 {
-  auto params = FVTimeKernel::validParams();
+  auto params = FVFunctorTimeKernel::validParams();
   params += INSFVMomentumResidualObject::validParams();
+  params.addParam<bool>(
+      "contribute_to_rc",
+      true,
+      "Whether the time derivative term should contribute to Rhie-Chow coefficients");
+  params.addParamNamesToGroup("contribute_to_rc", "Advanced");
   return params;
 }
 
 INSFVTimeKernel::INSFVTimeKernel(const InputParameters & params)
-  : FVTimeKernel(params), INSFVMomentumResidualObject(*this)
+  : FVFunctorTimeKernel(params),
+    INSFVMomentumResidualObject(*this),
+    _contribute_to_rc_coeffs(getParam<bool>("contribute_to_rc"))
 {
 }
 
-#ifdef MOOSE_GLOBAL_AD_INDEXING
 void
-INSFVTimeKernel::processResidualAndJacobian(const ADReal & residual, const dof_id_type dof_index)
+INSFVTimeKernel::addResidualAndJacobian(const ADReal & residual, const dof_id_type dof_index)
 {
-  _assembly.processResidualAndJacobian(residual, dof_index, _vector_tags, _matrix_tags);
+  addResidualsAndJacobian(_assembly,
+                          std::array<ADReal, 1>{{residual}},
+                          std::array<dof_id_type, 1>{{dof_index}},
+                          _var.scalingFactor());
 }
-#else
-void
-INSFVTimeKernel::processResidualAndJacobian(const ADReal &, const dof_id_type)
-{
-}
-#endif

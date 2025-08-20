@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,8 +28,8 @@ protected:
   const Function & _T_ambient_fn;
   /// Ambient heat transfer coefficient function
   const Function & _htc_ambient_fn;
-  /// Factor by which to scale integral, like when using a 2D domain
-  const Real & _scale;
+  /// Functor by which to scale the heat flux
+  const Moose::Functor<Real> & _scale;
 
 public:
   static InputParameters validParams();

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,11 +26,13 @@ KernelBase::validParams()
 
   params.addParam<std::vector<AuxVariableName>>(
       "save_in",
+      {},
       "The name of auxiliary variables to save this Kernel's residual contributions to. "
       " Everything about that variable must match everything about this variable (the "
       "type, what blocks it's on, etc.)");
   params.addParam<std::vector<AuxVariableName>>(
       "diag_save_in",
+      {},
       "The name of auxiliary variables to save this Kernel's diagonal Jacobian "
       "contributions to. Everything about that variable must match everything "
       "about this variable (the type, what blocks it's on, etc.)");
@@ -43,7 +45,7 @@ KernelBase::validParams()
                         "are provided in the Mesh block the "
                         "undisplaced mesh will still be used.");
 
-  params.addParamNamesToGroup(" diag_save_in save_in use_displaced_mesh", "Advanced");
+  params.addParamNamesToGroup("diag_save_in save_in use_displaced_mesh", "Advanced");
   params.addCoupledVar("displacements", "The displacements");
 
   // Kernels always couple within their element

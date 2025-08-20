@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -80,6 +80,7 @@ ComputeJacobianBlocksThread::postInternalSide(const Elem * elem, unsigned int si
                                         dof_map,
                                         _dof_indices,
                                         _dof_neighbor_indices,
+                                        _tags,
                                         _tid);
       }
   }

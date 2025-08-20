@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -53,7 +53,7 @@ SideDiffusiveFluxAverageTempl<is_ad>::execute()
 
 template <bool is_ad>
 Real
-SideDiffusiveFluxAverageTempl<is_ad>::getValue()
+SideDiffusiveFluxAverageTempl<is_ad>::getValue() const
 {
   return _integral_value / _volume;
 }
@@ -71,8 +71,7 @@ void
 SideDiffusiveFluxAverageTempl<is_ad>::threadJoin(const UserObject & y)
 {
   SideDiffusiveFluxIntegralTempl<is_ad, Real>::threadJoin(y);
-  const SideDiffusiveFluxAverageTempl<is_ad> & pps =
-      static_cast<const SideDiffusiveFluxAverageTempl<is_ad> &>(y);
+  const auto & pps = static_cast<const SideDiffusiveFluxAverageTempl<is_ad> &>(y);
   _volume += pps._volume;
 }
 

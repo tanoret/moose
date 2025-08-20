@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Moose.h"
+#include "MooseFunctorArguments.h"
 
 #define usingTransientInterfaceMembers                                                             \
   using TransientInterface::_t;                                                                    \
@@ -36,6 +37,13 @@ public:
 
   bool isImplicit() { return _is_implicit; }
 
+  /**
+   * Create a functor state argument that corresponds to the implicit state of this object. If we
+   * are implicit then we will return the current state. If we are not, then we will return the old
+   * state
+   */
+  Moose::StateArg determineState() const;
+
 protected:
   const InputParameters & _ti_params;
 
@@ -52,6 +60,9 @@ protected:
   /// Time
   Real & _t;
 
+  /// Old time
+  const Real & _t_old;
+
   /// The number of the time step
   int & _t_step;
 
@@ -67,3 +78,9 @@ protected:
 private:
   const std::string _ti_name;
 };
+
+inline Moose::StateArg
+TransientInterface::determineState() const
+{
+  return _is_implicit ? Moose::currentState() : Moose::oldState();
+}

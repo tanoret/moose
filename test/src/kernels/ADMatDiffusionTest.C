@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -38,12 +38,12 @@ ADMatDiffusionTest::ADMatDiffusionTest(const InputParameters & parameters)
   // check whether our has APIs work
 
   if (!hasADMaterialProperty<Real>("ad_mat_prop") &&
-      !defaultADMaterialProperty<Real>(deducePropertyName("ad_mat_prop")))
+      !defaultADMaterialProperty<Real>(getMaterialPropertyName("ad_mat_prop")))
     mooseError("It should be impossible to get an AD property without erroring and simultaneously "
                "be neither able to retrieve the property with 'hasADMaterialProperty' nor through "
                "a default property");
   if (!hasMaterialProperty<Real>("regular_mat_prop") &&
-      !defaultMaterialProperty<Real>(deducePropertyName("regular_mat_prop")))
+      !defaultMaterialProperty<Real>(getMaterialPropertyName("regular_mat_prop")))
     mooseError(
         "It should be impossible to get a regular property without erroring and simultaneously "
         "be neither able to retrieve the property with 'hasMaterialProperty' nor through "

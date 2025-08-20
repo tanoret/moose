@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -81,10 +81,10 @@ ComputeJacobianForScalingThread::operator()(const ConstElemRange & range,
 }
 
 void
-ComputeJacobianForScalingThread::computeJacobian()
+ComputeJacobianForScalingThread::computeOnElement()
 {
   if (_nl.offDiagonalsInAutoScaling())
-    ComputeFullJacobianThread::computeJacobian();
+    ComputeFullJacobianThread::computeOnElement();
   else
-    ComputeJacobianThread::computeJacobian();
+    ComputeJacobianThread::computeOnElement();
 }

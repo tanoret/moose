@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,7 +23,7 @@ MOOSE_PYTHON_DIR = os.path.join(MOOSE_DIR, 'python')
 if MOOSE_PYTHON_DIR not in sys.path:
     sys.path.append(MOOSE_PYTHON_DIR)
 
-# Always operate from the directory of them moosedocs.py script, this allows the script to be
+# Always operate from the directory of the moosedocs.py script, this allows the script to be
 # run from any location. CIVET runs 'modules/doc/moosedocs.py check' from the root directory.
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
 

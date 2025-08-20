@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,10 +21,12 @@
 
 ComputeNodalKernelBCJacobiansThread::ComputeNodalKernelBCJacobiansThread(
     FEProblemBase & fe_problem,
+    NonlinearSystemBase & nl,
     MooseObjectTagWarehouse<NodalKernelBase> & nodal_kernels,
     const std::set<TagID> & tags)
   : ThreadedNodeLoop<ConstBndNodeRange, ConstBndNodeRange::const_iterator>(fe_problem),
     _fe_problem(fe_problem),
+    _nl(nl),
     _aux_sys(fe_problem.getAuxiliarySystem()),
     _tags(tags),
     _nodal_kernels(nodal_kernels),
@@ -37,6 +39,7 @@ ComputeNodalKernelBCJacobiansThread::ComputeNodalKernelBCJacobiansThread(
     ComputeNodalKernelBCJacobiansThread & x, Threads::split split)
   : ThreadedNodeLoop<ConstBndNodeRange, ConstBndNodeRange::const_iterator>(x, split),
     _fe_problem(x._fe_problem),
+    _nl(x._nl),
     _aux_sys(x._aux_sys),
     _tags(x._tags),
     _nodal_kernels(x._nodal_kernels),
@@ -64,7 +67,7 @@ ComputeNodalKernelBCJacobiansThread::onNode(ConstBndNodeRange::const_iterator & 
 
   BoundaryID boundary_id = bnode->_bnd_id;
 
-  auto & ce = _fe_problem.couplingEntries(_tid);
+  auto & ce = _fe_problem.couplingEntries(_tid, _nl.number());
   for (const auto & it : ce)
   {
     MooseVariableFEBase & ivariable = *(it.first);
@@ -121,7 +124,10 @@ ComputeNodalKernelBCJacobiansThread::onNode(ConstBndNodeRange::const_iterator & 
         {
           _fe_problem.reinitNodeFace(node, boundary_id, _tid);
           for (const auto & nodal_kernel : active_involved_kernels)
+          {
+            nodal_kernel->setSubdomains(Moose::NodeArg::undefined_subdomain_connection);
             nodal_kernel->computeOffDiagJacobian(jvar);
+          }
 
           _num_cached++;
         }
@@ -130,8 +136,9 @@ ComputeNodalKernelBCJacobiansThread::onNode(ConstBndNodeRange::const_iterator & 
       if (_num_cached == 20) // cache 20 nodes worth before adding into the jacobian
       {
         _num_cached = 0;
-        _fe_problem.assembly(_tid, _fe_problem.currentNonlinearSystem().number())
-            .addCachedJacobian();
+        // vectors are thread-safe, but matrices are not yet
+        Threads::spin_mutex::scoped_lock lock(Threads::spin_mtx);
+        _fe_problem.addCachedJacobian(_tid);
       }
     }
   }
@@ -140,4 +147,19 @@ ComputeNodalKernelBCJacobiansThread::onNode(ConstBndNodeRange::const_iterator & 
 void
 ComputeNodalKernelBCJacobiansThread::join(const ComputeNodalKernelBCJacobiansThread & /*y*/)
 {
+}
+
+void
+ComputeNodalKernelBCJacobiansThread::printGeneralExecutionInformation() const
+{
+  if (!_fe_problem.shouldPrintExecution(_tid) || !_nkernel_warehouse->hasActiveBoundaryObjects())
+    return;
+
+  const auto & console = _fe_problem.console();
+  const auto & execute_on = _fe_problem.getCurrentExecuteOnFlag();
+  console << "[DBG] Computing nodal kernel & boundary conditions contribution to the Jacobian on "
+             "boundary nodes on "
+          << execute_on << std::endl;
+  console << "[DBG] Ordering on boundaries they are defined on:" << std::endl;
+  console << _nkernel_warehouse->activeObjectsToFormattedString() << std::endl;
 }

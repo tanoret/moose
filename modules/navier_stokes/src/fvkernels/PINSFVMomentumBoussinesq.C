@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -35,5 +35,6 @@ PINSFVMomentumBoussinesq::PINSFVMomentumBoussinesq(const InputParameters & param
 ADReal
 PINSFVMomentumBoussinesq::computeQpResidual()
 {
-  return _eps(makeElemArg(_current_elem)) * INSFVMomentumBoussinesq::computeQpResidual();
+  return _eps(makeElemArg(_current_elem), determineState()) *
+         INSFVMomentumBoussinesq::computeQpResidual();
 }

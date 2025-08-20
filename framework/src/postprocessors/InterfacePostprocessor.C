@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,6 +42,12 @@ InterfacePostprocessor::execute()
 void
 InterfacePostprocessor::threadJoin(const UserObject & y)
 {
-  const InterfacePostprocessor & pps = static_cast<const InterfacePostprocessor &>(y);
+  const auto & pps = static_cast<const InterfacePostprocessor &>(y);
   _interface_primary_area += pps._interface_primary_area;
+}
+
+void
+InterfacePostprocessor::finalize()
+{
+  gatherSum(_interface_primary_area);
 }

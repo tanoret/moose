@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,7 @@
 #include "PiecewiseLinear.h"
 #include "Transient.h"
 #include "NonlinearSystem.h"
+#include "FEProblemBase.h"
 
 #include <limits>
 #include <set>
@@ -57,8 +58,8 @@ IterationAdaptiveDT::validParams()
       "Timestep to apply after time sync with function point. To be used in "
       "conjunction with 'force_step_every_function_point'.");
   params.addRequiredParam<Real>("dt", "The default timestep size between solves");
-  params.addParam<std::vector<Real>>("time_t", "The values of t");
-  params.addParam<std::vector<Real>>("time_dt", "The values of dt");
+  params.addParam<std::vector<Real>>("time_t", {}, "The values of t");
+  params.addParam<std::vector<Real>>("time_dt", {}, "The values of dt");
   params.addParam<Real>("growth_factor",
                         2.0,
                         "Factor to apply to timestep if easy convergence (if "
@@ -66,9 +67,9 @@ IterationAdaptiveDT::validParams()
                         "from failed solve");
   params.addParam<Real>("cutback_factor",
                         0.5,
-                        "Factor to apply to timestep if difficult "
-                        "convergence (if 'optimal_iterations' is specified) "
-                        "or if solution failed");
+                        "Factor to apply to timestep if difficult convergence "
+                        "occurs (if 'optimal_iterations' is specified). "
+                        "For failed solves, use cutback_factor_at_failure");
 
   params.addParam<bool>("reject_large_step",
                         false,
@@ -261,12 +262,20 @@ IterationAdaptiveDT::computeDT()
   {
     _sync_last_step = false;
     if (_post_function_sync_dt)
+    {
       dt = _post_function_sync_dt;
-    else
-      dt = _dt_old;
 
-    if (_verbose)
-      _console << "Setting dt to value used before sync: " << std::setw(9) << dt << std::endl;
+      if (_verbose)
+        _console << "Setting dt to 'post_function_sync_dt': " << std::setw(9) << dt << std::endl;
+    }
+    else
+    {
+      dt = _executioner.unconstrainedDT();
+
+      if (_verbose)
+        _console << "Setting dt to unconstrained value used before sync: " << std::setw(9) << dt
+                 << std::endl;
+    }
   }
   else if (_adaptive_timestepping)
     computeAdaptiveDT(dt);
@@ -291,8 +300,15 @@ IterationAdaptiveDT::constrainStep(Real & dt)
 {
   bool at_sync_point = TimeStepper::constrainStep(dt);
 
-  // Limit the timestep to postprocessor value
-  limitDTToPostprocessorValue(dt);
+  // Use value from computed dt while rejecting the timestep
+  if (_dt_from_reject)
+  {
+    dt = *_dt_from_reject;
+    _dt_from_reject.reset();
+  }
+  // Otherwise, limit the timestep to the current postprocessor value
+  else
+    limitDTToPostprocessorValue(dt);
 
   // Limit the timestep to limit change in the function
   limitDTByFunction(dt);
@@ -322,13 +338,13 @@ IterationAdaptiveDT::computeFailedDT()
   if (_verbose)
   {
     _console << "\nSolve failed with dt: " << std::setw(9) << _dt
-             << "\nRetrying with reduced dt: " << std::setw(9) << _dt * _cutback_factor
+             << "\nRetrying with reduced dt: " << std::setw(9) << _dt * _cutback_factor_at_failure
              << std::endl;
   }
   else
     _console << "\nSolve failed, cutting timestep." << std::endl;
 
-  return _dt * _cutback_factor;
+  return _dt * _cutback_factor_at_failure;
 }
 
 bool
@@ -346,6 +362,10 @@ IterationAdaptiveDT::converged() const
   if (_dt == _dt_min || _t_step < 2)
     return true;
 
+  // This means we haven't tried constraining the latest step yet
+  if (_dt_from_reject)
+    return false;
+
   // we get what the next time step should be
   Real dt_test = _dt;
   limitDTToPostprocessorValue(dt_test);
@@ -357,7 +377,10 @@ IterationAdaptiveDT::converged() const
   // if the time step is much smaller than the current time step
   // we need to repeat the current iteration with a smaller time step
   if (dt_test < _dt * _large_step_rejection_threshold)
+  {
+    _dt_from_reject = dt_test;
     return false;
+  }
 
   // otherwise we move one
   return true;
@@ -369,12 +392,21 @@ IterationAdaptiveDT::limitDTToPostprocessorValue(Real & limitedDT) const
   if (_pps_value.size() != 0 && _t_step > 1)
   {
     Real limiting_pps_value = *_pps_value[0];
+    unsigned int i_min = 0;
     for (size_t i = 1; i < _pps_value.size(); ++i)
       if (*_pps_value[i] < limiting_pps_value)
+      {
         limiting_pps_value = *_pps_value[i];
+        i_min = i;
+      }
 
     if (limitedDT > limiting_pps_value)
     {
+      if (limiting_pps_value < 0)
+        mooseWarning(
+            "Negative timestep limiting postprocessor '" +
+            getParam<std::vector<PostprocessorName>>("timestep_limiting_postprocessor")[i_min] +
+            "': " + std::to_string(limiting_pps_value));
       limitedDT = std::max(_dt_min, limiting_pps_value);
 
       if (_verbose)
@@ -543,8 +575,8 @@ IterationAdaptiveDT::acceptStep()
     _tfunc_times.erase(_tfunc_times.begin());
   }
 
-  _nl_its = _fe_problem.getNonlinearSystemBase().nNonlinearIterations();
-  _l_its = _fe_problem.getNonlinearSystemBase().nLinearIterations();
+  _nl_its = _fe_problem.getNonlinearSystemBase(/*nl_sys=*/0).nNonlinearIterations();
+  _l_its = _fe_problem.getNonlinearSystemBase(/*nl_sys=*/0).nLinearIterations();
 
   if ((_at_function_point || _executioner.atSyncPoint()) &&
       _dt + _timestep_tolerance < _executioner.unconstrainedDT())

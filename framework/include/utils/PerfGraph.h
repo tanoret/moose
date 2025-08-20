@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -33,7 +33,7 @@ class PerfGraphLivePrint;
 template <class... Ts>
 class VariadicTable;
 
-#define MAX_STACK_SIZE 100
+#define MOOSE_MAX_STACK_SIZE 100
 #define MAX_EXECUTION_LIST_SIZE 10000
 
 /**
@@ -44,7 +44,6 @@ class PerfGraph : protected ConsoleStreamInterface
 {
 public:
   using PerfGraphRegistry = moose::internal::PerfGraphRegistry;
-  using PerfGraphSectionInfo = moose::internal::PerfGraphSectionInfo;
 
   /**
    * For retrieving values
@@ -130,9 +129,9 @@ public:
   void setActive(bool active) { _active = active; }
 
   /**
-   * Turn on or off live printing (if timing is off then live printing will be off too)
+   * Enables Live Print
    */
-  void setLivePrintActive(bool active) { _live_print_active = active; }
+  void enableLivePrint();
 
   /**
    * Completely disables Live Print (cannot be restarted)
@@ -188,7 +187,7 @@ public:
 
   template <typename Functor>
   void treeRecurse(const Functor & act,
-                   const unsigned int level = MAX_STACK_SIZE,
+                   const unsigned int level = MOOSE_MAX_STACK_SIZE,
                    const bool heaviest = false) const;
 
 protected:
@@ -246,9 +245,6 @@ protected:
 
     /// This section has already started printing
     PRINTED,
-
-    /// Something else printed, but now this printed again
-    CONTINUED,
 
     /// The section is complete
     FINISHED
@@ -341,7 +337,7 @@ protected:
   PerfGraphRegistry & _perf_graph_registry;
 
   /// This processor id
-  const processor_id_type _pid;
+  const libMesh::processor_id_type _pid;
 
   /// Name of the root node
   const std::string _root_name;
@@ -356,7 +352,7 @@ protected:
   int _current_position;
 
   /// The full callstack.  Currently capped at a depth of 100
-  std::array<PerfNode *, MAX_STACK_SIZE> _stack;
+  std::array<PerfNode *, MOOSE_MAX_STACK_SIZE> _stack;
 
   /// A circular buffer for holding the execution list, this is read by the printing loop
   std::array<SectionIncrement, MAX_EXECUTION_LIST_SIZE> _execution_list;
@@ -386,9 +382,6 @@ protected:
 
   /// Whether or not timing is active
   bool _active;
-
-  /// Whether or not live printing is active
-  std::atomic<bool> _live_print_active;
 
   /// The promise to the print thread that will signal when to stop
   std::promise<bool> _done;
@@ -478,7 +471,7 @@ PerfGraph::treeRecurseInternal(const PerfNode & node,
 template <typename Functor>
 void
 PerfGraph::treeRecurse(const Functor & act,
-                       const unsigned int level /* = MAX_STACK_SIZE */,
+                       const unsigned int level /* = MOOSE_MAX_STACK_SIZE */,
                        const bool heaviest /* = false */) const
 {
   mooseAssert(_root_node, "Root node does not exist; calling this too early");

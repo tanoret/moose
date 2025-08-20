@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,8 @@
 #include "MooseUtils.h"
 #include "libmesh/serial_mesh.h"
 #include "libmesh/exodusII_io.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", ExodusTimeSequenceStepper);
 

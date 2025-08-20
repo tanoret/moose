@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,8 +11,10 @@
 
 #include "FVFluxKernel.h"
 #include "INSFVVelocityVariable.h"
+#include "FVDiffusionInterpolationInterface.h"
 
-class INSFVMixingLengthScalarDiffusion : public FVFluxKernel
+class INSFVMixingLengthScalarDiffusion : public FVFluxKernel,
+                                         public FVDiffusionInterpolationInterface
 {
 public:
   static InputParameters validParams();
@@ -26,14 +28,14 @@ protected:
   const unsigned int _dim;
 
   /// x-velocity
-  const INSFVVelocityVariable * const _u_var;
+  const Moose::Functor<ADReal> & _u;
   /// y-velocity
-  const INSFVVelocityVariable * const _v_var;
+  const Moose::Functor<ADReal> * const _v;
   /// z-velocity
-  const INSFVVelocityVariable * const _w_var;
+  const Moose::Functor<ADReal> * const _w;
 
   /// Turbulent eddy mixing length
-  const MooseVariableFVReal & _mixing_len;
+  const Moose::Functor<ADReal> & _mixing_len;
 
   /// Turbulent Schmidt number (or turbulent Prandtl number)
   const Real & _schmidt_number;

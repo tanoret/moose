@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,10 +11,12 @@
 
 #include "Moose.h"
 #include "MooseError.h"
+#include "MooseTypes.h"
 #include "libmesh/libmesh.h"
 #include "libmesh/utility.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/compare_types.h"
+#include "libmesh/point.h"
 
 namespace MathUtils
 {
@@ -27,6 +29,48 @@ Real poly2Log(Real x, Real tol, unsigned int derivative_order);
 Real poly3Log(Real x, Real tol, unsigned int derivative_order);
 Real poly4Log(Real x, Real tol, unsigned int derivative_order);
 Real taylorLog(Real x);
+/**
+ * Evaluate Cartesian coordinates of any center point of a triangle given Barycentric
+ * coordinates of center point and Cartesian coordinates of triangle's vertices
+ * @param p0,p1,p2 are the three non-collinear vertices in Cartesian coordinates
+ * @param b0,b1,b2 is the center point in barycentric coordinates with b0+b1+b2=1, e.g.
+ * (1/3,1/3,1/3) for a centroid
+ * @return the center point of triangle in Cartesian coordinates
+ */
+Point barycentricToCartesian2D(const Point & p0,
+                               const Point & p1,
+                               const Point & p2,
+                               const Real b0,
+                               const Real b1,
+                               const Real b2);
+/**
+ * Evaluate Cartesian coordinates of any center point of a tetrahedron given Barycentric
+ * coordinates of center point and Cartesian coordinates of tetrahedon's vertices
+ * @param p0,p1,p2,p3 are the three non-coplanar vertices in Cartesian coordinates
+ * @param b0,b1,b2,b3 is the center point in barycentric coordinates with b0+b1+b2+b3=1, e.g.
+ * (1/4,1/4,1/4,1/4) for a centroid.
+ * @return the center point of tetrahedron in Cartesian coordinates
+ */
+Point barycentricToCartesian3D(const Point & p0,
+                               const Point & p1,
+                               const Point & p2,
+                               const Point & p3,
+                               const Real b0,
+                               const Real b1,
+                               const Real b2,
+                               const Real b3);
+/**
+ * Evaluate circumcenter of a triangle given three arbitrary points
+ * @param p0,p1,p2 are the three non-collinear vertices in Cartesian coordinates
+ * @return the circumcenter in Cartesian coordinates
+ */
+Point circumcenter2D(const Point & p0, const Point & p1, const Point & p2);
+/**
+ * Evaluate circumcenter of a tetrahedrom given four arbitrary points
+ * @param p0,p1,p2,p3 are the four non-coplanar vertices in Cartesian coordinates
+ * @return the circumcenter in Cartesian coordinates
+ */
+Point circumcenter3D(const Point & p0, const Point & p1, const Point & p2, const Point & p3);
 
 template <typename T>
 T
@@ -115,12 +159,13 @@ negativePart(T x)
   return x < 0.0 ? x : 0.0;
 }
 
-template <typename T,
-          typename T2,
-          typename T3,
-          typename std::enable_if<ScalarTraits<T>::value && ScalarTraits<T2>::value &&
-                                      ScalarTraits<T3>::value,
-                                  int>::type = 0>
+template <
+    typename T,
+    typename T2,
+    typename T3,
+    typename std::enable_if<libMesh::ScalarTraits<T>::value && libMesh::ScalarTraits<T2>::value &&
+                                libMesh::ScalarTraits<T3>::value,
+                            int>::type = 0>
 void
 addScaled(const T & a, const T2 & b, T3 & result)
 {
@@ -130,9 +175,11 @@ addScaled(const T & a, const T2 & b, T3 & result)
 template <typename T,
           typename T2,
           typename T3,
-          typename std::enable_if<ScalarTraits<T>::value, int>::type = 0>
+          typename std::enable_if<libMesh::ScalarTraits<T>::value, int>::type = 0>
 void
-addScaled(const T & scalar, const NumericVector<T2> & numeric_vector, NumericVector<T3> & result)
+addScaled(const T & scalar,
+          const libMesh::NumericVector<T2> & numeric_vector,
+          libMesh::NumericVector<T3> & result)
 {
   result.add(scalar, numeric_vector);
 }
@@ -284,8 +331,8 @@ smootherStep(T x, T2 start, T2 end, bool derivative = false)
   }
   x = (x - start) / (end - start);
   if (derivative)
-    return 30.0 * Utility::pow<2>(x) * (x * (x - 2.0) + 1.0) / (end - start);
-  return Utility::pow<3>(x) * (x * (x * 6.0 - 15.0) + 10.0);
+    return 30.0 * libMesh::Utility::pow<2>(x) * (x * (x - 2.0) + 1.0) / (end - start);
+  return libMesh::Utility::pow<3>(x) * (x * (x * 6.0 - 15.0) + 10.0);
 }
 
 enum class ComputeType
@@ -310,9 +357,9 @@ smootherStep(const X & x, const S & start, const E & end)
   }
   const auto u = (x - start) / (end - start);
   if constexpr (compute_type == ComputeType::derivative)
-    return 30.0 * Utility::pow<2>(u) * (u * (u - 2.0) + 1.0) / (end - start);
+    return 30.0 * libMesh::Utility::pow<2>(u) * (u * (u - 2.0) + 1.0) / (end - start);
   if constexpr (compute_type == ComputeType::value)
-    return Utility::pow<3>(u) * (u * (u * 6.0 - 15.0) + 10.0);
+    return libMesh::Utility::pow<3>(u) * (u * (u * 6.0 - 15.0) + 10.0);
 }
 
 /**
@@ -388,6 +435,36 @@ euclideanMod(T1 dividend, T2 divisor)
 {
   return (dividend % divisor + divisor) % divisor;
 }
+
+/**
+ * automatic prefixing for naming material properties based on gradients of coupled
+ * variables/functors
+ */
+template <typename T>
+T
+gradName(const T & base_prop_name)
+{
+  return "grad_" + base_prop_name;
+}
+
+/**
+ * automatic prefixing for naming material properties based on time derivatives of coupled
+ * variables/functors
+ */
+template <typename T>
+T
+timeDerivName(const T & base_prop_name)
+{
+  return "d" + base_prop_name + "_dt";
+}
+
+/**
+ * Computes the Kronecker product of two matrices.
+ * @param product Reference to the product matrix
+ * @param mat_A Reference to the first matrix
+ * @param mat_B Reference to the other matrix
+ */
+void kron(RealEigenMatrix & product, const RealEigenMatrix & mat_A, const RealEigenMatrix & mat_B);
 
 } // namespace MathUtils
 

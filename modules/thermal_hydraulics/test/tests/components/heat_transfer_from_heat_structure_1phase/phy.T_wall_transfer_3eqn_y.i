@@ -28,9 +28,9 @@
   []
 []
 
-[HeatStructureMaterials]
+[SolidProperties]
   [wall-mat]
-    type = SolidMaterialProperties
+    type = ThermalFunctionSolidProperties
     k = 100.0
     rho = 100.0
     cp = 100.0
@@ -67,7 +67,8 @@
     length = 1
     n_elems = 50
 
-    materials = 'wall-mat'
+    solid_properties = 'wall-mat'
+    solid_properties_T_ref = '300'
     n_part_elems = 3
     widths = '0.1'
     names = 'wall'
@@ -116,6 +117,9 @@
 
   l_tol = 1e-3
   l_max_its = 300
+
+  petsc_options_iname = '-pc_type'
+  petsc_options_value = 'lu'
 
   start_time = 0.0
   num_steps = 1

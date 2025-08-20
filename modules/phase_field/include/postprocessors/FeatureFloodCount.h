@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,7 +24,7 @@
 #include "libmesh/periodic_boundaries.h"
 
 // External includes
-#include "bitmask_operators.h"
+#include "boost/bitmask_operators.h"
 
 // Forward Declarations
 class MooseMesh;
@@ -52,7 +52,7 @@ public:
   virtual void initialize() override;
   virtual void execute() override;
   virtual void finalize() override;
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
 
   /// Return the number of active features
   std::size_t getNumberActiveFeatures() const;
@@ -107,6 +107,7 @@ public:
     HALOS,
     CENTROID,
     ACTIVE_BOUNDS,
+    INTERSECTS_SPECIFIED_BOUNDARY,
   };
 
   // Retrieve field information
@@ -306,7 +307,7 @@ public:
     /// The status of a feature (used mostly in derived classes like the GrainTracker)
     Status _status;
 
-    /// Enumaration indicating boundary intersection status
+    /// Enumeration indicating boundary intersection status
     BoundaryIntersection _boundary_intersection;
 
     FeatureData duplicate() const { return FeatureData(*this); }
@@ -540,29 +541,6 @@ protected:
    */
   void updateRegionOffsets();
 
-  /**
-   * This method detects whether two sets intersect without building a result set.
-   * It exits as soon as any intersection is detected.
-   */
-  template <class InputIterator>
-  static bool setsIntersect(InputIterator first1,
-                            InputIterator last1,
-                            InputIterator first2,
-                            InputIterator last2)
-  {
-    while (first1 != last1 && first2 != last2)
-    {
-      if (*first1 == *first2)
-        return true;
-
-      if (*first1 < *first2)
-        ++first1;
-      else if (*first1 > *first2)
-        ++first2;
-    }
-    return false;
-  }
-
   /*************************************************
    *************** Data Structures *****************
    ************************************************/
@@ -690,9 +668,9 @@ protected:
   std::vector<std::size_t> _feature_id_to_local_index;
 
   /// A pointer to the periodic boundary constraints object
-  PeriodicBoundaries * _pbs;
+  libMesh::PeriodicBoundaries * _pbs;
 
-  std::unique_ptr<PointLocatorBase> _point_locator;
+  std::unique_ptr<libMesh::PointLocatorBase> _point_locator;
 
   /// Average value of the domain which can optionally be used to find features in a field
   const PostprocessorValue & _element_average_value;

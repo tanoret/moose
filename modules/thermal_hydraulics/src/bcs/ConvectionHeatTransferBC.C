@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,6 +21,8 @@ ConvectionHeatTransferBC::validParams()
                                         "Ambient heat transfer coefficient function");
   params.addParam<PostprocessorName>(
       "scale_pp", 1.0, "Post-processor by which to scale boundary condition");
+  params.addClassDescription("Adds a convective heat flux boundary condition with user-specified "
+                             "ambient temperature and heat transfer coefficient functions");
   return params;
 }
 

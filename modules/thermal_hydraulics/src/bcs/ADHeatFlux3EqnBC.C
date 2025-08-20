@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #include "ADHeatFlux3EqnBC.h"
 #include "ADHeatFluxFromHeatStructureBaseUserObject.h"
-#include "THMIndices3Eqn.h"
+#include "THMIndicesVACE.h"
 #include "Assembly.h"
 
 registerMooseObject("ThermalHydraulicsApp", ADHeatFlux3EqnBC);
@@ -18,6 +18,7 @@ InputParameters
 ADHeatFlux3EqnBC::validParams()
 {
   InputParameters params = ADHeatFluxBaseBC::validParams();
+  params.addClassDescription("Wall heat flux boundary condition for the energy equation");
   return params;
 }
 

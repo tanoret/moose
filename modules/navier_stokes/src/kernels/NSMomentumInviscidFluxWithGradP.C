@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,7 +20,6 @@ NSMomentumInviscidFluxWithGradP::validParams()
   params.addClassDescription(
       "This class computes the inviscid flux with pressure gradient in the momentum equation.");
   params.addRequiredCoupledVar(NS::pressure, "pressure");
-  params.addDeprecatedCoupledVar("p", NS::pressure, "1/1/2022");
   params.addRequiredParam<unsigned int>("component", "");
   return params;
 }

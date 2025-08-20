@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,9 +46,9 @@ GeochemistryKineticRate::validParams()
                         "The rate is multiplied by kinetic_species_molality^kinetic_molal_index / "
                         "(kinetic_species_molality^kinetic_molal_index + "
                         "kinetic_half_saturation^kinetic_molal_index)^kinetic_monod_index");
-  params.addParam<std::vector<std::string>>("promoting_species_names",
-                                            "Names of any promoting species");
-  params.addParam<std::vector<Real>>("promoting_indices", "Indices of the promoting species");
+  params.addParam<std::vector<std::string>>(
+      "promoting_species_names", {}, "Names of any promoting species");
+  params.addParam<std::vector<Real>>("promoting_indices", {}, "Indices of the promoting species");
   params.addParam<std::vector<Real>>(
       "promoting_monod_indices",
       "Indices of the monod denominators of the promoting species.  If not given, then the default "

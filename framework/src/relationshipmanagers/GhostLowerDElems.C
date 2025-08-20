@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -50,6 +50,8 @@ GhostLowerDElems::operator()(const MeshBase::const_element_iterator & range_begi
 {
   mooseAssert(_moose_mesh,
               "The MOOSE mesh must be non-null in order for this relationship manager to work.");
+  if (!_moose_mesh->hasLowerD())
+    return;
 
   static const CouplingMatrix * const null_mat = nullptr;
 
@@ -58,8 +60,6 @@ GhostLowerDElems::operator()(const MeshBase::const_element_iterator & range_begi
     {
       const Elem * const neighbor = elem->neighbor_ptr(s);
       const bool elem_owns_lowerd = !neighbor || elem->id() < neighbor->id();
-      if (!elem_owns_lowerd && neighbor->processor_id() != p)
-        coupled_elements.emplace(neighbor, null_mat);
 
       const Elem * const lower_d_elem =
           elem_owns_lowerd
@@ -75,4 +75,10 @@ bool
 GhostLowerDElems::operator>=(const RelationshipManager & other) const
 {
   return dynamic_cast<const GhostLowerDElems *>(&other);
+}
+
+std::unique_ptr<GhostingFunctor>
+GhostLowerDElems::clone() const
+{
+  return _app.getFactory().copyConstruct(*this);
 }

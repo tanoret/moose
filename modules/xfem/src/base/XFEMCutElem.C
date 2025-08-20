@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,7 +23,7 @@ XFEMCutElem::XFEMCutElem(Elem * elem, unsigned int n_qpoints, unsigned int n_sid
   : _n_nodes(elem->n_nodes()),
     _n_qpoints(n_qpoints),
     _n_sides(n_sides),
-    _nodes(_n_nodes, NULL),
+    _nodes(_n_nodes, nullptr),
     _elem_side_area(n_sides),
     _physical_areafrac(n_sides),
     _have_weights(false),

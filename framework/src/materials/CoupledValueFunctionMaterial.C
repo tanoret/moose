@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -71,7 +71,7 @@ template <bool is_ad>
 void
 CoupledValueFunctionMaterialTempl<is_ad>::computeQpProperties()
 {
-  MooseADWrapper<Point, is_ad> p;
+  Moose::GenericType<Point, is_ad> p;
   GenericReal<is_ad> t = 0.0;
 
   for (const auto i : make_range(_nvals))

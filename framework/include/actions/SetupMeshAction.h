@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -30,4 +30,9 @@ private:
    * @return The new type of object that will be built.
    */
   std::string modifyParamsForUseSplit(InputParameters & moose_object_params) const;
+
+  /// Whether or not to use a split mesh; comes from either Mesh/use_split or --use-split
+  const bool _use_split;
+  /// The split mesh file (if any); comes from either Mesh/split_file or --split-file
+  const std::string _split_file;
 };

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,6 +9,7 @@
 
 #include "DiscreteNucleationInserter.h"
 #include "libmesh/parallel_algebra.h"
+#include "SystemBase.h"
 
 #include "libmesh/quadrature.h"
 
@@ -38,7 +39,7 @@ DiscreteNucleationInserter::DiscreteNucleationInserter(const InputParameters & p
   : DiscreteNucleationInserterBase(parameters),
     _probability(getMaterialProperty<Real>("probability")),
     _hold_time(getParam<Real>("hold_time")),
-    _local_nucleus_list(declareRestartableData("local_nucleus_list", NucleusList(0))),
+    _local_nucleus_list(declareRestartableData<NucleusList>("local_nucleus_list", 0)),
     _local_radius(getMaterialProperty<Real>("radius")),
     _time_dep_stats(getParam<bool>("time_dependent_statistics"))
 {
@@ -51,7 +52,7 @@ DiscreteNucleationInserter::initialize()
   _changes_made = {0, 0};
 
   // expire entries from the local nucleus list (if the current time step converged)
-  if (_fe_problem.converged())
+  if (_fe_problem.converged(_sys.number()))
   {
     unsigned int i = 0;
     while (i < _local_nucleus_list.size())
@@ -114,7 +115,7 @@ void
 DiscreteNucleationInserter::threadJoin(const UserObject & y)
 {
   // combine _local_nucleus_list entries from all threads on the current process
-  const DiscreteNucleationInserter & uo = static_cast<const DiscreteNucleationInserter &>(y);
+  const auto & uo = static_cast<const DiscreteNucleationInserter &>(y);
   _global_nucleus_list.insert(
       _global_nucleus_list.end(), uo._local_nucleus_list.begin(), uo._local_nucleus_list.end());
 

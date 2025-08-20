@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,6 +9,8 @@
 
 #include "ExceptionMaterial.h"
 #include "NonlinearSystemBase.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseTestApp", ExceptionMaterial);
 
@@ -40,7 +42,7 @@ ExceptionMaterial::computeQpProperties()
 
   // Throw an exception if we haven't already done so, and the
   // coupled variable has reached a certain value.
-  if (_fe_problem.getNonlinearSystemBase().getCurrentNonlinearIterationNumber() == 1 &&
+  if (_fe_problem.getNonlinearSystemBase(0).getCurrentNonlinearIterationNumber() == 1 &&
       _t_step == 2 && !_has_thrown &&
       (_rank == DofObject::invalid_processor_id || _rank == processor_id()))
   {

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,6 +46,12 @@ public:
   void join(const ComputeIndicatorThread & /*y*/);
 
 protected:
+  /// Print general information about the loop when it executes
+  void printGeneralExecutionInformation() const override;
+
+  /// Print list of specific objects executed and in which order
+  void printBlockExecutionInformation() const override;
+
   FEProblemBase & _fe_problem;
   AuxiliarySystem & _aux_sys;
 

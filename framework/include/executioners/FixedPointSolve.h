@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,6 +42,16 @@ public:
     DIVERGED_NONLINEAR = -2,
     DIVERGED_FAILED_MULTIAPP = -3
   };
+
+  /**
+   * Get the minimum number of fixed point iterations
+   */
+  unsigned int minFixedPointIts() const { return _min_fixed_point_its; }
+
+  /**
+   * Get the maximum number of fixed point iterations
+   */
+  unsigned int maxFixedPointIts() const { return _max_fixed_point_its; }
 
   /**
    * Get the number of fixed point iterations performed

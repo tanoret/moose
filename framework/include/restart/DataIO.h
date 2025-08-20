@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,18 +10,19 @@
 #pragma once
 
 // MOOSE includes
-#include "DualReal.h"
+#include "ADReal.h"
 #include "MooseTypes.h"
 #include "HashMap.h"
 #include "MooseError.h"
-#include "Backup.h"
 #include "RankTwoTensor.h"
 #include "RankThreeTensor.h"
 #include "RankFourTensor.h"
 #include "ColumnMajorMatrix.h"
+#include "UniqueStorage.h"
 
 #include "libmesh/parallel.h"
 #include "libmesh/parameters.h"
+#include "libmesh/numeric_vector.h"
 
 #ifdef LIBMESH_HAVE_CXX11_TYPE_TRAITS
 #include <type_traits>
@@ -34,12 +35,12 @@
 #include <iostream>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
+#include <optional>
 
 namespace libMesh
 {
-template <typename T>
-class NumericVector;
 template <typename T>
 class DenseMatrix;
 template <typename T>
@@ -95,10 +96,22 @@ template <typename P, typename Q>
 inline void storeHelper(std::ostream & stream, std::unordered_map<P, Q> & data, void * context);
 
 /**
+ * Optional helper routine
+ */
+template <typename P>
+inline void storeHelper(std::ostream & stream, std::optional<P> & data, void * context);
+
+/**
  * HashMap helper routine
  */
 template <typename P, typename Q>
 inline void storeHelper(std::ostream & stream, HashMap<P, Q> & data, void * context);
+
+/**
+ * UniqueStorage helper routine
+ */
+template <typename T>
+inline void storeHelper(std::ostream & stream, UniqueStorage<T> & data, void * context);
 
 /**
  * Scalar helper routine
@@ -143,10 +156,22 @@ template <typename P, typename Q>
 inline void loadHelper(std::istream & stream, std::unordered_map<P, Q> & data, void * context);
 
 /**
+ * Optional helper routine
+ */
+template <typename P>
+inline void loadHelper(std::istream & stream, std::optional<P> & data, void * context);
+
+/**
  * Hashmap helper routine
  */
 template <typename P, typename Q>
 inline void loadHelper(std::istream & stream, HashMap<P, Q> & data, void * context);
+
+/**
+ * UniqueStorage helper routine
+ */
+template <typename T>
+inline void loadHelper(std::istream & stream, UniqueStorage<T> & data, void * context);
 
 template <typename T>
 inline void dataStore(std::ostream & stream, T & v, void * /*context*/);
@@ -169,6 +194,7 @@ dataStore(std::ostream & stream, T & v, void * /*context*/)
 
   // Moose::out<<"Generic dataStore"<<std::endl;
   stream.write((char *)&v, sizeof(v));
+  mooseAssert(!stream.bad(), "Failed to store");
 }
 
 template <typename T>
@@ -176,7 +202,7 @@ inline void
 dataStore(std::ostream & /*stream*/, T *& /*v*/, void * /*context*/)
 {
   mooseError("Attempting to store a raw pointer type: \"",
-             demangle(typeid(T).name()),
+             libMesh::demangle(typeid(T).name()),
              " *\" as restartable data!\nWrite a custom dataStore() template specialization!\n\n");
 }
 
@@ -196,7 +222,7 @@ dataStore(std::ostream & stream, std::vector<T> & v, void * context)
 {
   // First store the size of the vector
   unsigned int size = v.size();
-  stream.write((char *)&size, sizeof(size));
+  dataStore(stream, size, nullptr);
 
   for (unsigned int i = 0; i < size; i++)
     storeHelper(stream, v[i], context);
@@ -226,7 +252,7 @@ dataStore(std::ostream & stream, std::set<T> & s, void * context)
 {
   // First store the size of the set
   unsigned int size = s.size();
-  stream.write((char *)&size, sizeof(size));
+  dataStore(stream, size, nullptr);
 
   typename std::set<T>::iterator it = s.begin();
   typename std::set<T>::iterator end = s.end();
@@ -244,7 +270,7 @@ dataStore(std::ostream & stream, std::list<T> & l, void * context)
 {
   // First store the size of the set
   unsigned int size = l.size();
-  stream.write((char *)&size, sizeof(size));
+  dataStore(stream, size, nullptr);
 
   typename std::list<T>::iterator it = l.begin();
   typename std::list<T>::iterator end = l.end();
@@ -262,7 +288,7 @@ dataStore(std::ostream & stream, std::deque<T> & l, void * context)
 {
   // First store the size of the container
   unsigned int size = l.size();
-  stream.write((char *)&size, sizeof(size));
+  dataStore(stream, size, nullptr);
 
   typename std::deque<T>::iterator it = l.begin();
   typename std::deque<T>::iterator end = l.end();
@@ -280,7 +306,7 @@ dataStore(std::ostream & stream, std::map<T, U> & m, void * context)
 {
   // First store the size of the map
   unsigned int size = m.size();
-  stream.write((char *)&size, sizeof(size));
+  dataStore(stream, size, nullptr);
 
   typename std::map<T, U>::iterator it = m.begin();
   typename std::map<T, U>::iterator end = m.end();
@@ -301,7 +327,7 @@ dataStore(std::ostream & stream, std::unordered_map<T, U> & m, void * context)
 {
   // First store the size of the map
   unsigned int size = m.size();
-  stream.write((char *)&size, sizeof(size));
+  dataStore(stream, size, nullptr);
 
   typename std::unordered_map<T, U>::iterator it = m.begin();
   typename std::unordered_map<T, U>::iterator end = m.end();
@@ -316,13 +342,36 @@ dataStore(std::ostream & stream, std::unordered_map<T, U> & m, void * context)
   }
 }
 
+template <typename T>
+inline void
+dataStore(std::ostream & stream, std::unordered_set<T> & s, void * context)
+{
+  // First store the size of the set
+  std::size_t size = s.size();
+  dataStore(stream, size, nullptr);
+
+  for (auto & element : s)
+    dataStore(stream, element, context);
+}
+
+template <typename T>
+inline void
+dataStore(std::ostream & stream, std::optional<T> & m, void * context)
+{
+  bool has_value = m.has_value();
+  dataStore(stream, has_value, nullptr);
+
+  if (has_value)
+    storeHelper(stream, *m, context);
+}
+
 template <typename T, typename U>
 inline void
 dataStore(std::ostream & stream, HashMap<T, U> & m, void * context)
 {
   // First store the size of the map
   unsigned int size = m.size();
-  stream.write((char *)&size, sizeof(size));
+  dataStore(stream, size, nullptr);
 
   typename HashMap<T, U>::iterator it = m.begin();
   typename HashMap<T, U>::iterator end = m.end();
@@ -343,6 +392,10 @@ void dataStore(std::ostream & stream, Real & v, void * context);
 template <>
 void dataStore(std::ostream & stream, std::string & v, void * context);
 template <>
+void dataStore(std::ostream & stream, VariableName & v, void * context);
+template <>
+void dataStore(std::ostream & stream, UserObjectName & v, void * context);
+template <>
 void dataStore(std::ostream & stream, bool & v, void * context);
 // Vectors of bools are special
 // https://en.wikipedia.org/w/index.php?title=Sequence_container_(C%2B%2B)&oldid=767869909#Specialization_for_bool
@@ -359,9 +412,7 @@ void dataStore(std::ostream & stream, Node *& n, void * context);
 template <>
 void dataStore(std::ostream & stream, std::stringstream & s, void * context);
 template <>
-void dataStore(std::ostream & stream, std::stringstream *& s, void * context);
-template <>
-void dataStore(std::ostream & stream, DualReal & dn, void * context);
+void dataStore(std::ostream & stream, ADReal & dn, void * context);
 template <>
 void dataStore(std::ostream & stream, RealEigenVector & v, void * context);
 template <>
@@ -369,9 +420,24 @@ void dataStore(std::ostream & stream, RealEigenMatrix & v, void * context);
 template <>
 void dataStore(std::ostream & stream, libMesh::Parameters & p, void * context);
 
+template <>
+/**
+ * Stores an owned numeric vector.
+ *
+ * This should be used in lieu of the NumericVector<Number> & implementation
+ * when the vector may not necessarily be initialized yet on the loading of
+ * the data. It stores the partitioning (total and local number of entries).
+ *
+ * Requirements: the unique_ptr must exist (cannot be null), the vector
+ * cannot be ghosted, and the provided context must be the Communicator.
+ */
+void dataStore(std::ostream & stream,
+               std::unique_ptr<libMesh::NumericVector<libMesh::Number>> & v,
+               void * context);
+
 template <std::size_t N>
 inline void
-dataStore(std::ostream & stream, std::array<DualReal, N> & dn, void * context)
+dataStore(std::ostream & stream, std::array<ADReal, N> & dn, void * context)
 {
   for (std::size_t i = 0; i < N; ++i)
     dataStore(stream, dn[i], context);
@@ -379,7 +445,7 @@ dataStore(std::ostream & stream, std::array<DualReal, N> & dn, void * context)
 
 template <std::size_t N>
 inline void
-dataStore(std::ostream & stream, DualReal (&dn)[N], void * context)
+dataStore(std::ostream & stream, ADReal (&dn)[N], void * context)
 {
   for (std::size_t i = 0; i < N; ++i)
     dataStore(stream, dn[i], context);
@@ -387,7 +453,7 @@ dataStore(std::ostream & stream, DualReal (&dn)[N], void * context)
 
 template <typename T>
 void
-dataStore(std::ostream & stream, NumericVector<T> & v, void * context)
+dataStore(std::ostream & stream, libMesh::NumericVector<T> & v, void * context)
 {
   v.close();
 
@@ -408,7 +474,7 @@ void
 dataStore(std::ostream & stream, DenseVector<T> & v, void * context)
 {
   unsigned int m = v.size();
-  stream.write((char *)&m, sizeof(m));
+  dataStore(stream, m, nullptr);
   for (unsigned int i = 0; i < v.size(); i++)
   {
     T r = v(i);
@@ -417,13 +483,13 @@ dataStore(std::ostream & stream, DenseVector<T> & v, void * context)
 }
 
 template <typename T>
-void dataStore(std::ostream & stream, TensorValue<T> & v, void * context);
+void dataStore(std::ostream & stream, libMesh::TensorValue<T> & v, void * context);
 
 template <typename T>
-void dataStore(std::ostream & stream, DenseMatrix<T> & v, void * context);
+void dataStore(std::ostream & stream, libMesh::DenseMatrix<T> & v, void * context);
 
 template <typename T>
-void dataStore(std::ostream & stream, VectorValue<T> & v, void * context);
+void dataStore(std::ostream & stream, libMesh::VectorValue<T> & v, void * context);
 
 template <typename T>
 void
@@ -474,6 +540,7 @@ inline void
 dataLoad(std::istream & stream, T & v, void * /*context*/)
 {
   stream.read((char *)&v, sizeof(v));
+  mooseAssert(!stream.bad(), "Failed to load");
 }
 
 template <typename T>
@@ -481,7 +548,7 @@ void
 dataLoad(std::istream & /*stream*/, T *& /*v*/, void * /*context*/)
 {
   mooseError("Attempting to load a raw pointer type: \"",
-             demangle(typeid(T).name()),
+             libMesh::demangle(typeid(T).name()),
              " *\" as restartable data!\nWrite a custom dataLoad() template specialization!\n\n");
 }
 
@@ -499,7 +566,7 @@ dataLoad(std::istream & stream, std::vector<T> & v, void * context)
 {
   // First read the size of the vector
   unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  dataLoad(stream, size, nullptr);
 
   v.resize(size);
 
@@ -531,7 +598,7 @@ dataLoad(std::istream & stream, std::set<T> & s, void * context)
 {
   // First read the size of the set
   unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  dataLoad(stream, size, nullptr);
 
   for (unsigned int i = 0; i < size; i++)
   {
@@ -547,7 +614,7 @@ dataLoad(std::istream & stream, std::list<T> & l, void * context)
 {
   // First read the size of the set
   unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  dataLoad(stream, size, nullptr);
 
   for (unsigned int i = 0; i < size; i++)
   {
@@ -563,7 +630,7 @@ dataLoad(std::istream & stream, std::deque<T> & l, void * context)
 {
   // First read the size of the container
   unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  dataLoad(stream, size, nullptr);
 
   for (unsigned int i = 0; i < size; i++)
   {
@@ -581,7 +648,7 @@ dataLoad(std::istream & stream, std::map<T, U> & m, void * context)
 
   // First read the size of the map
   unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  dataLoad(stream, size, nullptr);
 
   for (unsigned int i = 0; i < size; i++)
   {
@@ -601,7 +668,7 @@ dataLoad(std::istream & stream, std::unordered_map<T, U> & m, void * context)
 
   // First read the size of the map
   unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  dataLoad(stream, size, nullptr);
 
   for (unsigned int i = 0; i < size; i++)
   {
@@ -613,13 +680,48 @@ dataLoad(std::istream & stream, std::unordered_map<T, U> & m, void * context)
   }
 }
 
+template <typename T>
+inline void
+dataLoad(std::istream & stream, std::unordered_set<T> & s, void * context)
+{
+  s.clear();
+
+  // First read the size of the set
+  std::size_t size = 0;
+  dataLoad(stream, size, nullptr);
+  s.reserve(size);
+
+  for (std::size_t i = 0; i < size; i++)
+  {
+    T element;
+    dataLoad(stream, element, context);
+    s.insert(element);
+  }
+}
+
+template <typename T>
+inline void
+dataLoad(std::istream & stream, std::optional<T> & m, void * context)
+{
+  bool has_value;
+  dataLoad(stream, has_value, nullptr);
+
+  if (has_value)
+  {
+    m = T{};
+    loadHelper(stream, *m, context);
+  }
+  else
+    m.reset();
+}
+
 template <typename T, typename U>
 inline void
 dataLoad(std::istream & stream, HashMap<T, U> & m, void * context)
 {
   // First read the size of the map
   unsigned int size = 0;
-  stream.read((char *)&size, sizeof(size));
+  dataLoad(stream, size, nullptr);
 
   for (unsigned int i = 0; i < size; i++)
   {
@@ -637,6 +739,10 @@ void dataLoad(std::istream & stream, Real & v, void * /*context*/);
 template <>
 void dataLoad(std::istream & stream, std::string & v, void * /*context*/);
 template <>
+void dataLoad(std::istream & stream, VariableName & v, void * /*context*/);
+template <>
+void dataLoad(std::istream & stream, UserObjectName & v, void * /*context*/);
+template <>
 void dataLoad(std::istream & stream, bool & v, void * /*context*/);
 // Vectors of bools are special
 // https://en.wikipedia.org/w/index.php?title=Sequence_container_(C%2B%2B)&oldid=767869909#Specialization_for_bool
@@ -653,19 +759,38 @@ void dataLoad(std::istream & stream, Node *& e, void * context);
 template <>
 void dataLoad(std::istream & stream, std::stringstream & s, void * context);
 template <>
-void dataLoad(std::istream & stream, std::stringstream *& s, void * context);
-template <>
-void dataLoad(std::istream & stream, DualReal & dn, void * context);
+void dataLoad(std::istream & stream, ADReal & dn, void * context);
 template <>
 void dataLoad(std::istream & stream, RealEigenVector & v, void * context);
 template <>
 void dataLoad(std::istream & stream, RealEigenMatrix & v, void * context);
 template <>
 void dataLoad(std::istream & stream, libMesh::Parameters & p, void * context);
+template <>
+/**
+ * Loads an owned numeric vector.
+ *
+ * This is used in lieu of the NumericVector<double> & implementation when
+ * the vector may not necessarily be initialized yet on the loading of the data.
+ *
+ * If \p is not null, it must have the same global and local sizes that it
+ * was stored with. In this case, the data is simply filled into the vector.
+ *
+ * If \p is null, it will be constructed with the type (currently just a
+ * PetscVector) stored and initialized with the global and local sizes stored.
+ * The data will then be filled after initialization.
+ *
+ * Requirements: the vector cannot be ghosted, the provided context must be
+ * the Communicator, and if \p v is initialized, it must have the same global
+ * and local sizes that the vector was stored with.
+ */
+void dataLoad(std::istream & stream,
+              std::unique_ptr<libMesh::NumericVector<libMesh::Number>> & v,
+              void * context);
 
 template <std::size_t N>
 inline void
-dataLoad(std::istream & stream, std::array<DualReal, N> & dn, void * context)
+dataLoad(std::istream & stream, std::array<ADReal, N> & dn, void * context)
 {
   for (std::size_t i = 0; i < N; ++i)
     dataLoad(stream, dn[i], context);
@@ -673,7 +798,7 @@ dataLoad(std::istream & stream, std::array<DualReal, N> & dn, void * context)
 
 template <std::size_t N>
 inline void
-dataLoad(std::istream & stream, DualReal (&dn)[N], void * context)
+dataLoad(std::istream & stream, ADReal (&dn)[N], void * context)
 {
   for (std::size_t i = 0; i < N; ++i)
     dataLoad(stream, dn[i], context);
@@ -681,7 +806,7 @@ dataLoad(std::istream & stream, DualReal (&dn)[N], void * context)
 
 template <typename T>
 void
-dataLoad(std::istream & stream, NumericVector<T> & v, void * context)
+dataLoad(std::istream & stream, libMesh::NumericVector<T> & v, void * context)
 {
   numeric_index_type size = v.local_size();
   for (numeric_index_type i = v.first_local_index(); i < v.first_local_index() + size; i++)
@@ -701,7 +826,7 @@ void
 dataLoad(std::istream & stream, DenseVector<T> & v, void * context)
 {
   unsigned int n = 0;
-  stream.read((char *)&n, sizeof(n));
+  dataLoad(stream, n, nullptr);
   v.resize(n);
   for (unsigned int i = 0; i < n; i++)
   {
@@ -712,13 +837,13 @@ dataLoad(std::istream & stream, DenseVector<T> & v, void * context)
 }
 
 template <typename T>
-void dataLoad(std::istream & stream, TensorValue<T> & v, void * context);
+void dataLoad(std::istream & stream, libMesh::TensorValue<T> & v, void * context);
 
 template <typename T>
-void dataLoad(std::istream & stream, DenseMatrix<T> & v, void * context);
+void dataLoad(std::istream & stream, libMesh::DenseMatrix<T> & v, void * context);
 
 template <typename T>
-void dataLoad(std::istream & stream, VectorValue<T> & v, void * context);
+void dataLoad(std::istream & stream, libMesh::VectorValue<T> & v, void * context);
 
 template <typename T>
 void
@@ -818,12 +943,40 @@ storeHelper(std::ostream & stream, std::unordered_map<P, Q> & data, void * conte
   dataStore(stream, data, context);
 }
 
+// Optional Helper Function
+template <typename P>
+inline void
+storeHelper(std::ostream & stream, std::optional<P> & data, void * context)
+{
+  dataStore(stream, data, context);
+}
+
 // HashMap Helper Function
 template <typename P, typename Q>
 inline void
 storeHelper(std::ostream & stream, HashMap<P, Q> & data, void * context)
 {
   dataStore(stream, data, context);
+}
+
+/**
+ * UniqueStorage helper routine
+ *
+ * The data within the UniqueStorage object cannot be null. The helper
+ * for unique_ptr<T> is called to store the data.
+ */
+template <typename T>
+inline void
+storeHelper(std::ostream & stream, UniqueStorage<T> & data, void * context)
+{
+  std::size_t size = data.size();
+  dataStore(stream, size, nullptr);
+
+  for (const auto i : index_range(data))
+  {
+    mooseAssert(data.hasValue(i), "Data doesn't have a value");
+    storeHelper(stream, data.pointerValue(i), context);
+  }
 }
 
 // Scalar Helper Function
@@ -882,6 +1035,14 @@ loadHelper(std::istream & stream, std::unordered_map<P, Q> & data, void * contex
   dataLoad(stream, data, context);
 }
 
+// Optional Helper Function
+template <typename P>
+inline void
+loadHelper(std::istream & stream, std::optional<P> & data, void * context)
+{
+  dataLoad(stream, data, context);
+}
+
 // HashMap Helper Function
 template <typename P, typename Q>
 inline void
@@ -890,25 +1051,23 @@ loadHelper(std::istream & stream, HashMap<P, Q> & data, void * context)
   dataLoad(stream, data, context);
 }
 
-// Specializations for Backup type
-template <>
+/**
+ * UniqueStorage Helper Function
+ *
+ * The unique_ptr<T> loader is called to load the data. That is,
+ * you will likely need a specialization of unique_ptr<T> that will
+ * appropriately construct and then fill the piece of data.
+ */
+template <typename T>
 inline void
-dataStore(std::ostream & stream, Backup *& backup, void * context)
+loadHelper(std::istream & stream, UniqueStorage<T> & data, void * context)
 {
-  dataStore(stream, backup->_system_data, context);
+  std::size_t size;
+  dataLoad(stream, size, nullptr);
+  data.resize(size);
 
-  for (unsigned int i = 0; i < backup->_restartable_data.size(); i++)
-    dataStore(stream, backup->_restartable_data[i], context);
-}
-
-template <>
-inline void
-dataLoad(std::istream & stream, Backup *& backup, void * context)
-{
-  dataLoad(stream, backup->_system_data, context);
-
-  for (unsigned int i = 0; i < backup->_restartable_data.size(); i++)
-    dataLoad(stream, backup->_restartable_data[i], context);
+  for (const auto i : index_range(data))
+    loadHelper(stream, data.pointerValue(i), context);
 }
 
 void dataLoad(std::istream & stream, Point & p, void * context);

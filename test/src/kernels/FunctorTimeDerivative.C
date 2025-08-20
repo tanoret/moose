@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #include "FunctorTimeDerivative.h"
 
-registerMooseObject("MooseApp", FunctorTimeDerivative);
+registerMooseObject("MooseTestApp", FunctorTimeDerivative);
 
 InputParameters
 FunctorTimeDerivative::validParams()
@@ -26,5 +26,6 @@ FunctorTimeDerivative::FunctorTimeDerivative(const InputParameters & parameters)
 ADReal
 FunctorTimeDerivative::precomputeQpResidual()
 {
-  return _var.dot(std::make_tuple(_current_elem, _qp, _qrule));
+  return _var.dot(Moose::ElemQpArg{_current_elem, _qp, _qrule, _q_point[_qp]},
+                  Moose::currentState());
 }

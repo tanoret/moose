@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,6 +14,8 @@
 
 // libMesh includes
 #include "libmesh/nonlinear_solver.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", CentralDifference);
 
@@ -31,10 +33,8 @@ CentralDifference::validParams()
 CentralDifference::CentralDifference(const InputParameters & parameters)
   : ActuallyExplicitEuler(parameters),
     _du_dotdot_du(_sys.duDotDotDu()),
-    _solution_older(_sys.solutionState(2)),
-    _solution_old_old_old(_sys.solutionState(3))
+    _solution_older(_sys.solutionState(2))
 {
-  _is_explicit = true;
   if (_solve_type == LUMPED)
     _is_lumped = true;
 
@@ -44,12 +44,15 @@ CentralDifference::CentralDifference(const InputParameters & parameters)
 }
 
 void
-CentralDifference::computeADTimeDerivatives(DualReal & ad_u_dot,
+CentralDifference::computeADTimeDerivatives(ADReal & ad_u_dot,
                                             const dof_id_type & dof,
-                                            DualReal & ad_u_dotdot) const
+                                            ADReal & ad_u_dotdot) const
 {
-  computeTimeDerivativeHelper(
-      ad_u_dot, ad_u_dotdot, _solution_old(dof), _solution_older(dof), _solution_old_old_old(dof));
+  // Seeds ad_u_dotdot with _ad_dof_values and associated derivatives provided via ad_u_dot from
+  // MooseVariableData
+  ad_u_dotdot = ad_u_dot;
+
+  computeTimeDerivativeHelper(ad_u_dot, ad_u_dotdot, _solution_old(dof), _solution_older(dof));
 }
 
 void
@@ -58,10 +61,10 @@ CentralDifference::initialSetup()
   ActuallyExplicitEuler::initialSetup();
 
   // _nl here so that we don't create this vector in the aux system time integrator
-  _nl.disassociateVectorFromTag(*_nl.solutionUDot(), _u_dot_factor_tag);
-  _nl.addVector(_u_dot_factor_tag, true, GHOSTED);
-  _nl.disassociateVectorFromTag(*_nl.solutionUDotDot(), _u_dotdot_factor_tag);
-  _nl.addVector(_u_dotdot_factor_tag, true, GHOSTED);
+  _nl->disassociateVectorFromTag(*_nl->solutionUDot(), _u_dot_factor_tag);
+  _nl->addVector(_u_dot_factor_tag, true, GHOSTED);
+  _nl->disassociateVectorFromTag(*_nl->solutionUDotDot(), _u_dotdot_factor_tag);
+  _nl->addVector(_u_dotdot_factor_tag, true, GHOSTED);
 }
 
 void
@@ -79,16 +82,18 @@ CentralDifference::computeTimeDerivatives()
   auto & u_dot = *_sys.solutionUDot();
   auto & u_dotdot = *_sys.solutionUDotDot();
 
+  u_dot = *_solution;
+  u_dotdot = *_solution;
+
   // Computing derivatives
-  computeTimeDerivativeHelper(
-      u_dot, u_dotdot, _solution_old, _solution_older, _solution_old_old_old);
+  computeTimeDerivativeHelper(u_dot, u_dotdot, _solution_old, _solution_older);
 
   // make sure _u_dotdot and _u_dot are in good state
   u_dotdot.close();
   u_dot.close();
 
   // used for Jacobian calculations
-  _du_dot_du = 1.0 / (2 * _dt);
+  computeDuDotDu();
   _du_dotdot_du = 1.0 / (_dt * _dt);
 
   // Computing udotdot "factor"
@@ -114,4 +119,10 @@ CentralDifference::computeTimeDerivatives()
     u_dot_factor *= 1.0 / (2.0 * _dt);
     u_dot_factor.close();
   }
+}
+
+Real
+CentralDifference::duDotDuCoeff() const
+{
+  return Real(1) / Real(2);
 }

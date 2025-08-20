@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,7 +29,7 @@ NumResidualEvaluations::NumResidualEvaluations(const InputParameters & parameter
 }
 
 Real
-NumResidualEvaluations::getValue()
+NumResidualEvaluations::getValue() const
 {
-  return _fe_problem.getNonlinearSystemBase().nResidualEvaluations();
+  return _fe_problem.getNonlinearSystemBase(_sys.number()).nResidualEvaluations();
 }

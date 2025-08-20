@@ -11,10 +11,6 @@
   nx = 80
   xmax = 200
   bias_x = 1.05
-[]
-
-[Problem]
-  type = FEProblem
   coord_type = RZ
   rz_coord_axis = Y
 []
@@ -121,9 +117,15 @@
     type = CO2FluidProperties
   []
   [tabulated]
-    type = TabulatedFluidProperties
+    type = TabulatedBicubicFluidProperties
     fp = co2
     fluid_property_file = fluid_properties.csv
+    # We try to avoid using both, but some properties are not implemented in the tabulation
+    allow_fp_and_tabulation = true
+    # Test was design prior to bounds check
+    error_on_out_of_bounds = false
+    # Comment out the fp parameter and uncomment below to use the newly generated tabulation
+    # fluid_property_file = fluid_properties.csv
   []
   [water]
     type = Water97FluidProperties
@@ -220,12 +222,12 @@
 [Postprocessors]
   [pgas]
     type = PointValue
-    point =  '1 0 0'
+    point = '1 0 0'
     variable = pgas
   []
   [sgas]
     type = PointValue
-    point =  '1 0 0'
+    point = '1 0 0'
     variable = saturation_gas
   []
   [zi]
@@ -239,12 +241,12 @@
   []
   [x1]
     type = PointValue
-    point =  '1 0 0'
+    point = '1 0 0'
     variable = x1
   []
   [y0]
     type = PointValue
-    point =  '1 0 0'
+    point = '1 0 0'
     variable = y0
   []
 []

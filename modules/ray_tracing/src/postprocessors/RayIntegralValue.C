@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -86,7 +86,7 @@ RayIntegralValue::initialize()
 }
 
 Real
-RayIntegralValue::getValue()
+RayIntegralValue::getValue() const
 {
   // This gathers the value from the proc that killed the Ray we're looking for
   return _study->getBankedRayData(_ray_id, _ray_data_index);

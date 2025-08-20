@@ -60,7 +60,6 @@
   []
 []
 
-
 [Executioner]
   type = Steady
   petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart '
@@ -79,21 +78,22 @@
     input_files = sub_level1.i
     execute_on = 'timestep_end'
 
-    # We have to make backups of the full tree in order to do a proper restore for the Picard iteration.
-    no_backup_and_restore = false
+    # We need to disable restoration within the multiapp so that the previous
+    # picard iterate is used as the starting solution within each iteration
+    no_restore = false
   []
 []
 
 [Transfers]
   [u_to_sub]
-    type = MultiAppShapeEvaluationTransfer
+    type = MultiAppGeneralFieldShapeEvaluationTransfer
     source_variable = u
     variable = u
     to_multi_app = level1-
     execute_on = 'timestep_end'
   []
   [v_from_sub]
-    type = MultiAppShapeEvaluationTransfer
+    type = MultiAppGeneralFieldShapeEvaluationTransfer
     source_variable = v
     variable = v
     from_multi_app = level1-

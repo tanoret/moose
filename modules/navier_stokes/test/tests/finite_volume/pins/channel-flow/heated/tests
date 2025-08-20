@@ -7,21 +7,28 @@
       type = 'Exodiff'
       input = 2d-rc-heated.i
       exodiff = rc-heated.e
-      method = "!dbg"
+      capabilities = 'method!=dbg'
       abs_zero = 1e-9
       detail = 'with a Cartesian geometry, only modeling the fluid phase,'
-      ad_indexing_type = 'global'
       valgrind = HEAVY
       cli_args = "Outputs/file_base='rc-heated'"
+    []
+    [fluid_only_displaced]
+      type = 'Exodiff'
+      input = 2d-rc-heated-disp-system.i
+      exodiff = 2d-rc-heated-disp-system_out.e
+      capabilities = 'method!=dbg'
+      abs_zero = 1e-9
+      detail = 'with a Cartesian geometry, only modeling the fluid phase, with objects running on the displaced mesh,'
+      valgrind = HEAVY
     []
     [rz]
       type = 'Exodiff'
       input = 2d-rc-heated.i
       exodiff = rc-heated-rz.e
-      method = "!dbg"
+      capabilities = 'method!=dbg'
       abs_zero = 2e-9
       detail = 'in rz geometry,'
-      ad_indexing_type = 'global'
       valgrind = HEAVY
       cli_args = "Problem/coord_type='rz' Problem/rz_coord_axis='x' Outputs/file_base='rc-heated-rz'"
     []
@@ -29,10 +36,9 @@
       type = 'Exodiff'
       input = 2d-rc-heated-effective.i
       exodiff = rc-heated-effective.e
-      method = "!dbg"
+      capabilities = 'method!=dbg'
       abs_zero = 1e-9
       detail = 'with an effective diffusion coefficient,'
-      ad_indexing_type = 'global'
       valgrind = HEAVY
       cli_args = "Outputs/file_base='rc-heated-effective'"
     []
@@ -40,10 +46,9 @@
       type = 'Exodiff'
       input = 2d-rc-heated-effective-action.i
       exodiff = rc-heated-effective-action.e
-      method = "!dbg"
+      capabilities = 'method!=dbg'
       abs_zero = 1e-9
       detail = 'with an effective diffusion coefficient and NSFVAction syntax,'
-      ad_indexing_type = 'global'
       valgrind = HEAVY
       cli_args = "Outputs/file_base='rc-heated-effective-action'"
     []
@@ -51,10 +56,9 @@
       type = 'Exodiff'
       input = 2d-rc-heated-effective.i
       exodiff = rc-heated-effective-dirichlet.e
-      method = "!dbg"
+      capabilities = 'method!=dbg'
       abs_zero = 1e-9
       detail = 'with an effective diffusion coefficient and dirichlet inlet boundary condition for fluid temperature,'
-      ad_indexing_type = 'global'
       valgrind = HEAVY
       cli_args = "FVBCs/inactive=inlet-T Outputs/file_base='rc-heated-effective-dirichlet' "
                  "Mesh/gen/nx=6 Mesh/gen/ny=3"
@@ -64,11 +68,10 @@
     type = 'Exodiff'
     input = 2d-rc-heated.i
     exodiff = rc-heated-solid-fluid.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     abs_zero = 1e-9
     issues = '#16756'
     requirement = 'The system shall be able to solve for fluid energy diffusion, advection and convection with the solid phase in a 2D channel, modeling both fluid and solid temperature.'
-    ad_indexing_type = 'global'
     valgrind = HEAVY
     design = 'PINSFVEnergyAmbientConvection.md'
     cli_args = "Variables/inactive='' AuxVariables/inactive='T_solid' FVKernels/inactive='' "
@@ -78,24 +81,34 @@
     type = 'Exodiff'
     input = 2d-rc-heated-action.i
     exodiff = rc-heated-solid-fluid-action.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     abs_zero = 1e-9
     issues = '#19472'
     design = 'NSFVAction.md'
     requirement = 'The system shall be able to solve for fluid energy diffusion, advection and convection with the solid phase in a 2D channel using the NSFV action syntax.'
-    ad_indexing_type = 'global'
     valgrind = HEAVY
     cli_args = "Outputs/file_base='rc-heated-solid-fluid-action'"
+  []
+  [solid-fluid-physics]
+    type = 'Exodiff'
+    input = 2d-rc-heated-physics.i
+    exodiff = rc-heated-solid-fluid-physics.e
+    capabilities = 'method!=dbg'
+    abs_zero = 1e-9
+    issues = '#19472'
+    design = 'WCNSFVFlowPhysics.md WCNSFVFluidHeatTransferPhysics.md'
+    requirement = 'The system shall be able to solve for fluid energy diffusion, advection and convection with the solid phase in a 2D channel using the WCNSFV Physics syntax.'
+    valgrind = HEAVY
+    cli_args = "Outputs/file_base='rc-heated-solid-fluid-physics'"
   []
   [solid-fluid-block]
     type = 'Exodiff'
     input = 2d-rc-heated.i
     exodiff = rc-heated-solid-fluid-block.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     abs_zero = 1e-9
     issues = '#16756'
     requirement = 'The system shall be able to solve for fluid energy diffusion, advection and block-restricted convection.'
-    ad_indexing_type = 'global'
     valgrind = HEAVY
     design = 'PINSFVEnergyAmbientConvection.md'
     cli_args = "Variables/inactive='' AuxVariables/inactive='T_solid' FVKernels/inactive='' "
@@ -107,12 +120,11 @@
     type = 'Exodiff'
     input = 2d-rc-heated-action.i
     exodiff = rc-heated-solid-fluid-block-action.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     abs_zero = 1e-9
     issues = '#19472'
     design = 'NSFVAction.md'
     requirement = 'The system shall be able to solve for fluid energy diffusion, advection and block-restricted convection with the solid phase in a 2D channel using the NSFV action syntax.'
-    ad_indexing_type = 'global'
     valgrind = HEAVY
     cli_args = "Outputs/file_base='rc-heated-solid-fluid-block-action' "
                "Modules/NavierStokesFV/ambient_convection_blocks='2' "
@@ -123,11 +135,10 @@
     type = 'Exodiff'
     input = 2d-transient.i
     exodiff = 2d-transient_out.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     abs_zero = 1e-9
     issues = '#16756'
     requirement = 'The system shall be able to solve transient relaxations with fluid energy diffusion, advection and convection with the solid phase in a 2D channel, modeling both fluid and solid temperature.'
-    ad_indexing_type = 'global'
     valgrind = 'none'
     design = 'PINSFVEnergyTimeDerivative.md INSFVMomentumTimeDerivative.md'
   []
@@ -135,22 +146,20 @@
     type = 'Exodiff'
     input = 2d-transient-action.i
     exodiff = 2d-transient-action_out.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     abs_zero = 1e-9
     issues = '#19472'
     design = 'NSFVAction.md'
     requirement = 'The system shall be able to run transient simulations with fluid energy diffusion, advection and convection with the solid phase in a 2D channel, modeling both fluid and solid temperature using the NSFV action syntax.'
-    ad_indexing_type = 'global'
     valgrind = 'none'
   []
   [boussinesq]
     type = 'Exodiff'
     input = 2d-rc-heated-boussinesq.i
     exodiff = rc-heated-boussinesq.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     issues = '#16756'
     requirement = 'The system shall be able to solve for fluid energy diffusion, advection and convection with the solid phase in a 2D channel with a Boussinesq approximation for the influence of temperature on density.'
-    ad_indexing_type = 'global'
     valgrind = HEAVY
     design = 'PINSFVMomentumBoussinesq.md'
     cli_args = "Outputs/file_base='rc-heated-boussinesq'"
@@ -159,11 +168,10 @@
     type = 'Exodiff'
     input = 2d-rc-heated-boussinesq-action.i
     exodiff = rc-heated-boussinesq-action.e
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     issues = '#19472'
     design = 'NSFVAction.md'
     requirement = 'The system shall be able to solve for fluid energy diffusion, advection and convection with the solid phase in a 2D channel with a Boussinesq approximation using the NSFV action syntax.'
-    ad_indexing_type = 'global'
     valgrind = HEAVY
     cli_args = "Outputs/file_base='rc-heated-boussinesq-action'"
   []

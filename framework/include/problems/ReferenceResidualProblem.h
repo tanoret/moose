@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,121 +10,19 @@
 #pragma once
 
 #include "FEProblem.h"
+#include "ReferenceResidualInterface.h"
 
 /**
- * FEProblemBase derived class to enable convergence checking relative to a user-specified
- * postprocessor
+ * Problem that checks for convergence relative to a user-supplied reference quantity
+ * rather than the initial residual.
  */
-class ReferenceResidualProblem : public FEProblem
+class ReferenceResidualProblem : public FEProblem, public ReferenceResidualInterface
 {
 public:
   static InputParameters validParams();
 
   ReferenceResidualProblem(const InputParameters & params);
 
-  virtual void initialSetup() override;
-  void updateReferenceResidual();
-  virtual MooseNonlinearConvergenceReason
-  checkNonlinearConvergence(std::string & msg,
-                            const PetscInt it,
-                            const Real xnorm,
-                            const Real snorm,
-                            const Real fnorm,
-                            const Real rtol,
-                            const Real divtol,
-                            const Real stol,
-                            const Real abstol,
-                            const PetscInt nfuncs,
-                            const PetscInt max_funcs,
-                            const Real initial_residual_before_preset_bcs,
-                            const Real div_threshold) override;
-
-  /**
-   * Check the convergence by comparing the norm of each variable separately against
-   * its reference variable's norm. Only consider the solution converged if all
-   * variables are converged individually using either a relative or absolute
-   * criterion.
-   * @param fnorm Function norm (norm of full residual vector)
-   * @param abstol Absolute convergence tolerance
-   * @param rtol Relative convergence tolerance
-   * @param initial_residual_before_preset_bcs Initial norm of full residual vector
-   *                                           before applying preset bcs
-   * @return true if all variables are converged
-   */
-  bool checkConvergenceIndividVars(const Real fnorm,
-                                   const Real abstol,
-                                   const Real rtol,
-                                   const Real initial_residual_before_preset_bcs);
-
-  /**
-   * Add a set of variables that need to be grouped together. For use in
-   * actions that create variables. This is templated for backwards compatibility to allow passing
-   * in std::string or NonlinearVariableName.
-   * @param group_vars A set of solution variables that need to be grouped.
-   */
-  template <typename T>
-  void addGroupVariables(const std::set<T> & group_vars);
-
-protected:
-  ///@{
-  /// List of solution variable names whose reference residuals will be stored,
-  /// and the residual variable names that will store them.
-  std::vector<NonlinearVariableName> _soln_var_names;
-  std::vector<AuxVariableName> _ref_resid_var_names;
-  ///@}
-
-  ///@{
-  /// List of grouped solution variable names whose reference residuals will be stored,
-  /// and the residual variable names that will store them.
-  std::vector<NonlinearVariableName> _group_soln_var_names;
-  std::vector<AuxVariableName> _group_ref_resid_var_names;
-  ///@}
-
-  ///@{
-  /// Variable numbers assoicated with the names in _soln_var_names and _ref_resid_var_names.
-  std::vector<unsigned int> _soln_vars;
-  std::vector<unsigned int> _ref_resid_vars;
-  ///@}
-
-  ///@{
-  /// "Acceptable" absolute and relative tolerance multiplier and
-  /// acceptable number of iterations.  Used when checking the
-  /// convergence of individual variables.
-  Real _accept_mult;
-  int _accept_iters;
-  ///@}
-
-  ///@{
-  /// Local storage for *discrete L2 residual norms* of the grouped variables listed in _group_ref_resid_var_names.
-  std::vector<Real> _group_ref_resid;
-  std::vector<Real> _group_resid;
-  std::vector<Real> _group_output_resid;
-  ///@}
-
-  /// Group number index for each variable
-  std::vector<unsigned int> _variable_group_num_index;
-
-  /// Local storage for the scaling factors applied to each of the variables to apply to _ref_resid_vars.
-  std::vector<Real> _scaling_factors;
-
-  /// Name of variables that are grouped together to check convergence
-  std::vector<std::vector<NonlinearVariableName>> _group_variables;
-
-  /// True if any variables are grouped
-  bool _use_group_variables;
-
-  /// The vector storing the reference residual values
-  const NumericVector<Number> * _reference_vector;
-
-  std::vector<NonlinearVariableName> _converge_on;
-  std::vector<bool> _converge_on_var;
+  virtual void addDefaultNonlinearConvergence(const InputParameters & params) override;
+  virtual bool onlyAllowDefaultNonlinearConvergence() const override { return true; }
 };
-
-template <typename T>
-void
-ReferenceResidualProblem::addGroupVariables(const std::set<T> & group_vars)
-{
-  _group_variables.push_back(
-      std::vector<NonlinearVariableName>(group_vars.begin(), group_vars.end()));
-  _use_group_variables = true;
-}

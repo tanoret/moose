@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -45,6 +45,7 @@ Real
 FunctorVectorElementalAuxTempl<is_ad>::computeValue()
 {
   const auto elem_arg = makeElemArg(_current_elem);
-  return MetaPhysicL::raw_value(_factor(elem_arg)) *
-         MetaPhysicL::raw_value(_functor(elem_arg)(_component));
+  const auto state = determineState();
+  return MetaPhysicL::raw_value(_factor(elem_arg, state)) *
+         MetaPhysicL::raw_value(_functor(elem_arg, state)(_component));
 }

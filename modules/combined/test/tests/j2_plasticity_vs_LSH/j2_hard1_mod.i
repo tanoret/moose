@@ -6,7 +6,7 @@
 # plot vm_stress vs intnl to see constant hardening
 #
 # Original test located at:
-# tensor_mechanics/tests/j2_plasticity/hard1.i
+# solid_mechanics/tests/j2_plasticity/hard1.i
 
 [GlobalParams]
   displacements = 'disp_x disp_y disp_z'
@@ -26,7 +26,7 @@
   zmax = 0.5
 []
 
-[Modules/TensorMechanics/Master]
+[Physics/SolidMechanics/QuasiStatic]
   [all]
     add_variables = true
     strain = FINITE

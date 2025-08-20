@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,15 +11,18 @@
 #include <iostream>
 #include <typeinfo>
 
+#include "MooseError.h"
+#include "libmesh/id_types.h"
 #include "libmesh/parallel.h"
 #include "libmesh/parallel_object.h"
 
 #include "ReporterName.h"
 #include "ReporterMode.h"
 #include "ReporterState.h"
-#include "nlohmann/json.h"
+#include "JsonIO.h"
 #include "JsonSyntaxTree.h"
 #include "MooseObject.h"
+#include <type_traits>
 
 class ReporterData;
 
@@ -29,7 +32,7 @@ class ReporterData;
  *
  * @see Reporter, ReporterData, ReporterState
  *
- * This file contains several reporter context types with specific polymophism:
+ * This file contains several reporter context types with specific polymorphism:
  *
  * ReporterContextBase--->ReporterContext<T>
  *                        |        |
@@ -44,12 +47,12 @@ class ReporterData;
  * When creating a new context, it is generally advisable to derive from ReporterGeneralContext
  * (@see VectorPostprocessorContext). The reason for the split between ReporterGeneralContext
  * and ReporterVectorContext is due to the declareVectorClone and resize functionality. If we
- * were to declare a vector clone in ReporterContext there would be a infinite instatiation of
+ * were to declare a vector clone in ReporterContext there would be a infinite instantiation of
  * of vector contexts, which is why this declare is defined in ReporterGeneralContext and an
  * error is thrown in ReporterVectorContext. There is also no easy way to partially instantiate
  * a member function (you have to due it for the entire class), which is why the resize is
  * defined in ReporterVectorContext. That being said, we are always open for improvements,
- * especially for simplifying the polymophism of these contexts.
+ * especially for simplifying the polymorphism of these contexts.
  */
 class ReporterContextBase : public libMesh::ParallelObject
 {
@@ -74,6 +77,9 @@ public:
   /// Called by FEProblemBase::advanceState via ReporterData
   virtual void copyValuesBack() = 0;
 
+  /// Called by FEProblemBase::restoreSolutions via ReporterData
+  virtual bool restoreState() = 0;
+
   /// Called by JSONOutput::outputReporters to output meta data independent of calculated
   /// values
   virtual void storeInfo(nlohmann::json & json) const = 0;
@@ -85,6 +91,9 @@ public:
   /// and include all the data including the old values.
   ///
   /// This method only outputs the current value within the JSONOutput object.
+  /// NOTE: nlohmann qualification is needed for argument json because the std::vector overload is
+  ///       not in the std namespace, it's in the nlohmann namespace, and will come up in argument
+  ///       dependent lookup (ADL) only because of this qualification.
   ///
   /// @see JsonIO.h
   /// @see JSONOutput.h
@@ -137,6 +146,19 @@ public:
                                 unsigned int time_index = 0) const = 0;
 
   /**
+   * Helper for enabling generic transfer of a vector Reporter of values to a
+   * single value
+   * @param r_data The ReporterData on the app that this data is being transferred to
+   * @param r_name The name of the Reporter being transferred to
+   *
+   * @see ReporterTransferInterface
+   */
+  virtual void transferFromVector(ReporterData & r_data,
+                                  const ReporterName & r_name,
+                                  dof_id_type index,
+                                  unsigned int time_index = 0) const = 0;
+
+  /**
    * Helper for declaring new reporter values based on this context
    *
    * @param r_data The ReporterData on the app that this value is being declared
@@ -170,6 +192,16 @@ public:
    * @param local_size Number of elements to resize vector to
    */
   virtual void resize(dof_id_type local_size) = 0;
+
+  /**
+   * Helper for clearing vector data
+   */
+  virtual void clear() = 0;
+
+  /**
+   * Helper for summing reporter value.
+   */
+  virtual void vectorSum() = 0;
 
 protected:
   /**
@@ -256,18 +288,24 @@ public:
                                 dof_id_type index,
                                 unsigned int time_index = 0) const override;
 
+  /**
+   * Perform type specific transfer from a vector
+   *
+   * NOTE: This is defined in ReporterData.h to avoid cyclic includes that would arise. I don't
+   *       know of a better solution, if you have one please implement it.
+   */
+  virtual void transferFromVector(ReporterData & r_data,
+                                  const ReporterName & r_name,
+                                  dof_id_type index,
+                                  unsigned int time_index = 0) const override;
+
 protected:
-  /// For broadcasting values if it is of fundamental type
-  template <typename Q = T>
-  typename std::enable_if<MooseUtils::canBroadcast<Q>::value, void>::type broadcast()
+  void broadcast()
   {
-    this->comm().broadcast(this->_state.value());
-  }
-  /// Error if trying to broadcast not fundamental type
-  template <typename Q = T>
-  typename std::enable_if<!MooseUtils::canBroadcast<Q>::value, void>::type broadcast()
-  {
-    mooseError("Can only broadcast fundamental types.");
+    if constexpr (MooseUtils::canBroadcast<T>::value)
+      this->comm().broadcast(this->_state.value());
+    else
+      mooseError("Cannot broadcast Reporter type '", MooseUtils::prettyCppType<T>(), "'");
   }
 
   /// Output meta data to JSON, see JSONOutput
@@ -280,6 +318,9 @@ protected:
 
   // The following are called by the ReporterData and are not indented for external use
   virtual void copyValuesBack() override;
+
+  /// Restore state to its old values. @see ReporterState::restoreState
+  virtual bool restoreState() override { return _state.restoreState(); }
 
   /// The state on which this context object operates
   ReporterState<T> & _state;
@@ -380,7 +421,7 @@ template <typename T>
 void
 ReporterContext<T>::store(nlohmann::json & json) const
 {
-  storeHelper(json, this->_state.value());
+  nlohmann::to_json(json, this->_state.value());
 }
 
 template <typename T>
@@ -423,14 +464,104 @@ public:
                                   const MooseObject & producer) const override;
 
   virtual void resize(dof_id_type local_size) final;
+  virtual void clear() final;
+  virtual void vectorSum() final;
 
   virtual std::string contextType() const override { return MooseUtils::prettyCppType(this); }
 };
 
-template <typename T>
-void ReporterGeneralContext<T>::resize(dof_id_type)
+//  Needed for compile-time checking if T is a vector.
+template <typename>
+struct is_std_vector : std::false_type
 {
-  mooseError("Cannot resize non vector-type reporter values.");
+};
+
+template <typename T, typename A>
+struct is_std_vector<std::vector<T, A>> : std::true_type
+{
+};
+
+template <typename T>
+void
+ReporterGeneralContext<T>::resize(dof_id_type size)
+{
+  if constexpr (is_std_vector<T>::value)
+    this->_state.value().resize(size);
+  else
+  {
+    libmesh_ignore(size);
+    mooseError("Cannot resize non vector-type reporter values.");
+  }
+}
+template <typename T>
+void
+ReporterGeneralContext<T>::clear()
+{
+  if constexpr (is_std_vector<T>::value)
+    this->_state.value().clear();
+  else
+    mooseError("Cannot clear non vector-type reporter values.");
+}
+
+template <typename T>
+void
+ReporterGeneralContext<T>::vectorSum()
+{
+  // Case 1: T is a numeric type that we can sum (excluding bool)
+  if constexpr (std::is_arithmetic<T>::value && !std::is_same<T, bool>::value)
+  {
+    // Perform summation of the scalar value across all processors
+    this->comm().sum(this->_state.value());
+    return;
+  }
+  // Case 2: T is a vector type
+  else if constexpr (is_std_vector<T>::value)
+  {
+    using VectorValueType = typename T::value_type;
+
+    // Check if the vector elements are of a numeric type
+    if constexpr (std::is_arithmetic<VectorValueType>::value &&
+                  !std::is_same<VectorValueType, bool>::value)
+    {
+      // Perform summation of the vector elements across all processors
+      this->comm().sum(this->_state.value());
+      return;
+    }
+    // Check if the vector elements are also vectors
+    else if constexpr (is_std_vector<VectorValueType>::value)
+    {
+      using InnerValueType = typename VectorValueType::value_type;
+
+      // Check if the inner vector elements are of a numeric type
+      if constexpr (std::is_arithmetic<InnerValueType>::value &&
+                    !std::is_same<InnerValueType, bool>::value)
+      {
+#ifdef DEBUG
+        auto vec_size = this->_state.value().size();
+        this->comm().max(vec_size);
+        // Assert only passes on all ranks if they are all the same size.
+        mooseAssert(this->_state.value().size() == vec_size,
+                    "Reporter vector have different sizes on different ranks.");
+#endif
+        // Iterate over each inner vector in the outer vector
+        for (auto & innerVector : this->_state.value())
+        {
+          // Get the maximum size of the inner vector across all processors
+          dof_id_type maxInnerSize = innerVector.size();
+          this->comm().max(maxInnerSize);
+
+          // Resize the inner vector to the maximum size
+          innerVector.resize(maxInnerSize);
+
+          // Perform summation of the inner vector elements across all processors
+          this->comm().sum(innerVector);
+        }
+        return;
+      }
+    }
+  }
+
+  mooseError("Cannot perform sum operation on non-numeric or unsupported vector types.");
 }
 
 /**
@@ -631,6 +762,60 @@ public:
    * on @param local_size
    */
   virtual void resize(dof_id_type local_size) override { this->_state.value().resize(local_size); }
+
+  /**
+   * Since we know that the _state value is a vector type, we can clear it.
+   */
+  virtual void clear() override { this->_state.value().clear(); }
+
+  virtual void vectorSum() override
+  {
+    // Case 1: T is type that we can sum
+    if constexpr (std::is_arithmetic<T>::value &&
+                  !std::is_same<T, bool>::value) // We can't sum bools.
+    {
+      // Resize vector to max size
+      dof_id_type vec_size = this->_state.value().size();
+      this->comm().max(vec_size);
+      this->_state.value().resize(vec_size);
+
+      this->comm().sum(this->_state.value());
+      return;
+    }
+    // Case 2: T is a vector
+    else if constexpr (is_std_vector<T>::value)
+    {
+      // Resize vector to max size
+      dof_id_type vec_size = this->_state.value().size();
+      this->comm().max(vec_size);
+      this->_state.value().resize(vec_size);
+
+      using ValueType = typename T::value_type;
+      // Check if the ValueType is a vector
+      if constexpr (std::is_arithmetic<ValueType>::value && !std::is_same<ValueType, bool>::value)
+      {
+#ifdef DEBUG
+        auto vec_size = this->_state.value().size();
+        this->comm().max(vec_size);
+        // Assert only passes on all ranks if they are all the same size.
+        mooseAssert(this->_state.value().size() == vec_size,
+                    "Reporter vector have different sizes on different ranks.");
+#endif
+        for (auto & val_vec : this->_state.value())
+        {
+          // Resize vector to max size
+          dof_id_type val_vec_size = val_vec.size();
+          this->comm().max(val_vec_size);
+          val_vec.resize(val_vec_size);
+
+          this->comm().sum(val_vec);
+        }
+        return;
+      }
+    }
+    // If we don't perform a summing operation, error out.
+    mooseError("Cannot perform sum operation on non-numeric or unsupported vector types.");
+  }
 
   virtual std::string contextType() const override { return MooseUtils::prettyCppType(this); }
 };

@@ -12,15 +12,6 @@
   file = quarter_sym.e
 []
 
-[UserObjects]
-  [./ellip_cut_uo]
-    type = EllipseCutUserObject
-    cut_data = '-0.5 -0.5 0
-                -0.5 -0.1 0
-                 0.1 -0.5 0'
-  [../]
-[]
-
 [DomainIntegral]
   integrals = 'InteractionIntegralKI'
   crack_direction_method = CurvedCrackFront
@@ -35,7 +26,16 @@
   incremental = true
 []
 
-[Modules/TensorMechanics/Master]
+[UserObjects]
+  [./ellip_cut_uo]
+    type = EllipseCutUserObject
+    cut_data = '-0.5 -0.5 0
+                -0.5 -0.1 0
+                 0.1 -0.5 0'
+  [../]
+[]
+
+[Physics/SolidMechanics/QuasiStatic]
   [./all]
     strain = FINITE
     add_variables = true

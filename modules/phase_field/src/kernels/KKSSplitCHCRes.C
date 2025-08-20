@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -33,7 +33,7 @@ KKSSplitCHCRes::validParams()
 KKSSplitCHCRes::KKSSplitCHCRes(const InputParameters & parameters)
   : DerivativeMaterialInterface<JvarMapKernelInterface<SplitCHBase>>(parameters),
     _ca_var(coupled("ca")),
-    _ca_name(getVar("ca", 0)->name()),
+    _ca_name(coupledName("ca", 0)),
     _dFadca(getMaterialPropertyDerivative<Real>("fa_name", _ca_name)),
     _d2Fadcadarg(_n_args),
     _w_var(coupled("w")),

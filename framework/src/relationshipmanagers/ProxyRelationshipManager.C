@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,8 @@
 #include "libmesh/system.h"
 #include "libmesh/elem.h"
 #include "libmesh/dof_map.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseApp", ProxyRelationshipManager);
 
@@ -110,4 +112,10 @@ ProxyRelationshipManager::operator>=(const RelationshipManager & /*rhs*/) const
 {
   // There isn't a need to determine these because only the correct ones will be added
   return false;
+}
+
+std::unique_ptr<GhostingFunctor>
+ProxyRelationshipManager::clone() const
+{
+  return _app.getFactory().copyConstruct(*this);
 }

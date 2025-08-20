@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -56,7 +56,7 @@ HeatTransferBase::init()
     _model_type = flow_channel.getFlowModelID();
     _fp_name = flow_channel.getFluidPropertiesName();
     _A_fn_name = flow_channel.getAreaFunctionName();
-    _closures = flow_channel.getClosures();
+    _closures_objects = flow_channel.getClosuresObjects();
   }
 }
 
@@ -139,7 +139,8 @@ HeatTransferBase::addHeatedPerimeter()
       makeFunctionControllableIfConstant(_P_hf_fn_name, "P_hf");
     }
 
-    getTHMProblem().addFunctionIC(_P_hf_name, _P_hf_fn_name, _flow_channel_subdomains);
+    if (!_app.isRestarting())
+      getTHMProblem().addFunctionIC(_P_hf_name, _P_hf_fn_name, _flow_channel_subdomains);
   }
 }
 

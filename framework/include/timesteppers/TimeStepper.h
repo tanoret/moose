@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,7 +14,7 @@
 #include "ScalarCoupleable.h"
 
 class FEProblemBase;
-class Transient;
+class TransientBase;
 
 /**
  * Base class for time stepping
@@ -103,29 +103,23 @@ public:
 
 protected:
   /**
-   * Called to compute _current_dt for the first timestep.
-   * Note that this does not return.
-   * The TimeStepper's job here is to fill in _current_dt.
+   * Computes time step size for the initial time step
    */
   virtual Real computeInitialDT() = 0;
 
   /**
-   * Called to compute _current_dt for a normal step.
-   * Note that this does not return.
-   * The TimeStepper's job here is to fill in _current_dt.
+   * Computes time step size after the initial time step
    */
   virtual Real computeDT() = 0;
 
   /**
-   * Called to compute _current_dt after a solve has failed.
-   * Note that this does not return.
-   * The TimeStepper's job here is to fill in _current_dt.
+   * Computes time step size after a failed time step
    */
   virtual Real computeFailedDT();
 
   FEProblemBase & _fe_problem;
   /// Reference to transient executioner
-  Transient & _executioner;
+  TransientBase & _executioner;
 
   /// Values from executioner
   Real & _time;

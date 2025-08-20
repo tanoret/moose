@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,7 +28,10 @@ AddAuxVariableAction::AddAuxVariableAction(const InputParameters & params)
 MooseEnum
 AddAuxVariableAction::getAuxVariableFamilies()
 {
-  return MooseEnum("LAGRANGE MONOMIAL SCALAR LAGRANGE_VEC MONOMIAL_VEC", "LAGRANGE", true);
+  return MooseEnum("LAGRANGE MONOMIAL SCALAR LAGRANGE_VEC MONOMIAL_VEC L2_HIERARCHIC "
+                   "L2_HIERARCHIC_VEC L2_LAGRANGE L2_LAGRANGE_VEC L2_RAVIART_THOMAS",
+                   "LAGRANGE",
+                   true);
 }
 
 MooseEnum
@@ -43,7 +46,7 @@ AddAuxVariableAction::init()
 {
   AddVariableAction::init();
 
-  if (_fe_type.order > NINTH && !_scalar_var)
+  if (_fe_type.order > libMesh::NINTH && !_scalar_var)
     mooseError("Non-scalar AuxVariables must be CONSTANT, FIRST, SECOND, THIRD, FOURTH, FIFTH, "
                "SIXTH, SEVENTH, EIGHTH or NINTH order (",
                _fe_type.order,

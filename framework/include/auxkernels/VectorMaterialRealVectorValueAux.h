@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,7 +17,7 @@
  */
 template <bool is_ad>
 class VectorMaterialRealVectorValueAuxTempl
-  : public MaterialAuxBaseTempl<RealVectorValue, is_ad, RealVectorValue>
+  : public MaterialAuxBaseTempl<RealVectorValue, is_ad, false, RealVectorValue>
 {
 public:
   static InputParameters validParams();

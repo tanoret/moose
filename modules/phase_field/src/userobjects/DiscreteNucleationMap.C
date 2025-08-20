@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -113,7 +113,7 @@ DiscreteNucleationMap::threadJoin(const UserObject & y)
   // if the map needs to be updated we merge the maps from all threads
   if (_rebuild_map)
   {
-    const DiscreteNucleationMap & uo = static_cast<const DiscreteNucleationMap &>(y);
+    const auto & uo = static_cast<const DiscreteNucleationMap &>(y);
     _nucleus_map.insert(uo._nucleus_map.begin(), uo._nucleus_map.end());
   }
 }

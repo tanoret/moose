@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -44,5 +44,8 @@ protected:
   const Moose::CoordinateSystemType & _coord_sys;
 
   /// Either traction or laplace
-  MooseEnum _form;
+  const MooseEnum _form;
+
+  /// The radial coordinate index for RZ coordinate systems
+  const unsigned int _rz_radial_coord;
 };

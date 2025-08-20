@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,6 +9,7 @@
 
 #include "ADPrandtlNumberMaterial.h"
 #include "Numerics.h"
+#include "FlowModelSinglePhase.h"
 
 registerMooseObject("ThermalHydraulicsApp", ADPrandtlNumberMaterial);
 
@@ -16,9 +17,14 @@ InputParameters
 ADPrandtlNumberMaterial::validParams()
 {
   InputParameters params = Material::validParams();
-  params.addRequiredParam<MaterialPropertyName>("cp", "Constant-pressure specific heat");
-  params.addRequiredParam<MaterialPropertyName>("mu", "Dynamic viscosity");
-  params.addRequiredParam<MaterialPropertyName>("k", "Thermal conductivity");
+  params.addParam<MaterialPropertyName>("Pr", "Pr", "Prandlt number property name");
+  params.addParam<MaterialPropertyName>("cp",
+                                        FlowModelSinglePhase::SPECIFIC_HEAT_CONSTANT_PRESSURE,
+                                        "Constant-pressure specific heat");
+  params.addParam<MaterialPropertyName>(
+      "mu", FlowModelSinglePhase::DYNAMIC_VISCOSITY, "Dynamic viscosity");
+  params.addParam<MaterialPropertyName>(
+      "k", FlowModelSinglePhase::THERMAL_CONDUCTIVITY, "Thermal conductivity");
   params.addClassDescription("Computes Prandtl number as material property");
   return params;
 }

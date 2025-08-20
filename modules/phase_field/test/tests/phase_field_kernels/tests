@@ -6,6 +6,8 @@
     issues = '#3356'
     design = '/CahnHilliard.md'
     requirement = 'The system shall provide a non-split Cahn-Hilliard formalism'
+    # uses exodus oversampling see #2295
+    recover = false
   [../]
 
   [./SplitCahnHilliard]
@@ -32,7 +34,6 @@
     cli_args = 'Outputs/exodus=false Executioner/num_steps=2'
     ratio_tol = 1e-8
     difference_tol = 1e-4
-    petsc_version = '<3.9.0 || >=3.9.4'
     issues = '#13138'
     design = '/ADSplitCHParsed.md'
     requirement = 'The system shall provide a perfect Jacobian for the AD split Cahn-Hilliard problem.'
@@ -62,7 +63,6 @@
     expect_out = '\nNo errors detected. :-\)\n'
     resize_mesh = true
     recover = false
-    petsc_version = '<3.9.0 || >=3.9.4'
     issues = '#3816'
     design = '/AllenCahn.md'
     requirement = 'The system shall provide perfect Jacobian contributions for the Allen-Cahn phase field formulation.'
@@ -169,6 +169,8 @@
     issues = '#6910'
     design = '/SimpleCHInterface.md'
     requirement = 'The system shall provide a suite of simple to understand phase field kernels for novice users.'
+    # Use exodus oversampling. See #2295
+    recover = false
   [../]
 
   [./ACInterfaceStress]
@@ -199,5 +201,26 @@
     issues = '#11829'
     design = '/ACBarrierFunction.md'
     requirement = 'The system shall verify that the barrier height and gradient energy parameter must be permitted to depend on non-linear variables.'
+  [../]
+
+  [./nonuniform_barrier_coefficient_AD]
+    type = 'Exodiff'
+    input = 'ADnonuniform_barrier_coefficient.i'
+    exodiff = 'nonuniform_barrier_coefficient_out.e'
+    issues = '#15573'
+    design = '/ACBarrierFunction.md /ACKappaFunction.md'
+    requirement = 'MOOSE shall have AD examples where the barrier height and gradient energy parameter depend on non-linear variables'
+  [../]
+
+  [./ADnonuniform_barrier_coefficient-jac]
+    type = 'PetscJacobianTester'
+    input = 'ADnonuniform_barrier_coefficient.i'
+    run_sim = 'True'
+    cli_args = 'Outputs/exodus=false Executioner/num_steps=1'
+    ratio_tol = 1e-7
+    difference_tol = 2e-4
+    issues = '#15573'
+    design = '/ACBarrierFunction.md /ACKappaFunction.md'
+    requirement = 'The Jacobian for the AD Allen-Cahn problem with a variable dependent coeffecients shall be perfect'
   [../]
 []

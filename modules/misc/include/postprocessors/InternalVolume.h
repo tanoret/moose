@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,11 +29,11 @@ public:
 
   InternalVolume(const InputParameters & parameters);
 
-  void initialSetup();
+  virtual void initialSetup() override;
 
 protected:
-  virtual Real computeQpIntegral();
-  virtual Real getValue();
+  virtual Real computeQpIntegral() override;
+  virtual Real getValue() const override;
 
   const unsigned int _component;
   const Real _scale;

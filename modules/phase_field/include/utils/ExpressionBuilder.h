@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -146,7 +146,8 @@ public:
       LOG10,
       EXP,
       SINH,
-      COSH
+      COSH,
+      TANH
     } _type;
 
     EBUnaryFuncTermNode(EBTermNode * subnode, NodeType type)
@@ -434,6 +435,7 @@ public:
     friend EBTerm exp(const EBTerm &);
     friend EBTerm sinh(const EBTerm &);
     friend EBTerm cosh(const EBTerm &);
+    friend EBTerm tanh(const EBTerm &);
 
 /*
  * Binary operators (including number,term operations)

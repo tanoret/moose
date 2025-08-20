@@ -33,6 +33,8 @@
     cli_args = 'Mesh/gmg/dim=3 Mesh/gmg/nx=20 Mesh/gmg/ny=20 Mesh/gmg/nz=20 Outputs/file_base=distributed_rectilinear_mesh_generator_out_3d Outputs/hide="pid npid" '
     requirement = 'The system shall be able to generate 3D HEX8 mesh in parallel.'
     valgrind = 'NONE'
+    # Enables running the limited HPC tests on CIVET on all events
+    group = 'hpc'
   [../]
 
   [./3D_ptscotch]
@@ -40,7 +42,7 @@
     input = 'distributed_rectilinear_mesh_generator.i'
     exodiff = 'distributed_rectilinear_mesh_generator_out_3d_ptscotch.e'
     ptscotch = true
-    petsc_version = '>=3.10.0'
+    capabilities = 'petsc>=3.10.0'
     valgrind = none
     cli_args = 'Mesh/gmg/dim=3 Mesh/gmg/nx=20 Mesh/gmg/ny=20 Mesh/gmg/nz=20 Mesh/gmg/part_package=ptscotch Outputs/file_base=distributed_rectilinear_mesh_generator_out_3d_ptscotch Outputs/hide="pid npid" '
     requirement = 'The system shall be able to generate 3D HEX8 mesh in parallel using ptscotch partitioner'
@@ -73,7 +75,7 @@
     max_parallel = 8
     issues = '#15464'
     cli_args = 'Mesh/gmg/num_cores_for_partition=10 Mesh/gmg/dim=3 Mesh/gmg/nx=20 Mesh/gmg/ny=20 Mesh/gmg/nz=20 Outputs/hide="pid npid" '
-    requirement = 'The system shall error out if the number of cores for partition is larger than the total number of cores.'
+    requirement = 'The system shall report an error if the number of cores for partition is larger than the total number of cores.'
   [../]
 
   [./mesh_adaptivity]

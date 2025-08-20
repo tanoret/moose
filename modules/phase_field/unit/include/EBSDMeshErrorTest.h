@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,6 +18,7 @@
 #include "MooseParsedFunction.h"
 #include "PhaseFieldApp.h"
 #include "AppFactory.h"
+#include "MooseMain.h"
 
 class EBSDMeshErrorTest : public ::testing::Test
 {
@@ -25,7 +26,7 @@ protected:
   void SetUp()
   {
     const char * argv[2] = {"foo", "\0"};
-    _app = AppFactory::createAppShared("PhaseFieldApp", 1, (char **)argv);
+    _app = Moose::createMooseApp("PhaseFieldApp", 1, (char **)argv);
     _factory = &_app->getFactory();
   }
 

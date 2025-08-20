@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,51 +9,29 @@
 
 #pragma once
 
-#include "Executioner.h"
-
-// System includes
-#include <string>
-
-// Forward declarations
-class InputParameters;
-class FEProblemBase;
-
-template <typename T>
-InputParameters validParams();
+#include "SteadyBase.h"
 
 /**
  * Steady executioners usually only call "solve()" on the NonlinearSystem once.
  */
-class Steady : public Executioner
+class Steady : public SteadyBase
 {
 public:
+  static InputParameters validParams();
+
   /**
    * Constructor
    *
    * @param parameters The parameters object holding data for the class to use.
-   * @return Whether or not the solve was successful.
    */
-  static InputParameters validParams();
-
   Steady(const InputParameters & parameters);
 
   virtual void init() override;
 
-  virtual void execute() override;
-
+  /// Check if a time kernel has been declared
   virtual void checkIntegrity();
 
-  virtual bool lastSolveConverged() const override { return _last_solve_converged; }
-
 protected:
-  FEProblemBase & _problem;
-
+  /// The solve object to use in this executioner
   FEProblemSolve _feproblem_solve;
-
-  Real _system_time;
-  int & _time_step;
-  Real & _time;
-
-private:
-  bool _last_solve_converged;
 };

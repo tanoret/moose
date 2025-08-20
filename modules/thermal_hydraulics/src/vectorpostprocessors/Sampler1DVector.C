@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,6 +17,8 @@ Sampler1DVector::validParams()
   InputParameters params = Sampler1DBase<Real>::validParams();
   params.addRequiredParam<unsigned int>("index",
                                         "Index of the vector property component to sample");
+  params.addClassDescription("Samples a single component of array material properties at all "
+                             "quadrature points in mesh block(s)");
   return params;
 }
 

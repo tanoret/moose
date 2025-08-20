@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Action.h"
-#include "hit.h"
+#include "hit/hit.h"
 
 // Forward declarations
 class ReporterName;
@@ -86,7 +86,7 @@ protected:
    *
    * @return std::string The name of the StochasticReporter.
    */
-  std::string stochasticReporterName() const { return "study_qoi"; }
+  std::string stochasticReporterName() const { return "study_results"; }
 
   /**
    * The perscribed name of the output objects created in this action.
@@ -95,13 +95,6 @@ protected:
    * @return std::string The name of the StochasticReporter.
    */
   OutputName outputName(std::string type) const { return type; }
-
-  /**
-   * The perscribed name of the samples VPP created in this action.
-   *
-   * @return std::string The name of the SamplerData VPP.
-   */
-  std::string samplesName() const { return "study_samples"; }
 
   /**
    * The name of the reporter values in the StochasticReporter representing the QoIs.
@@ -167,6 +160,8 @@ private:
    */
   unsigned int inferMultiAppMode();
 
+  /// The inputted parameter vector
+  const std::vector<std::string> & _parameters;
   /// The sampling type
   const unsigned int _sampling_type;
   /// The distributions

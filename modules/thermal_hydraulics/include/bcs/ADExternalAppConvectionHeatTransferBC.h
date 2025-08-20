@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -28,6 +28,8 @@ protected:
   const ADVariableValue & _htc_ext;
   /// Post-processor by which to scale boundary condition
   const PostprocessorValue & _scale_pp;
+  /// Function by which to scale the boundary condition
+  const Function & _scale_fn;
 
 public:
   static InputParameters validParams();

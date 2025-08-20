@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -95,7 +95,7 @@ public:
     auto & child_node = _children[id];
 
     if (!child_node)
-      child_node.reset(new PerfNode(id));
+      child_node = std::make_unique<PerfNode>(id);
 
     return child_node.get();
   }

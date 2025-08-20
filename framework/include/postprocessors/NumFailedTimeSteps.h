@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,9 +22,9 @@ public:
 
   NumFailedTimeSteps(const InputParameters & parameters);
 
-  void initialize() override {}
-  void execute() override {}
-  Real getValue() override;
+  virtual void initialize() override {}
+  virtual void execute() override {}
+  virtual Real getValue() const override;
 
 protected:
   /// Retrieves the current TimeStepper used by the executioner.

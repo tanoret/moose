@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,7 +24,7 @@ public:
   void execute() override;
   void finalize() override;
   void threadJoin(const UserObject & user_object) override;
-  virtual PostprocessorValue getValue() override;
+  virtual PostprocessorValue getValue() const override;
 
 private:
   /// The max velocity on an element, this is done simply to avoid creating temporary calls to execute.

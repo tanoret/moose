@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,6 +10,8 @@
 #include "StitchedMesh.h"
 #include "Parser.h"
 #include "InputParameters.h"
+
+#include "MooseApp.h"
 
 #include "libmesh/mesh_modification.h"
 #include "libmesh/serial_mesh.h"
@@ -74,7 +76,7 @@ StitchedMesh::StitchedMesh(const StitchedMesh & other_mesh)
 std::unique_ptr<MooseMesh>
 StitchedMesh::safeClone() const
 {
-  return std::make_unique<StitchedMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 void

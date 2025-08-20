@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,7 +31,7 @@ template <bool is_ad>
 Real
 MaterialRateRealAuxTempl<is_ad>::getRealValue()
 {
-  Real prop = MetaPhysicL::raw_value(this->_prop[this->_qp]);
+  Real prop = MetaPhysicL::raw_value(this->_full_value);
   Real prop_old = MetaPhysicL::raw_value(this->_prop_old[this->_qp]);
   Real rate = (prop - prop_old) / this->_dt;
   return rate;

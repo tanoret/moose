@@ -1,6 +1,6 @@
 #!/bin/bash
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -62,7 +62,8 @@ yum install -y \
   sudo \
   file \
   zlib-devel \
-  rsync
+  rsync \
+  cmake
 
 # Clear cache
 yum clean all

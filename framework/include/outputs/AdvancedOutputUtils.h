@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -98,7 +98,7 @@ public:
   /**
    * A method for testing of a key exists
    */
-  bool contains(const std::string & name) { return find(name) != end(); }
+  bool contains(const std::string & name) const { return find(name) != end(); }
 
 protected:
   /// Data storage

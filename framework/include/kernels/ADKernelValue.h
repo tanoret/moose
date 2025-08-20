@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -38,6 +38,12 @@ protected:
   precomputeQpResidual() = 0;
 
   virtual ADReal computeQpResidual() override final;
+
+  /// Unused method to enable downstream generic object creation
+  virtual Real precomputeQpJacobian()
+  {
+    mooseError("precomputeQpJacobian should not be called for AD methods");
+  }
 
   using ADKernelTempl<T>::_assembly;
   using ADKernelTempl<T>::_var;

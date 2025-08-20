@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,8 +26,8 @@ class ComputeNodalAuxVarsThread
 {
 public:
   ComputeNodalAuxVarsThread(FEProblemBase & fe_problem,
-                            const MooseObjectWarehouse<AuxKernelType> & storage,
-                            const std::vector<std::vector<MooseVariableFEBase *>> & vars);
+                            const MooseObjectWarehouse<AuxKernelType> & storage);
+
   // Splitting Constructor
   ComputeNodalAuxVarsThread(ComputeNodalAuxVarsThread & x, Threads::split split);
 
@@ -40,12 +40,15 @@ public:
   void post() override;
 
 protected:
+  /// Print information about the loop, mostly order of execution of objects
+  void printGeneralExecutionInformation() const override;
+
   AuxiliarySystem & _aux_sys;
 
   /// Storage object containing active AuxKernel objects
   const MooseObjectWarehouse<AuxKernelType> & _storage;
 
-  const std::vector<std::vector<MooseVariableFEBase *>> _aux_vars;
-
   std::set<SubdomainID> _block_ids;
+
+  static Threads::spin_mutex writable_variable_mutex;
 };

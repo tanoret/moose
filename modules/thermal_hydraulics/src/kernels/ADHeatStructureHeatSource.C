@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,6 +15,7 @@ InputParameters
 ADHeatStructureHeatSource::validParams()
 {
   InputParameters params = ADKernel::validParams();
+  params.addClassDescription("Adds a heat source term for the energy equation");
   params.addRequiredParam<Real>("power_fraction", "The fraction of power used");
   params.addRequiredCoupledVar("total_power", "Total reactor power");
   params.addRequiredParam<Real>("num_units", "The number of units");

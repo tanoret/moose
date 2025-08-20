@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,7 +25,6 @@ INSChorinCorrector::validParams()
   params.addCoupledVar("v_star", "star y-velocity"); // only required in 2D and 3D
   params.addCoupledVar("w_star", "star z-velocity"); // only required in 3D
   params.addRequiredCoupledVar(NS::pressure, "pressure");
-  params.addDeprecatedCoupledVar("p", NS::pressure, "1/1/2022");
 
   // Required parameters
   params.addRequiredParam<unsigned>(

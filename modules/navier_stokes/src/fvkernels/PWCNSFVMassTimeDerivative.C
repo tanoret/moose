@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -31,5 +31,6 @@ PWCNSFVMassTimeDerivative::PWCNSFVMassTimeDerivative(const InputParameters & par
 ADReal
 PWCNSFVMassTimeDerivative::computeQpResidual()
 {
-  return _eps(makeElemArg(_current_elem)) * WCNSFVMassTimeDerivative::computeQpResidual();
+  return _eps(makeElemArg(_current_elem), determineState()) *
+         WCNSFVMassTimeDerivative::computeQpResidual();
 }

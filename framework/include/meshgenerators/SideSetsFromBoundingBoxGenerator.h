@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,14 +9,14 @@
 
 #pragma once
 
-#include "MeshGenerator.h"
+#include "SideSetsGeneratorBase.h"
 #include "MooseEnum.h"
 #include "libmesh/bounding_box.h"
 
 /**
  * MeshGenerator for defining sidesets inside or outside of a bounding box
  */
-class SideSetsFromBoundingBoxGenerator : public MeshGenerator
+class SideSetsFromBoundingBoxGenerator : public SideSetsGeneratorBase
 {
 public:
   static InputParameters validParams();
@@ -26,13 +26,8 @@ public:
   std::unique_ptr<MeshBase> generate() override;
 
 protected:
-  std::unique_ptr<MeshBase> & _input;
-
   /// ID location (inside of outside of box)
   MooseEnum _location;
-
-  /// Block ID to assign to the region
-  subdomain_id_type _block_id;
 
   /// List of boundary names to select
   std::vector<BoundaryName> _boundaries_old;

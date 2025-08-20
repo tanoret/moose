@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -14,123 +14,13 @@
 #include <ctime>
 
 // MOOSE includes
+#include "Registry.h"
 #include "MooseObject.h"
 #include "MooseTypes.h"
 #include "FileLineInfo.h"
 
 // Forward declarations
 class InputParameters;
-
-/**
- * Macros
- */
-#define stringifyName(name) #name
-#define registerObject(name) factory.reg<name>(stringifyName(name), __FILE__, __LINE__)
-#define registerNamedObject(obj, name)                                                             \
-  do                                                                                               \
-  {                                                                                                \
-    factory.reg<obj>(name, __FILE__, __LINE__);                                                    \
-    factory.associateNameToClass(name, stringifyName(obj));                                        \
-  } while (0)
-
-#define registerDeprecatedObject(name, time)                                                       \
-  factory.regDeprecated<name>(stringifyName(name), time, __FILE__, __LINE__)
-
-#define registerDeprecatedObjectWithReplacement(dep_obj, replacement_name, time)                   \
-  factory.regReplaced<dep_obj>(stringifyName(dep_obj), replacement_name, time, __FILE__, __LINE__)
-
-#define registerRenamedObject(orig_name, new_obj, time)                                            \
-  factory.renameObject<new_obj>(orig_name, stringifyName(new_obj), time, __FILE__, __LINE__)
-
-// for backward compatibility
-#define registerKernel(name) registerObject(name)
-#define registerNodalKernel(name) registerObject(name)
-#define registerBoundaryCondition(name) registerObject(name)
-#define registerAux(name) registerObject(name)
-#define registerAuxKernel(name) registerObject(name)
-#define registerMaterial(name) registerObject(name)
-#define registerPostprocessor(name) registerObject(name)
-#define registerVectorPostprocessor(name) registerObject(name)
-#define registerInitialCondition(name) registerObject(name)
-#define registerDamper(name) registerObject(name)
-#define registerDiracKernel(name) registerObject(name)
-#define registerDGKernel(name) registerObject(name)
-#define registerInterfaceKernel(name) registerObject(name)
-#define registerExecutioner(name) registerObject(name)
-#define registerFunction(name) registerObject(name)
-#define registerDistribution(name) registerObject(name)
-#define registerSampler(name) registerObject(name)
-#define registerMesh(name) registerObject(name)
-#define registerConstraint(name) registerObject(name)
-#define registerScalarKernel(name) registerObject(name)
-#define registerUserObject(name) registerObject(name)
-#define registerPreconditioner(name) registerObject(name)
-#define registerIndicator(name) registerObject(name)
-#define registerMarker(name) registerObject(name)
-#define registerProblem(name) registerObject(name)
-#define registerMultiApp(name) registerObject(name)
-#define registerTransfer(name) registerObject(name)
-#define registerTimeStepper(name) registerObject(name)
-#define registerTimeIntegrator(name) registerObject(name)
-#define registerPredictor(name) registerObject(name)
-#define registerSplit(name) registerObject(name)
-#define registerOutput(name) registerObject(name)
-#define registerControl(name) registerObject(name)
-#define registerPartitioner(name) registerObject(name)
-#define registerRelationshipManager(name) registerObject(name)
-
-#define registerNamedKernel(obj, name) registerNamedObject(obj, name)
-#define registerNamedNodalKernel(obj, name) registerNamedObject(obj, name)
-#define registerNamedBoundaryCondition(obj, name) registerNamedObject(obj, name)
-#define registerNamedAux(obj, name) registerNamedObject(obj, name)
-#define registerNamedAuxKernel(name) registerNamedObject(obj, name)
-#define registerNamedMaterial(obj, name) registerNamedObject(obj, name)
-#define registerNamedPostprocessor(obj, name) registerNamedObject(obj, name)
-#define registerNamedVectorPostprocessor(obj, name) registerNamedObject(obj, name)
-#define registerNamedInitialCondition(obj, name) registerNamedObject(obj, name)
-#define registerNamedDamper(obj, name) registerNamedObject(obj, name)
-#define registerNamedDiracKernel(obj, name) registerNamedObject(obj, name)
-#define registerNamedDGKernel(obj, name) registerNamedObject(obj, name)
-#define registerNamedExecutioner(obj, name) registerNamedObject(obj, name)
-#define registerNamedFunction(obj, name) registerNamedObject(obj, name)
-#define registerNamedDistribution(obj, name) registerNamedObject(obj, name)
-#define registerNamedSampler(obj, name) registerNamedObject(obj, name)
-#define registerNamedMesh(obj, name) registerNamedObject(obj, name)
-#define registerNamedConstraint(obj, name) registerNamedObject(obj, name)
-#define registerNamedUserObject(obj, name) registerNamedObject(obj, name)
-#define registerNamedPreconditioner(obj, name) registerNamedObject(obj, name)
-#define registerNamedIndicator(obj, name) registerNamedObject(obj, name)
-#define registerNamedMarker(obj, name) registerNamedObject(obj, name)
-#define registerNamedProblem(obj, name) registerNamedObject(obj, name)
-#define registerNamedMultiApp(obj, name) registerNamedObject(obj, name)
-#define registerNamedTransfer(obj, name) registerNamedObject(obj, name)
-#define registerNamedTimeStepper(obj, name) registerNamedObject(obj, name)
-#define registerNamedTimeIntegrator(obj, name) registerNamedObject(obj, name)
-#define registerNamedPredictor(obj, name) registerNamedObject(obj, name)
-#define registerNamedSplit(obj, name) registerNamedObject(obj, name)
-#define registerNamedOutput(obj, name) registerNamedObject(obj, name)
-#define registerNamedControl(obj, name) registerNamedObject(obj, name)
-#define registerNamedPartitioner(obj, name) registerNamedObject(obj, name);
-
-/**
- * alias to wrap shared pointer type
- */
-using MooseObjectPtr = std::shared_ptr<MooseObject>;
-
-/**
- * alias for validParams function
- */
-using paramsPtr = InputParameters (*)();
-
-/**
- * alias for method to build objects
- */
-using buildPtr = MooseObjectPtr (*)(const InputParameters & parameters);
-
-/**
- * alias for registered Object iterator
- */
-using registeredMooseObjectIterator = std::map<std::string, paramsPtr>::iterator;
 
 /**
  * Generic factory class for build all sorts of objects
@@ -141,24 +31,7 @@ public:
   Factory(MooseApp & app);
   virtual ~Factory();
 
-  /**
-   * Register a new object
-   * @param obj_name Name of the object to register
-   */
-  template <typename T>
-  void reg(const std::string & obj_name, const std::string & file = "", int line = -1)
-  {
-    reg("", obj_name, &buildObject<T>, &moose::internal::callValidParams<T>, "", "", file, line);
-  }
-
-  void reg(const std::string & label,
-           const std::string & obj_name,
-           const buildPtr & build_ptr,
-           const paramsPtr & params_ptr,
-           const std::string & deprecated_time = "",
-           const std::string & replacement_name = "",
-           const std::string & file = "",
-           int line = -1);
+  void reg(std::shared_ptr<RegistryEntryBase> obj);
 
   /**
    * Gets file and line information where an object was initially registered.
@@ -182,87 +55,11 @@ public:
   std::string associatedClassName(const std::string & name) const;
 
   /**
-   * Register a deprecated object that expires
-   * @param obj_name The name of the object to register
-   * @param t_str String containing the expiration date for the object in "MM/DD/YYYY HH:MM"
-   * format. Note that the HH:MM is not optional
-   *
-   * Note: Params file and line are supplied by the macro
-   */
-  template <typename T>
-  void regDeprecated(const std::string & obj_name,
-                     const std::string t_str,
-                     const std::string & file,
-                     int line)
-  {
-    reg("", obj_name, &buildObject<T>, &moose::internal::callValidParams<T>, t_str, "", file, line);
-  }
-
-  /**
-   * Registers an object as deprecated and associates it with the replacement name.
-   * @param dep_obj - The name (type) of the object being registered (the deprecated type)
-   * @param replacement_name - The name of the object replacing the deprecated object (new name)
-   * @param time_str - Time at which the deprecated message prints as  an error "MM/DD/YYYY HH:MM"
-   * Note that the HH:MM is not optional
-   *
-   * Note: Params file and line are supplied by the macro
-   */
-  template <typename T>
-  void regReplaced(const std::string & dep_obj,
-                   const std::string & replacement_name,
-                   const std::string time_str,
-                   const std::string & file,
-                   int line)
-  {
-    reg("",
-        dep_obj,
-        &buildObject<T>,
-        &moose::internal::callValidParams<T>,
-        time_str,
-        replacement_name,
-        file,
-        line);
-  }
-
-  /**
-   * Used when an existing object's name changes
-   *
-   * Template T: The type of the new class
-   *
-   * @param orig_name The name of the original class
-   * @param new_name The name of the new class
-   * @param time_str The date the deprecation will expire
-   *
-   * Note: Params file and line are supplied by the macro
-   */
-  template <typename T>
-  void renameObject(const std::string & orig_name,
-                    const std::string & new_name,
-                    const std::string time_str,
-                    const std::string & file,
-                    int line)
-  {
-    // Deprecate the old name
-    // Store the time
-    _deprecated_time[orig_name] = parseTime(time_str);
-
-    // Store the new name
-    _deprecated_name[orig_name] = new_name;
-
-    // Register the new object with the old name
-    reg<T>(orig_name, __FILE__, __LINE__);
-    associateNameToClass(orig_name, new_name);
-
-    // Register the new object with the new name
-    reg<T>(new_name, file, line);
-  }
-
-  /**
    * Get valid parameters for the object
    * @param name Name of the object whose parameter we are requesting
    * @return Parameters of the object
    */
-  InputParameters getValidParams(const std::string & name);
+  InputParameters getValidParams(const std::string & name) const;
 
   /**
    * Build an object (must be registered) - THIS METHOD IS DEPRECATED (Use create<T>())
@@ -273,11 +70,18 @@ public:
    * @param print_deprecated controls the deprecated message
    * @return The created object
    */
+  ///@{
+  std::unique_ptr<MooseObject> createUnique(const std::string & obj_name,
+                                            const std::string & name,
+                                            const InputParameters & parameters,
+                                            THREAD_ID tid = 0,
+                                            bool print_deprecated = true);
   std::shared_ptr<MooseObject> create(const std::string & obj_name,
                                       const std::string & name,
                                       const InputParameters & parameters,
                                       THREAD_ID tid = 0,
                                       bool print_deprecated = true);
+  ///@}
 
   /**
    * Build an object (must be registered)
@@ -287,21 +91,39 @@ public:
    * @param tid The thread id that this copy will be created for
    * @return The created object
    */
+  ///@{
+  template <typename T>
+  std::unique_ptr<T> createUnique(const std::string & obj_name,
+                                  const std::string & name,
+                                  const InputParameters & parameters,
+                                  const THREAD_ID tid = 0);
   template <typename T>
   std::shared_ptr<T> create(const std::string & obj_name,
                             const std::string & name,
                             const InputParameters & parameters,
-                            THREAD_ID tid = 0)
-  {
-    std::shared_ptr<T> new_object =
-        std::dynamic_pointer_cast<T>(create(obj_name, name, parameters, tid, false));
-    if (!new_object)
-      mooseError("We expected to create an object of type '" + demangle(typeid(T).name()) +
-                 "'.\nInstead we received a parameters object for type '" + obj_name +
-                 "'.\nDid you call the wrong \"add\" method in your Action?");
+                            const THREAD_ID tid = 0);
+  ///@}
 
-    return new_object;
-  }
+  /**
+   * Clones the object \p object.
+   *
+   * Under the hood, this creates a copy of the InputParameters from \p object
+   * and constructs a new object with the copied parameters. The suffix _clone<i>
+   * will be added to the object's name, where <i> is incremented each time
+   * the object is cloned.
+   */
+  template <typename T>
+  std::unique_ptr<T> clone(const T & object);
+
+  /**
+   * Copy constructs the object \p object.
+   *
+   * Under the hood, the new object's parameters will point to the same address
+   * as the parameters in \p object. This can be dangerous and thus this is only
+   * allowed for a subset of objects.
+   */
+  template <typename T>
+  std::unique_ptr<T> copyConstruct(const T & object);
 
   /**
    * Releases any shared resources created as a side effect of creating an object through
@@ -320,14 +142,14 @@ public:
   void restrictRegisterableObjects(const std::vector<std::string> & names);
 
   /**
-   * Access to registered object iterator (begin)
+   * Returns a reference to the map from names to RegistryEntryBase pointers
    */
-  registeredMooseObjectIterator registeredObjectsBegin() { return _name_to_params_pointer.begin(); }
+  const auto & registeredObjects() const { return _name_to_object; }
 
   /**
-   * Access to registered object iterator (end)
+   * Returns a Boolean indicating whether an object type has been registered
    */
-  registeredMooseObjectIterator registeredObjectsEnd() { return _name_to_params_pointer.end(); }
+  bool isRegistered(const std::string & obj_name) const { return _name_to_object.count(obj_name); }
 
   /**
    * Get a list of all constructed Moose Object types
@@ -335,6 +157,14 @@ public:
   std::vector<std::string> getConstructedObjects() const;
 
   MooseApp & app() { return _app; }
+
+  /**
+   * @return The InputParameters for the object that is currently being constructed,
+   * if any.
+   *
+   * Can be used to ensure that all MooseObjects are created using the Factory
+   */
+  const InputParameters * currentlyConstructing() const;
 
 private:
   /**
@@ -349,7 +179,7 @@ private:
    * Show the appropriate message for deprecated objects
    * @param obj_name Name of the deprecated object
    */
-  void deprecatedMessage(const std::string obj_name);
+  void deprecatedMessage(const std::string obj_name) const;
 
   /**
    * Prints error information when an object is not registered
@@ -357,29 +187,34 @@ private:
   void reportUnregisteredError(const std::string & obj_name) const;
 
   /**
-   * Build an object of type T
+   * Initializes the data structures and the parameters (in the InputParameterWarehouse)
+   * for the object with the given state.
    */
-  template <typename T>
-  static MooseObjectPtr buildObject(const InputParameters & parameters)
-  {
-    return std::make_shared<T>(parameters);
-  }
+  InputParameters & initialize(const std::string & type,
+                               const std::string & name,
+                               const InputParameters & from_params,
+                               const THREAD_ID tid);
+
+  /**
+   * Finalizes the creaction of \p object of type \p type.
+   *
+   * This will do some sanity checking on whether or not the parameters in the
+   * created object match the valid paramters of the associated type.
+   */
+  void finalize(const std::string & type, const MooseObject & object);
 
   /// Reference to the application
   MooseApp & _app;
 
-  /// Storage for pointers to the object
-  std::map<std::string, buildPtr> _name_to_build_pointer;
-
-  /// Storage for pointers to the parameters objects
-  std::map<std::string, paramsPtr> _name_to_params_pointer;
+  /// Storage for pointers to the object registry entry
+  std::map<std::string, std::shared_ptr<RegistryEntryBase>> _name_to_object;
 
   FileLineInfoMap _name_to_line;
 
   /// Object name to class name association
   std::map<std::string, std::string> _name_to_class;
 
-  /// Storage for deprecated object experiation dates
+  /// Storage for deprecated object expiration dates
   std::map<std::string, std::time_t> _deprecated_time;
 
   /// Storage for the deprecated objects that have replacements
@@ -391,8 +226,101 @@ private:
   /// Constructed Moose Object types
   std::set<std::string> _constructed_types;
 
+  /// Set of deprecated object types that have been printed
+  mutable std::set<std::string> _deprecated_types;
+
   /// set<label/appname, objectname> used to track if an object previously added is being added
   /// again - which is okay/allowed, while still allowing us to detect/reject cases of duplicate
   /// object name registration where the label/appname is not identical.
   std::set<std::pair<std::string, std::string>> _objects_by_label;
+
+  /// The object's parameters that are currently being constructed (if any).
+  /// This is a vector because we create within create, thus the last entry is the
+  /// one that is being constructed at the moment
+  std::vector<const InputParameters *> _currently_constructing;
+
+  /// Counter for keeping track of the number of times an object with a given name has
+  /// been cloned so that we can continue to create objects with unique names
+  std::map<const MooseObject *, unsigned int> _clone_counter;
 };
+
+template <typename T>
+std::unique_ptr<T>
+Factory::createUnique(const std::string & obj_name,
+                      const std::string & name,
+                      const InputParameters & parameters,
+                      const THREAD_ID tid)
+{
+  auto object = createUnique(obj_name, name, parameters, tid, false);
+  if (!dynamic_cast<T *>(object.get()))
+    mooseError("We expected to create an object of type '" + libMesh::demangle(typeid(T).name()) +
+               "'.\nInstead we received a parameters object for type '" + obj_name +
+               "'.\nDid you call the wrong \"add\" method in your Action?");
+
+  return std::unique_ptr<T>(static_cast<T *>(object.release()));
+}
+
+template <typename T>
+std::shared_ptr<T>
+Factory::create(const std::string & obj_name,
+                const std::string & name,
+                const InputParameters & parameters,
+                const THREAD_ID tid)
+{
+  return std::move(createUnique<T>(obj_name, name, parameters, tid));
+}
+
+template <typename T>
+std::unique_ptr<T>
+Factory::clone(const T & object)
+{
+  static_assert(std::is_base_of_v<MooseObject, T>, "Not a MooseObject");
+
+  const auto tid = object.template getParam<THREAD_ID>("_tid");
+  if (tid != 0)
+    mooseError("Factory::clone(): The object ",
+               object.typeAndName(),
+               " is threaded but cloning does not work with threaded objects");
+
+  // Clone the parameters; we can't copy construct InputParameters
+  InputParameters cloned_params = emptyInputParameters();
+  cloned_params += object.parameters();
+  if (const auto hit_node = object.parameters().getHitNode())
+    cloned_params.setHitNode(*hit_node, {});
+
+  // Fill the new parameters in the warehouse
+  const auto type = static_cast<const MooseBase &>(object).type();
+  const auto clone_count = _clone_counter[&object]++;
+  const auto name = object.name() + "_clone" + std::to_string(clone_count);
+  const auto & params = initialize(type, name, cloned_params, 0);
+
+  // Construct the object
+  _currently_constructing.push_back(&params);
+  auto cloned_object = std::make_unique<T>(params);
+  _currently_constructing.pop_back();
+
+  // Do some sanity checking
+  finalize(type, *cloned_object);
+
+  return cloned_object;
+}
+
+template <typename T>
+std::unique_ptr<T>
+Factory::copyConstruct(const T & object)
+{
+  static_assert(std::is_base_of_v<MooseObject, T>, "Not a MooseObject");
+
+  const auto type = static_cast<const MooseBase &>(object).type();
+  const auto base = object.parameters().getBase();
+  if (!base || (*base != "MooseMesh" && *base != "RelationshipManager"))
+    mooseError("Copy construction of ", type, " objects is not supported.");
+
+  _currently_constructing.push_back(&object.parameters());
+  auto cloned_object = std::make_unique<T>(object);
+  _currently_constructing.pop_back();
+
+  finalize(type, *cloned_object);
+
+  return cloned_object;
+}

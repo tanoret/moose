@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -52,97 +52,6 @@ applyQuotientRule(const Real & num,
   d_dy.add(-num / std::pow(den, 2), dden_dy);
 
   return d_dy;
-}
-
-Real
-Reynolds(Real volume_fraction, Real rho, Real vel, Real D_h, Real mu)
-{
-  return volume_fraction * rho * std::fabs(vel) * D_h / mu;
-}
-
-ADReal
-Reynolds(ADReal volume_fraction, ADReal rho, ADReal vel, ADReal D_h, ADReal mu)
-{
-  return volume_fraction * rho * std::fabs(vel) * D_h / mu;
-}
-
-Real
-Prandtl(Real cp, Real mu, Real k)
-{
-  return cp * mu / k;
-}
-
-ADReal
-Prandtl(ADReal cp, ADReal mu, ADReal k)
-{
-  return cp * mu / k;
-}
-
-Real
-Grashof(Real beta, Real dT, Real D_h, Real rho_liquid, Real mu_liquid, Real gravity_magnitude)
-{
-  return gravity_magnitude * beta * dT * std::pow(D_h, 3) * (rho_liquid * rho_liquid) /
-         (mu_liquid * mu_liquid);
-}
-
-ADReal
-Grashof(
-    ADReal beta, ADReal dT, ADReal D_h, ADReal rho_liquid, ADReal mu_liquid, Real gravity_magnitude)
-{
-  return gravity_magnitude * beta * dT * std::pow(D_h, 3) * (rho_liquid * rho_liquid) /
-         (mu_liquid * mu_liquid);
-}
-
-Real
-Laplace(Real surf_tension, Real delta_rho, Real gravity_magnitude)
-{
-  return std::sqrt(surf_tension / (gravity_magnitude * delta_rho));
-}
-
-ADReal
-Laplace(ADReal surf_tension, ADReal delta_rho, Real gravity_magnitude)
-{
-  return std::sqrt(surf_tension / (gravity_magnitude * delta_rho));
-}
-
-Real
-viscosityNumber(
-    Real viscosity, Real surf_tension, Real rho_k, Real delta_rho, Real gravity_magnitude)
-{
-  return viscosity /
-         std::sqrt(rho_k * surf_tension * std::sqrt(surf_tension / gravity_magnitude / delta_rho));
-}
-
-ADReal
-viscosityNumber(
-    ADReal viscosity, ADReal surf_tension, ADReal rho_k, ADReal delta_rho, Real gravity_magnitude)
-{
-  return viscosity /
-         std::sqrt(rho_k * surf_tension * std::sqrt(surf_tension / gravity_magnitude / delta_rho));
-}
-
-Real
-wallHeatTransferCoefficient(Real Nu, Real k, Real D_h)
-{
-  return Nu * k / D_h;
-}
-
-ADReal
-wallHeatTransferCoefficient(ADReal Nu, ADReal k, ADReal D_h)
-{
-  return Nu * k / D_h;
-}
-
-Real
-Dean(Real Re, Real doD)
-{
-  return Re * std::sqrt(doD);
-}
-
-ADReal
-Dean(ADReal Re, ADReal doD)
-{
-  return Re * std::sqrt(doD);
 }
 
 void

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,11 +46,12 @@ public:
 
   virtual int order() override { return 3; }
   virtual void computeTimeDerivatives() override;
-  virtual void computeADTimeDerivatives(DualReal & ad_u_dot,
+  virtual void computeADTimeDerivatives(ADReal & ad_u_dot,
                                         const dof_id_type & dof,
-                                        DualReal & ad_u_dotdot) const override;
+                                        ADReal & ad_u_dotdot) const override;
   virtual void solve() override;
   virtual void postResidual(NumericVector<Number> & residual) override;
+  virtual bool overridesSolve() const override { return true; }
 
 protected:
   /**

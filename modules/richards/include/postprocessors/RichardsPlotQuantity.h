@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -24,11 +24,11 @@ public:
   RichardsPlotQuantity(const InputParameters & parameters);
   virtual ~RichardsPlotQuantity();
 
-  virtual void initialize();
-  virtual void execute();
+  virtual void initialize() override;
+  virtual void execute() override;
 
   /// returns the value of the RichardsSumQuantity
-  virtual PostprocessorValue getValue();
+  virtual PostprocessorValue getValue() const override;
 
 protected:
   /// the RichardsSumQuantity userobject

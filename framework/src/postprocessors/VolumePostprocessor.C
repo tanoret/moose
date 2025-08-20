@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,7 +27,7 @@ VolumePostprocessor::VolumePostprocessor(const InputParameters & parameters)
 void
 VolumePostprocessor::threadJoin(const UserObject & y)
 {
-  const VolumePostprocessor & pps = static_cast<const VolumePostprocessor &>(y);
+  const auto & pps = static_cast<const VolumePostprocessor &>(y);
   _integral_value += pps._integral_value;
 }
 

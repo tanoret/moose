@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -114,7 +114,7 @@ plt.legend(loc = 'upper right')
 plt.xlabel("r (m)")
 plt.ylabel("Temperature (K)")
 plt.title("Temperature around cavity")
-plt.savefig("temperature_fig.pdf")
+plt.savefig("temperature_fig.png")
 
 plt.figure()
 plt.plot(rpoints, [1E-6 * p for p in expected[1]], 'k-', linewidth = 3.0, label = 'expected')
@@ -123,7 +123,7 @@ plt.legend(loc = 'upper right')
 plt.xlabel("r (m)")
 plt.ylabel("Porepressure (MPa)")
 plt.title("Porepressure around cavity")
-plt.savefig("porepressure_fig.pdf")
+plt.savefig("porepressure_fig.png")
 
 plt.figure()
 plt.plot(rpoints, [1000 * u for u in expected[2]], 'k-', linewidth = 3.0, label = 'expected (fixed)')
@@ -134,6 +134,6 @@ plt.legend(loc = 'center right')
 plt.xlabel("r (m)")
 plt.ylabel("displacement (mm)")
 plt.title("Radial displacement around cavity")
-plt.savefig("displacement_fig.pdf")
+plt.savefig("displacement_fig.png")
 
 sys.exit(0)

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -403,7 +403,7 @@ TEST_F(RankFourTensorTest, bignum)
       RankFourTensor::general);
 
   constexpr std::size_t derivative_size = 1000;
-  typedef NumberArray<derivative_size, Real> DNDerivativeType;
+  typedef MetaPhysicL::NumberArray<derivative_size, Real> DNDerivativeType;
   typedef DualNumber<Real, DNDerivativeType, /*allow_skiping_derivatives=*/true> ADBig;
 
   RankFourTensorTempl<ADBig> A = tensor;

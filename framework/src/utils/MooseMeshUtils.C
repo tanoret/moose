@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,35 +12,64 @@
 
 #include "libmesh/elem.h"
 #include "libmesh/boundary_info.h"
-#include "libmesh/replicated_mesh.h"
-#include "libmesh/mesh_base.h"
 #include "libmesh/parallel.h"
 #include "libmesh/parallel_algebra.h"
+#include "libmesh/utility.h"
+
+using namespace libMesh;
 
 namespace MooseMeshUtils
 {
+
+void
+mergeBoundaryIDsWithSameName(MeshBase & mesh)
+{
+  // We check if we have the same boundary name with different IDs. If we do, we assign the
+  // first ID to every occurrence.
+  const auto & side_bd_name_map = mesh.get_boundary_info().get_sideset_name_map();
+  const auto & node_bd_name_map = mesh.get_boundary_info().get_nodeset_name_map();
+  std::map<boundary_id_type, boundary_id_type> same_name_ids;
+
+  auto populate_map = [](const std::map<boundary_id_type, std::string> & map,
+                         std::map<boundary_id_type, boundary_id_type> & same_ids)
+  {
+    for (const auto & pair_outer : map)
+      for (const auto & pair_inner : map)
+        // The last condition is needed to make sure we only store one combination
+        if (pair_outer.second == pair_inner.second && pair_outer.first != pair_inner.first &&
+            same_ids.find(pair_inner.first) == same_ids.end())
+          same_ids[pair_outer.first] = pair_inner.first;
+  };
+
+  populate_map(side_bd_name_map, same_name_ids);
+  populate_map(node_bd_name_map, same_name_ids);
+
+  for (const auto & [id1, id2] : same_name_ids)
+    mesh.get_boundary_info().renumber_id(id2, id1);
+}
+
 void
 changeBoundaryId(MeshBase & mesh,
-                 const libMesh::boundary_id_type old_id,
-                 const libMesh::boundary_id_type new_id,
+                 const boundary_id_type old_id,
+                 const boundary_id_type new_id,
                  bool delete_prev)
 {
   // Get a reference to our BoundaryInfo object, we will use it several times below...
-  libMesh::BoundaryInfo & boundary_info = mesh.get_boundary_info();
+  BoundaryInfo & boundary_info = mesh.get_boundary_info();
 
   // Container to catch ids passed back from BoundaryInfo
-  std::vector<libMesh::boundary_id_type> old_ids;
+  std::vector<boundary_id_type> old_ids;
 
   // Only level-0 elements store BCs.  Loop over them.
   for (auto & elem : as_range(mesh.level_elements_begin(0), mesh.level_elements_end(0)))
   {
     unsigned int n_sides = elem->n_sides();
-    for (unsigned int s = 0; s != n_sides; ++s)
+    for (const auto s : make_range(n_sides))
     {
       boundary_info.boundary_ids(elem, s, old_ids);
       if (std::find(old_ids.begin(), old_ids.end(), old_id) != old_ids.end())
       {
-        std::vector<libMesh::boundary_id_type> new_ids(old_ids);
+        std::vector<boundary_id_type> new_ids(old_ids);
         std::replace(new_ids.begin(), new_ids.end(), old_id, new_id);
         if (delete_prev)
         {
@@ -58,44 +87,70 @@ changeBoundaryId(MeshBase & mesh,
   // from showing up when printing information, etc.
   if (delete_prev)
     boundary_info.remove_id(old_id);
+
+  // global information may now be out of sync
+  mesh.set_isnt_prepared();
 }
 
-std::vector<libMesh::boundary_id_type>
-getBoundaryIDs(const libMesh::MeshBase & mesh,
+std::vector<boundary_id_type>
+getBoundaryIDs(const MeshBase & mesh,
                const std::vector<BoundaryName> & boundary_name,
                bool generate_unknown)
 {
-  const libMesh::BoundaryInfo & boundary_info = mesh.get_boundary_info();
-  const std::map<libMesh::boundary_id_type, std::string> & sideset_map =
-      boundary_info.get_sideset_name_map();
-  const std::map<libMesh::boundary_id_type, std::string> & nodeset_map =
-      boundary_info.get_nodeset_name_map();
+  return getBoundaryIDs(
+      mesh, boundary_name, generate_unknown, mesh.get_boundary_info().get_boundary_ids());
+}
 
-  std::set<libMesh::boundary_id_type> boundary_ids = boundary_info.get_boundary_ids();
+std::vector<boundary_id_type>
+getBoundaryIDs(const MeshBase & mesh,
+               const std::vector<BoundaryName> & boundary_name,
+               bool generate_unknown,
+               const std::set<BoundaryID> & mesh_boundary_ids)
+{
+  const BoundaryInfo & boundary_info = mesh.get_boundary_info();
+  const std::map<BoundaryID, std::string> & sideset_map = boundary_info.get_sideset_name_map();
+  const std::map<BoundaryID, std::string> & nodeset_map = boundary_info.get_nodeset_name_map();
 
-  // On a distributed mesh we may have boundary ids that only exist on
-  // other processors.
-  if (!mesh.is_replicated())
-    mesh.comm().set_union(boundary_ids);
+  BoundaryID max_boundary_local_id = 0;
+  /* It is required to generate a new ID for a given name. It is used often in mesh modifiers such
+   * as SideSetsBetweenSubdomains. Then we need to check the current boundary ids since they are
+   * changing during "mesh modify()", and figure out the right max boundary ID. Most of mesh
+   * modifiers are running in serial, and we won't involve a global communication.
+   */
+  if (generate_unknown)
+  {
+    const auto & bids = mesh.is_prepared() ? mesh.get_boundary_info().get_global_boundary_ids()
+                                           : mesh.get_boundary_info().get_boundary_ids();
+    max_boundary_local_id = bids.empty() ? 0 : *(bids.rbegin());
+    /* We should not hit this often */
+    if (!mesh.is_prepared() && !mesh.is_serial())
+      mesh.comm().max(max_boundary_local_id);
+  }
 
-  libMesh::boundary_id_type max_boundary_id = boundary_ids.empty() ? 0 : *(boundary_ids.rbegin());
+  BoundaryID max_boundary_id = mesh_boundary_ids.empty() ? 0 : *(mesh_boundary_ids.rbegin());
 
-  std::vector<libMesh::boundary_id_type> ids(boundary_name.size());
-  for (unsigned int i = 0; i < boundary_name.size(); i++)
+  max_boundary_id =
+      max_boundary_id > max_boundary_local_id ? max_boundary_id : max_boundary_local_id;
+
+  std::vector<BoundaryID> ids(boundary_name.size());
+  for (const auto i : index_range(boundary_name))
   {
     if (boundary_name[i] == "ANY_BOUNDARY_ID")
     {
-      ids.assign(boundary_ids.begin(), boundary_ids.end());
+      ids.assign(mesh_boundary_ids.begin(), mesh_boundary_ids.end());
       if (i)
         mooseWarning("You passed \"ANY_BOUNDARY_ID\" in addition to other boundary_names.  This "
                      "may be a logic error.");
       break;
     }
 
-    libMesh::boundary_id_type id;
-    std::istringstream ss(boundary_name[i]);
+    if (boundary_name[i].empty() && !generate_unknown)
+      mooseError("Incoming boundary name is empty and we are not generating unknown boundary IDs. "
+                 "This is invalid.");
 
-    if (!(ss >> id) || !ss.eof())
+    BoundaryID id;
+
+    if (boundary_name[i].empty() || !MooseUtils::isDigits(boundary_name[i]))
     {
       /**
        * If the conversion from a name to a number fails, that means that this must be a named
@@ -109,6 +164,8 @@ getBoundaryIDs(const libMesh::MeshBase & mesh,
       else
         id = boundary_info.get_id_by_name(boundary_name[i]);
     }
+    else
+      id = getIDFromName<BoundaryName, BoundaryID>(boundary_name[i]);
 
     ids[i] = id;
   }
@@ -117,7 +174,7 @@ getBoundaryIDs(const libMesh::MeshBase & mesh,
 }
 
 std::set<BoundaryID>
-getBoundaryIDSet(const libMesh::MeshBase & mesh,
+getBoundaryIDSet(const MeshBase & mesh,
                  const std::vector<BoundaryName> & boundary_name,
                  bool generate_unknown)
 {
@@ -126,25 +183,12 @@ getBoundaryIDSet(const libMesh::MeshBase & mesh,
 }
 
 std::vector<subdomain_id_type>
-getSubdomainIDs(const libMesh::MeshBase & mesh, const std::vector<SubdomainName> & subdomain_name)
+getSubdomainIDs(const MeshBase & mesh, const std::vector<SubdomainName> & subdomain_name)
 {
-  std::vector<subdomain_id_type> ids(subdomain_name.size());
-  std::set<subdomain_id_type> mesh_subdomains;
-  mesh.subdomain_ids(mesh_subdomains);
+  std::vector<SubdomainID> ids(subdomain_name.size());
 
-  for (unsigned int i = 0; i < subdomain_name.size(); i++)
-  {
-    if (subdomain_name[i] == "ANY_BLOCK_ID")
-    {
-      ids.assign(mesh_subdomains.begin(), mesh_subdomains.end());
-      if (i)
-        mooseWarning("You passed \"ANY_BLOCK_ID\" in addition to other block names.  This may be a "
-                     "logic error.");
-      break;
-    }
-
+  for (const auto i : index_range(subdomain_name))
     ids[i] = MooseMeshUtils::getSubdomainID(subdomain_name[i], mesh);
-  }
 
   return ids;
 }
@@ -153,10 +197,13 @@ BoundaryID
 getBoundaryID(const BoundaryName & boundary_name, const MeshBase & mesh)
 {
   BoundaryID id = Moose::INVALID_BOUNDARY_ID;
-  std::istringstream ss(boundary_name);
+  if (boundary_name.empty())
+    return id;
 
-  if (!(ss >> id))
+  if (!MooseUtils::isDigits(boundary_name))
     id = mesh.get_boundary_info().get_id_by_name(boundary_name);
+  else
+    id = getIDFromName<BoundaryName, BoundaryID>(boundary_name);
 
   return id;
 }
@@ -168,12 +215,26 @@ getSubdomainID(const SubdomainName & subdomain_name, const MeshBase & mesh)
     mooseError("getSubdomainID() does not work with \"ANY_BLOCK_ID\"");
 
   SubdomainID id = Moose::INVALID_BLOCK_ID;
-  std::istringstream ss(subdomain_name);
+  if (subdomain_name.empty())
+    return id;
 
-  if (!(ss >> id) || !ss.eof())
+  if (!MooseUtils::isDigits(subdomain_name))
     id = mesh.get_id_by_name(subdomain_name);
+  else
+    id = getIDFromName<SubdomainName, SubdomainID>(subdomain_name);
 
   return id;
+}
+
+void
+changeSubdomainId(MeshBase & mesh, const subdomain_id_type old_id, const subdomain_id_type new_id)
+{
+  for (const auto & elem : mesh.element_ptr_range())
+    if (elem->subdomain_id() == old_id)
+      elem->subdomain_id() = new_id;
+
+  // global cached information may now be out of sync
+  mesh.set_isnt_prepared();
 }
 
 Point
@@ -194,68 +255,82 @@ meshCentroidCalculator(const MeshBase & mesh)
   return centroid_pt;
 }
 
-std::map<dof_id_type, dof_id_type>
+std::unordered_map<dof_id_type, dof_id_type>
 getExtraIDUniqueCombinationMap(const MeshBase & mesh,
                                const std::set<SubdomainID> & block_ids,
                                std::vector<ExtraElementIDName> extra_ids)
 {
   // check block restriction
-  const bool block_restricted = block_ids.find(Moose::ANY_BLOCK_ID) == block_ids.end();
+  const bool block_restricted = !block_ids.empty();
   // get element id name of interest in recursive parsing algorithm
   ExtraElementIDName id_name = extra_ids.back();
   extra_ids.pop_back();
   const auto id_index = mesh.get_elem_integer_index(id_name);
+
   // create base parsed id set
   if (extra_ids.empty())
   {
     // get set of extra id values;
-    std::set<dof_id_type> ids;
-    for (const auto & elem : mesh.active_element_ptr_range())
+    std::vector<dof_id_type> ids;
     {
-      if (block_restricted && block_ids.find(elem->subdomain_id()) == block_ids.end())
-        continue;
-      auto id = elem->get_extra_integer(id_index);
-      ids.insert(id);
+      std::set<dof_id_type> ids_set;
+      for (const auto & elem : mesh.active_element_ptr_range())
+      {
+        if (block_restricted && block_ids.find(elem->subdomain_id()) == block_ids.end())
+          continue;
+        const auto id = elem->get_extra_integer(id_index);
+        ids_set.insert(id);
+      }
+      mesh.comm().set_union(ids_set);
+      ids.assign(ids_set.begin(), ids_set.end());
     }
-    mesh.comm().set_union(ids);
+
     // determine new extra id values;
-    std::map<dof_id_type, dof_id_type> parsed_ids;
+    std::unordered_map<dof_id_type, dof_id_type> parsed_ids;
     for (auto & elem : mesh.active_element_ptr_range())
     {
       if (block_restricted && block_ids.find(elem->subdomain_id()) == block_ids.end())
         continue;
       parsed_ids[elem->id()] = std::distance(
-          ids.begin(), std::find(ids.begin(), ids.end(), elem->get_extra_integer(id_index)));
+          ids.begin(), std::lower_bound(ids.begin(), ids.end(), elem->get_extra_integer(id_index)));
     }
     return parsed_ids;
   }
+
   // if extra_ids is not empty, recursively call getExtraIDUniqueCombinationMap
-  std::map<dof_id_type, dof_id_type> base_parsed_ids =
+  const auto base_parsed_ids =
       MooseMeshUtils::getExtraIDUniqueCombinationMap(mesh, block_ids, extra_ids);
   // parsing extra ids based on ref_parsed_ids
-  std::set<std::pair<dof_id_type, dof_id_type>> unique_ids;
-  for (const auto & elem : mesh.active_element_ptr_range())
+  std::vector<std::pair<dof_id_type, dof_id_type>> unique_ids;
   {
-    if (block_restricted && block_ids.find(elem->subdomain_id()) == block_ids.end())
-      continue;
-    const dof_id_type id1 = base_parsed_ids[elem->id()];
-    const dof_id_type id2 = elem->get_extra_integer(id_index);
-    if (!unique_ids.count(std::pair<dof_id_type, dof_id_type>(id1, id2)))
-      unique_ids.insert(std::pair<dof_id_type, dof_id_type>(id1, id2));
+    std::set<std::pair<dof_id_type, dof_id_type>> unique_ids_set;
+    for (const auto & elem : mesh.active_element_ptr_range())
+    {
+      if (block_restricted && block_ids.find(elem->subdomain_id()) == block_ids.end())
+        continue;
+      const dof_id_type id1 = libmesh_map_find(base_parsed_ids, elem->id());
+      const dof_id_type id2 = elem->get_extra_integer(id_index);
+      const std::pair<dof_id_type, dof_id_type> ids = std::make_pair(id1, id2);
+      unique_ids_set.insert(ids);
+    }
+    mesh.comm().set_union(unique_ids_set);
+    unique_ids.assign(unique_ids_set.begin(), unique_ids_set.end());
   }
-  mesh.comm().set_union(unique_ids);
-  std::map<dof_id_type, dof_id_type> parsed_ids;
+
+  std::unordered_map<dof_id_type, dof_id_type> parsed_ids;
+
   for (const auto & elem : mesh.active_element_ptr_range())
   {
     if (block_restricted && block_ids.find(elem->subdomain_id()) == block_ids.end())
       continue;
-    const dof_id_type id1 = base_parsed_ids[elem->id()];
+    const dof_id_type id1 = libmesh_map_find(base_parsed_ids, elem->id());
     const dof_id_type id2 = elem->get_extra_integer(id_index);
-    parsed_ids[elem->id()] = std::distance(
+    const dof_id_type new_id = std::distance(
         unique_ids.begin(),
-        std::find(
-            unique_ids.begin(), unique_ids.end(), std::pair<dof_id_type, dof_id_type>(id1, id2)));
+        std::lower_bound(unique_ids.begin(), unique_ids.end(), std::make_pair(id1, id2)));
+    parsed_ids[elem->id()] = new_id;
   }
+
   return parsed_ids;
 }
 
@@ -280,7 +355,7 @@ isCoPlanar(const std::vector<Point> vec_pts)
   // Assuming that overlapped Points are allowed, the Points that are overlapped with vec_pts[0] are
   // removed before further calculation.
   std::vector<Point> vec_pts_nonzero{vec_pts[0]};
-  for (unsigned int i = 1; i < vec_pts.size(); i++)
+  for (const auto i : index_range(vec_pts))
     if (!MooseUtils::absoluteFuzzyEqual((vec_pts[i] - vec_pts[0]).norm(), 0.0))
       vec_pts_nonzero.push_back(vec_pts[i]);
   // 3 or fewer points are always coplanar
@@ -288,7 +363,7 @@ isCoPlanar(const std::vector<Point> vec_pts)
     return true;
   else
   {
-    for (unsigned int i = 1; i < vec_pts_nonzero.size() - 1; i++)
+    for (const auto i : make_range(vec_pts_nonzero.size() - 1))
     {
       const Point tmp_pt = (vec_pts_nonzero[i] - vec_pts_nonzero[0])
                                .cross(vec_pts_nonzero[i + 1] - vec_pts_nonzero[0]);
@@ -331,7 +406,7 @@ getNextFreeBoundaryID(MeshBase & input_mesh)
 }
 
 bool
-hasSubdomainID(MeshBase & input_mesh, const SubdomainID & id)
+hasSubdomainID(const MeshBase & input_mesh, const SubdomainID & id)
 {
   std::set<SubdomainID> mesh_blocks;
   input_mesh.subdomain_ids(mesh_blocks);
@@ -345,17 +420,17 @@ hasSubdomainID(MeshBase & input_mesh, const SubdomainID & id)
 }
 
 bool
-hasSubdomainName(MeshBase & input_mesh, const SubdomainName & name)
+hasSubdomainName(const MeshBase & input_mesh, const SubdomainName & name)
 {
   const auto id = getSubdomainID(name, input_mesh);
   return hasSubdomainID(input_mesh, id);
 }
 
 bool
-hasBoundaryID(MeshBase & input_mesh, const BoundaryID & id)
+hasBoundaryID(const MeshBase & input_mesh, const BoundaryID id)
 {
-  const libMesh::BoundaryInfo & boundary_info = input_mesh.get_boundary_info();
-  std::set<libMesh::boundary_id_type> boundary_ids = boundary_info.get_boundary_ids();
+  const BoundaryInfo & boundary_info = input_mesh.get_boundary_info();
+  std::set<boundary_id_type> boundary_ids = boundary_info.get_boundary_ids();
 
   // On a distributed mesh we may have boundary IDs that only exist on
   // other processors
@@ -366,9 +441,174 @@ hasBoundaryID(MeshBase & input_mesh, const BoundaryID & id)
 }
 
 bool
-hasBoundaryName(MeshBase & input_mesh, const BoundaryName & name)
+hasBoundaryName(const MeshBase & input_mesh, const BoundaryName & name)
 {
   const auto id = getBoundaryID(name, input_mesh);
   return hasBoundaryID(input_mesh, id);
+}
+
+void
+makeOrderedNodeList(std::vector<std::pair<dof_id_type, dof_id_type>> & node_assm,
+                    std::vector<dof_id_type> & elem_id_list,
+                    std::vector<dof_id_type> & midpoint_node_list,
+                    std::vector<dof_id_type> & ordered_node_list,
+                    std::vector<dof_id_type> & ordered_elem_id_list)
+{
+  // a flag to indicate if the ordered_node_list has been reversed
+  bool is_flipped = false;
+  // Start from the first element, try to find a chain of nodes
+  mooseAssert(node_assm.size(), "Node list must not be empty");
+  ordered_node_list.push_back(node_assm.front().first);
+  if (midpoint_node_list.front() != DofObject::invalid_id)
+    ordered_node_list.push_back(midpoint_node_list.front());
+  ordered_node_list.push_back(node_assm.front().second);
+  ordered_elem_id_list.push_back(elem_id_list.front());
+  // Remove the element that has just been added to ordered_node_list
+  node_assm.erase(node_assm.begin());
+  midpoint_node_list.erase(midpoint_node_list.begin());
+  elem_id_list.erase(elem_id_list.begin());
+  const unsigned int node_assm_size_0 = node_assm.size();
+  for (unsigned int i = 0; i < node_assm_size_0; i++)
+  {
+    // Find nodes to expand the chain
+    dof_id_type end_node_id = ordered_node_list.back();
+    auto isMatch1 = [end_node_id](std::pair<dof_id_type, dof_id_type> old_id_pair)
+    { return old_id_pair.first == end_node_id; };
+    auto isMatch2 = [end_node_id](std::pair<dof_id_type, dof_id_type> old_id_pair)
+    { return old_id_pair.second == end_node_id; };
+    auto result = std::find_if(node_assm.begin(), node_assm.end(), isMatch1);
+    bool match_first;
+    if (result == node_assm.end())
+    {
+      match_first = false;
+      result = std::find_if(node_assm.begin(), node_assm.end(), isMatch2);
+    }
+    else
+    {
+      match_first = true;
+    }
+    // If found, add the node to boundary_ordered_node_list
+    if (result != node_assm.end())
+    {
+      const auto elem_index = std::distance(node_assm.begin(), result);
+      if (midpoint_node_list[elem_index] != DofObject::invalid_id)
+        ordered_node_list.push_back(midpoint_node_list[elem_index]);
+      ordered_node_list.push_back(match_first ? (*result).second : (*result).first);
+      node_assm.erase(result);
+      midpoint_node_list.erase(midpoint_node_list.begin() + elem_index);
+      ordered_elem_id_list.push_back(elem_id_list[elem_index]);
+      elem_id_list.erase(elem_id_list.begin() + elem_index);
+    }
+    // If there are still elements in node_assm and result ==
+    // node_assm.end(), this means the curve is not a loop, the
+    // ordered_node_list is flipped and try the other direction that has not
+    // been examined yet.
+    else
+    {
+      if (is_flipped)
+        // Flipped twice; this means the node list has at least two segments.
+        throw MooseException("The node list provided has more than one segments.");
+
+      // mark the first flip event.
+      is_flipped = true;
+      std::reverse(ordered_node_list.begin(), ordered_node_list.end());
+      std::reverse(midpoint_node_list.begin(), midpoint_node_list.end());
+      std::reverse(ordered_elem_id_list.begin(), ordered_elem_id_list.end());
+      // As this iteration is wasted, set the iterator backward
+      i--;
+    }
+  }
+}
+
+void
+makeOrderedNodeList(std::vector<std::pair<dof_id_type, dof_id_type>> & node_assm,
+                    std::vector<dof_id_type> & elem_id_list,
+                    std::vector<dof_id_type> & ordered_node_list,
+                    std::vector<dof_id_type> & ordered_elem_id_list)
+{
+  std::vector<dof_id_type> dummy_midpoint_node_list(node_assm.size(), DofObject::invalid_id);
+  makeOrderedNodeList(
+      node_assm, elem_id_list, dummy_midpoint_node_list, ordered_node_list, ordered_elem_id_list);
+}
+
+void
+swapNodesInElem(Elem & elem, const unsigned int nd1, const unsigned int nd2)
+{
+  Node * n_temp = elem.node_ptr(nd1);
+  elem.set_node(nd1) = elem.node_ptr(nd2);
+  elem.set_node(nd2) = n_temp;
+}
+
+void
+extraElemIntegerSwapParametersProcessor(
+    const std::string & class_name,
+    const unsigned int num_sections,
+    const unsigned int num_integers,
+    const std::vector<std::vector<std::vector<dof_id_type>>> & elem_integers_swaps,
+    std::vector<std::unordered_map<dof_id_type, dof_id_type>> & elem_integers_swap_pairs)
+{
+  elem_integers_swap_pairs.reserve(num_sections * num_integers);
+  for (const auto i : make_range(num_integers))
+  {
+    const auto & elem_integer_swaps = elem_integers_swaps[i];
+    std::vector<std::unordered_map<dof_id_type, dof_id_type>> elem_integer_swap_pairs;
+    try
+    {
+      MooseMeshUtils::idSwapParametersProcessor(class_name,
+                                                "elem_integers_swaps",
+                                                elem_integer_swaps,
+                                                elem_integer_swap_pairs,
+                                                i * num_sections);
+    }
+    catch (const MooseException & e)
+    {
+      throw MooseException(e.what());
+    }
+
+    elem_integers_swap_pairs.insert(elem_integers_swap_pairs.end(),
+                                    elem_integer_swap_pairs.begin(),
+                                    elem_integer_swap_pairs.end());
+  }
+}
+
+std::unique_ptr<ReplicatedMesh>
+buildBoundaryMesh(const ReplicatedMesh & input_mesh, const boundary_id_type boundary_id)
+{
+  auto poly_mesh = std::make_unique<ReplicatedMesh>(input_mesh.comm());
+
+  auto side_list = input_mesh.get_boundary_info().build_side_list();
+
+  std::unordered_map<dof_id_type, dof_id_type> old_new_node_map;
+  for (const auto & bside : side_list)
+  {
+    if (std::get<2>(bside) != boundary_id)
+      continue;
+
+    const Elem * elem = input_mesh.elem_ptr(std::get<0>(bside));
+    const auto side = std::get<1>(bside);
+    auto side_elem = elem->build_side_ptr(side);
+    auto copy = side_elem->build(side_elem->type());
+
+    for (const auto i : side_elem->node_index_range())
+    {
+      auto & n = side_elem->node_ref(i);
+
+      if (old_new_node_map.count(n.id()))
+        copy->set_node(i) = poly_mesh->node_ptr(old_new_node_map[n.id()]);
+      else
+      {
+        Node * node = poly_mesh->add_point(side_elem->point(i));
+        copy->set_node(i) = node;
+        old_new_node_map[n.id()] = node->id();
+      }
+    }
+    poly_mesh->add_elem(copy.release());
+  }
+  poly_mesh->skip_partitioning(true);
+  poly_mesh->prepare_for_use();
+  if (poly_mesh->n_elem() == 0)
+    mooseError("The input mesh does not have a boundary with id ", boundary_id);
+
+  return poly_mesh;
 }
 }

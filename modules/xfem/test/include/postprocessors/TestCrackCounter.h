@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,13 +22,13 @@ public:
   TestCrackCounter(const InputParameters & parameters);
 
   /// Initialize the number of Cracks.
-  virtual void initialize();
+  virtual void initialize() override;
 
   /// Calculates the number of Cracks
-  virtual void execute();
+  virtual void execute() override;
 
   /// Get number of Cracks
-  virtual Real getValue();
+  virtual Real getValue() const override;
 
 protected:
   /// Variable used to write out the number of Cracks

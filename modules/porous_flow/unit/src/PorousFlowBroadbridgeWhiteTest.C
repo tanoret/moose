@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -100,4 +100,22 @@ TEST_F(PorousFlowBroadbridgeWhiteTest, d2relperm)
   EXPECT_NEAR(0.0,
               PorousFlowBroadbridgeWhite::d2RelativePermeability(0.99, _c, _sn, _ss, _kn, _ks),
               1.0E-5);
+}
+
+TEST_F(PorousFlowBroadbridgeWhiteTest, adrelperm)
+{
+  ADReal sat = 0.3;
+  sat.derivatives() = {};
+  Moose::derivInsert(sat.derivatives(), 0, 1.0);
+
+  const auto adrelperm =
+      PorousFlowBroadbridgeWhite::relativePermeability(sat, _c, _sn, _ss, _kn, _ks);
+
+  const auto relperm =
+      PorousFlowBroadbridgeWhite::relativePermeability(sat.value(), _c, _sn, _ss, _kn, _ks);
+  const auto drelperm =
+      PorousFlowBroadbridgeWhite::dRelativePermeability(sat.value(), _c, _sn, _ss, _kn, _ks);
+
+  EXPECT_NEAR(adrelperm.value(), relperm, 1.0E-5);
+  EXPECT_NEAR(adrelperm.derivatives()[0], drelperm, 1.0E-5);
 }

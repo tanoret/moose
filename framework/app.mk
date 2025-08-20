@@ -40,6 +40,11 @@ ifneq ($(SUFFIX),)
   app_LIB_SUFFIX := $(app_LIB_SUFFIX)_$(SUFFIX)
 endif
 
+ifeq ($(MOOSE_SKIP_DOCS),)
+  DOCUMENTATION := yes
+else
+  DOCUMENTATION := no
+endif
 ##############################################################################
 ######################### Application Variables ##############################
 ##############################################################################
@@ -74,24 +79,34 @@ $(eval $(call unity_dir_rule, $(unity_src_dir)))
 # The idea here is that if all they have is src then it's a big jumble of stuff
 # that won't benefit from unity building
 # Also, exclude the base directory by default because it's another big jumble
-# of unrelated stuff
-non_unity_dirs := %.libs %/src %src/base $(app_non_unity_dirs)
+# of unrelated stuff.
+non_unity_dirs := %.libs %/src $(app_non_unity_dirs)
 
-# Find all of the individual subdirectories
+# Find all of the subdirectories in our src folder(s) up to $(app_unity_depth)
+app_unity_depth ?= 1
+ifeq ($(shell expr $(app_unity_depth) \< 1), 1)
+	$(error "app_unity_depth cannot be less than 1, got $(app_unity_depth)")
+endif
 # We will create a Unity file for each individual subdirectory
 # The idea is that files grouped withing a subdirectory are closely related
 # and will benefit from a Unity build
-srcsubdirs := $(shell find $(APPLICATION_DIR)/src -type d -not -path '*/.libs*')
+srcsubdirs := $(shell find $(APPLICATION_DIR)/src -maxdepth $(app_unity_depth) -type d -not -path '*/.libs*')
+srcsubdirs_nonmaxdepth := $(shell find $(APPLICATION_DIR)/src -maxdepth $(shell expr $(app_unity_depth) - 1) -type d -not -path '*/.libs*')
+srcsubdirs_maxdepth := $(filter-out $(srcsubdirs_nonmaxdepth), $(srcsubdirs))
+allsrcsubdirs := $(shell find $(APPLICATION_DIR)/src -type d -not -path '*/.libs*')
 
 # Filter out the paths we don't want to Unity build
 unity_srcsubdirs := $(filter-out $(non_unity_dirs), $(srcsubdirs))
-non_unity_srcsubdirs := $(filter $(non_unity_dirs), $(srcsubdirs))
+unity_srcsubdirs_nonmaxdepth := $(filter-out $(non_unity_dirs), $(srcsubdirs_nonmaxdepth))
+unity_srcsubdirs_maxdepth := $(filter-out $(non_unity_dirs), $(srcsubdirs_maxdepth))
+non_unity_srcsubdirs := $(filter $(non_unity_dirs), $(allsrcsubdirs))
 
 # This is a biggie
 # Loop over the subdirectories, creating a rule to create the Unity source file
 # for each subdirectory.  To do that we need to create a unique name using the
 # full hierarchy of the path underneath src
-$(foreach srcsubdir,$(unity_srcsubdirs),$(eval $(call unity_file_rule,$(call unity_unique_name,$(unity_src_dir),$(APPLICATION_DIR),$(srcsubdir)),$(shell find $(srcsubdir) -maxdepth 1 \( -type f -o -type l \) -regex "[^\#~]*\.C"),$(srcsubdir),$(unity_src_dir))))
+$(foreach srcsubdir,$(unity_srcsubdirs_nonmaxdepth),$(eval $(call unity_file_rule,$(call unity_unique_name,$(unity_src_dir),$(APPLICATION_DIR),$(srcsubdir)),$(shell find $(srcsubdir) -maxdepth 1 \( -type f -o -type l \) -regex "[^\#~]*\.C"),$(srcsubdir),$(unity_src_dir))))
+$(foreach srcsubdir,$(unity_srcsubdirs_maxdepth),$(eval $(call unity_file_rule,$(call unity_unique_name,$(unity_src_dir),$(APPLICATION_DIR),$(srcsubdir)),$(shell find $(srcsubdir) \( -type f -o -type l \) -regex "[^\#~]*\.C"),$(srcsubdir),$(unity_src_dir))))
 
 # This creates the whole list of Unity source files so we can use it as a dependency
 app_unity_srcfiles := $(foreach srcsubdir,$(unity_srcsubdirs),$(call unity_unique_name,$(unity_src_dir),$(APPLICATION_DIR),$(srcsubdir)))
@@ -139,20 +154,6 @@ test_fobjects:= $(patsubst %.f, %.$(obj-suffix), $(test_fsrcfiles))
 test_f90objects:= $(patsubst %.f90, %.$(obj-suffix), $(test_f90srcfiles))
 app_test_objects := $(test_objects) $(test_cobjects) $(test_fobjects) $(test_f90objects)
 
-ifeq ($(MOOSE_HEADER_SYMLINKS),true)
-
-$(app_objects): $(moose_config_symlink)
-$(app_test_objects): $(moose_config_symlink)
-$(excluded_objects): $(moose_config_symlink)
-
-else
-
-$(app_objects): $(moose_config)
-$(app_test_objects): $(moose_config)
-$(excluded_objects): $(moose_config_symlink)
-
-endif
-
 # plugin files
 plugfiles   := $(shell find $(PLUGIN_DIR) -regex "[^\#~]*\.C" 2>/dev/null)
 cplugfiles  := $(shell find $(PLUGIN_DIR) -name "*.c" 2>/dev/null)
@@ -169,6 +170,9 @@ plugins	    += $(patsubst %.f90, %-$(METHOD).plugin, $(f90plugfiles))
 MAIN_DIR    ?= $(APPLICATION_DIR)/src
 main_src    := $(MAIN_DIR)/main.C
 main_object := $(patsubst %.C, %.$(obj-suffix), $(main_src))
+
+# all objects that make up an application
+all_app_objects := $(app_objects) $(app_test_objects) $(plugins) $(main_object) $(excluded_objects)
 
 # dependency files
 app_deps     := $(patsubst %.$(obj-suffix), %.$(obj-suffix).d, $(objects)) \
@@ -209,12 +213,11 @@ include_files	:= $(shell find $(depend_dirs) -regex "[^\#~]*\.[hf]")
 all_header_dir := $(APPLICATION_DIR)/build/header_symlinks
 
 # header file links
-link_names := $(foreach i, $(include_files), $(all_header_dir)/$(notdir $(i)))
+app_LINK := $(foreach i, $(include_files), $(all_header_dir)/$(notdir $(i)))
 
 $(eval $(call all_header_dir_rule, $(all_header_dir)))
 $(call symlink_rules, $(all_header_dir), $(include_files))
 
-header_symlinks: $(all_header_dir) $(link_names)
 app_INCLUDE = -I$(all_header_dir)
 
 else # No Header Symlinks
@@ -231,7 +234,7 @@ app_EXEC    := $(APPLICATION_DIR)/$(APPLICATION_NAME)-$(METHOD)
 ifeq ($(GEN_REVISION),yes)
   CAMEL_CASE_NAME := $(shell echo $(APPLICATION_NAME) | perl -pe 's/(?:^|_)([a-z])/\u$$1/g')
   app_BASE_DIR    ?= base/
-  app_HEADER      ?= $(APPLICATION_DIR)/include/$(app_BASE_DIR)$(CAMEL_CASE_NAME)Revision.h
+  app_HEADER      := $(APPLICATION_DIR)/include/$(app_BASE_DIR)$(CAMEL_CASE_NAME)Revision.h
 endif
 
 # depend modules
@@ -262,11 +265,14 @@ else
   app_plugin_deps :=
 endif
 
-app_LIBS       := $(app_LIB) $(app_LIBS)
-app_LIBS_other := $(filter-out $(app_LIB),$(app_LIBS))
+app_LIBS       += $(app_LIB)
 app_HEADERS    := $(app_HEADER) $(app_HEADERS)
 app_INCLUDES   += $(app_INCLUDE) $(ADDITIONAL_INCLUDES)
 app_DIRS       += $(APPLICATION_DIR)
+# app_LINKS cumulatively lists all the header symlinks.
+# This is such that when used as a dependency for the module loader rule, it
+# establishes a dependence on the header symlinks of each individual module.
+app_LINKS      := $(app_LINK) $(app_LINKS)
 
 # WARNING: the += operator does NOT work here!
 ADDITIONAL_CPPFLAGS := $(ADDITIONAL_CPPFLAGS) -D$(shell echo $(APPLICATION_NAME) | perl -pe 'y/a-z/A-Z/' | perl -pe 's/-//g')_ENABLED
@@ -285,6 +291,20 @@ LIBRARY_SUFFIX :=
 # Build Rules:
 #
 ###############################################################################
+
+ifeq ($(MOOSE_HEADER_SYMLINKS),true)
+
+# If we are compiling with header symlinks, we don't want to start compiling any
+# object files until all symlinking is completed. The first dependency in the
+# list below ensures this.
+
+$(all_app_objects) : | $(app_LINKS) $(moose_config_symlink)
+
+else
+
+$(all_app_objects) : $(moose_config)
+
+endif
 
 # Instantiate a new suffix rule for the module loader
 $(eval $(call CXX_RULE_TEMPLATE,_with$(app_LIB_SUFFIX)))
@@ -327,23 +347,35 @@ ifeq (x$(app_HEADER_deps),x)
 endif
 
 # Target-specific Variable Values (See GNU-make manual)
-$(app_HEADER): curr_dir    := $(APPLICATION_DIR)
-$(app_HEADER): curr_app    := $(APPLICATION_NAME)
-$(app_HEADER): all_header_dir := $(all_header_dir)
-$(app_HEADER): $(app_HEADER_deps)
+$(app_HEADER): curr_dir              := $(APPLICATION_DIR)
+$(app_HEADER): curr_app              := $(APPLICATION_NAME)
+$(app_HEADER): curr_installable_dirs := $(INSTALLABLE_DIRS)
+$(app_HEADER): all_header_dir        := $(all_header_dir)
+$(app_HEADER): $(app_HEADER_deps) | $(all_header_dir)
 	@echo "Checking if header needs updating: "$@"..."
-	$(shell $(FRAMEWORK_DIR)/scripts/get_repo_revision.py $(curr_dir) $@ $(curr_app))
+	$(shell REPO_LOCATION="$(curr_dir)" \
+	        HEADER_FILE="$@" \
+					APPLICATION_NAME="$(curr_app)" \
+					INSTALLABLE_DIRS="$(curr_installable_dirs)" \
+	        $(FRAMEWORK_DIR)/scripts/get_repo_revision.py)
 	@ln -sf $@ $(all_header_dir)
+
+#
+# .APPNAME resource file
+#
+app_resource = $(APPLICATION_DIR)/$(APPLICATION_NAME).yaml
 
 # Target-specific Variable Values (See GNU-make manual)
 $(app_LIB): curr_objs := $(app_objects)
 $(app_LIB): curr_dir  := $(APPLICATION_DIR)
 $(app_LIB): curr_deps := $(depend_libs)
 $(app_LIB): curr_libs := $(depend_libs_flags)
+$(app_LIB): curr_additional_depend_libs := $(ADDITIONAL_DEPEND_LIBS)
+$(app_LIB): curr_additional_libs := $(ADDITIONAL_LIBS)
 $(app_LIB): $(app_HEADER) $(app_plugin_deps) $(depend_libs) $(app_objects) $(ADDITIONAL_DEPEND_LIBS)
 	@echo "Linking Library "$@"..."
 	@$(libmesh_LIBTOOL) --tag=CXX $(LIBTOOLFLAGS) --mode=link --quiet \
-	  $(libmesh_CXX) $(CXXFLAGS) $(libmesh_CXXFLAGS) -o $@ $(curr_objs) $(libmesh_LDFLAGS) $(EXTERNAL_FLAGS) -rpath $(curr_dir)/lib $(curr_libs)
+	  $(libmesh_CXX) $(CXXFLAGS) $(libmesh_CXXFLAGS) -o $@ $(curr_objs) $(libmesh_LDFLAGS) $(EXTERNAL_FLAGS) $(curr_additional_libs) -rpath $(curr_dir)/lib $(curr_libs)
 	@$(libmesh_LIBTOOL) --mode=install --quiet install -c $@ $(curr_dir)/lib
 
 ifeq ($(BUILD_TEST_OBJECTS_LIB),no)
@@ -357,10 +389,12 @@ $(app_test_LIB): curr_objs := $(app_test_objects)
 $(app_test_LIB): curr_dir  := $(APPLICATION_DIR)/test
 $(app_test_LIB): curr_deps := $(depend_libs)
 $(app_test_LIB): curr_libs := $(depend_libs_flags)
+$(app_test_LIB): curr_additional_depend_libs := $(ADDITIONAL_DEPEND_LIBS)
+$(app_test_LIB): curr_additional_libs := $(ADDITIONAL_LIBS)
 $(app_test_LIB): $(app_HEADER) $(app_plugin_deps) $(depend_libs) $(app_test_objects) $(ADDITIONAL_DEPEND_LIBS)
-	@echo "Linking Library "$@"..."
+	@echo "Linking Test Library "$@"..."
 	@$(libmesh_LIBTOOL) --tag=CXX $(LIBTOOLFLAGS) --mode=link --quiet \
-	  $(libmesh_CXX) $(CXXFLAGS) $(libmesh_CXXFLAGS) -o $@ $(curr_objs) $(libmesh_LDFLAGS) $(EXTERNAL_FLAGS) -rpath $(curr_dir)/lib $(curr_libs)
+	  $(libmesh_CXX) $(CXXFLAGS) $(libmesh_CXXFLAGS) -o $@ $(curr_objs) $(libmesh_LDFLAGS) $(EXTERNAL_FLAGS) $(curr_additional_libs) -rpath $(curr_dir)/lib $(curr_libs)
 	@$(libmesh_LIBTOOL) --mode=install --quiet install -c $@ $(curr_dir)/lib
 endif
 
@@ -375,25 +409,25 @@ endif
 # for more explanations/details.
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 compilertype := unknown
-applibs :=  $(app_test_LIB) $(app_LIBS) $(depend_test_libs)
-applibs := $(call uniq,$(applibs))
-ifeq ($(libmesh_static),yes)
-  ifneq (,$(findstring clang,$(CXX)))
+ifneq (,$(findstring clang,$(CXX)))
+  compilertype := clang
+else
+ifneq (,$(findstring g++,$(CXX)))
+  compilertype := gcc
+else
+ifneq (,$(findstring mpicxx,$(CXX)))
+  ifneq (,$(findstring clang,$(shell mpicxx -show)))
     compilertype := clang
   else
-  ifneq (,$(findstring g++,$(CXX)))
     compilertype := gcc
-  else
-  ifneq (,$(findstring mpicxx,$(CXX)))
-    ifneq (,$(findstring clang,$(shell mpicxx -show)))
-      compilertype := clang
-    else
-      compilertype := gcc
-    endif
   endif
-  endif
-  endif
+endif
+endif
+endif
+applibs :=  $(app_test_LIB) $(app_LIBS) $(depend_test_libs) $(ADDITIONAL_DEPEND_LIBS)
+applibs := $(call uniq,$(applibs))
 
+ifeq ($(libmesh_static),yes)
   ifeq ($(compilertype),clang)
     # replace .a with .dylib for testing in dynamic configuration:
     applibs := $(foreach lib,$(patsubst %.la,%.a,$(applibs)),-Wl,-force_load,$(lib))
@@ -401,6 +435,22 @@ ifeq ($(libmesh_static),yes)
     applibs := $(foreach lib,$(patsubst %.la,%.a,$(applibs)),-Wl,--whole-archive,$(lib),--no-whole-archive)
   endif
 endif
+
+# Write resource file
+$(app_resource): | prebuild
+	@echo "Creating Resource file $@"
+	@$(shell $(FRAMEWORK_DIR)/scripts/write_appresource_file.py $(app_resource) $(APPLICATION_NAME) \
+     $(libmesh_CXXFLAGS) \
+     compiler_type=$(compilertype) \
+     documentation=$(DOCUMENTATION) \
+     installation_type=in_tree)
+
+# Update and Copy resource file to prefix/bin
+install_$(APPLICATION_NAME)_resource:
+	@echo "Installing $(APPLICATION_NAME).yaml Resource file"
+	@$(shell $(FRAMEWORK_DIR)/scripts/write_appresource_file.py $(app_resource) $(APPLICATION_NAME) installation_type=relocated)
+	@mkdir -p $(bin_install_dir)
+	@cp $(app_resource) $(bin_install_dir)
 
 # Codesign command (OS X Only)
 codesign :=
@@ -411,7 +461,7 @@ ifneq (,$(findstring darwin,$(libmesh_HOST)))
   endif
 endif
 
-$(app_EXEC): $(app_LIBS) $(mesh_library) $(main_object) $(app_test_LIB) $(depend_test_libs) $(ADDITIONAL_DEPEND_LIBS)
+$(app_EXEC): $(app_LIBS) $(mesh_library) $(main_object) $(app_test_LIB) $(depend_test_libs) $(app_resource)
 	@echo "Linking Executable "$@"..."
 	@$(libmesh_LIBTOOL) --tag=CXX $(LIBTOOLFLAGS) --mode=link --quiet \
 	  $(libmesh_CXX) $(CXXFLAGS) $(libmesh_CXXFLAGS) -o $@ $(main_object) $(depend_test_libs_flags) $(applibs) $(ADDITIONAL_LIBS) $(libmesh_LDFLAGS) $(libmesh_LIBS) $(EXTERNAL_FLAGS)
@@ -419,17 +469,23 @@ $(app_EXEC): $(app_LIBS) $(mesh_library) $(main_object) $(app_test_LIB) $(depend
 
 ###### install stuff #############
 docs_dir := $(APPLICATION_DIR)/doc
-bindst = $(bin_install_dir)/$(notdir $(app_EXEC))
+installed_app_binary = $(bin_install_dir)/$(notdir $(app_EXEC))
 binlink = $(share_install_dir)/$(notdir $(app_EXEC))
 # Strip the trailing slashes (if provided) and transform into a suitable Makefile targets
 copy_input_targets := $(foreach dir,$(INSTALLABLE_DIRS),target_$(APPLICATION_NAME)_$(patsubst %/,%,$(dir)))
 
-lib_install_targets = $(foreach lib,$(applibs),$(dir $(lib))install_lib_$(notdir $(lib)))
-ifneq ($(app_test_LIB),)
-	lib_install_targets += $(dir $(app_test_LIB))install_lib_$(notdir $(app_test_LIB))
+ifeq ($(want_exec),yes)
+  install_bin: $(installed_app_binary)
+# Install targets for library archives, which will also install the associated .so/.dylib library
+  lib_archive_install_targets = $(foreach lib,$(filter %.la, $(applibs)),$(dir $(lib))install_lib_from_archive_$(notdir $(lib)))
+# Install targets for libraries that do not have archives (.so/.dylib)
+	lib_install_targets = $(foreach lib,$(filter %.$(lib_suffix), $(applibs)),$(dir $(lib))install_lib_$(notdir $(lib)))
+else
+  install_bin:
 endif
 
-install_libs:: $(lib_install_targets)
+# Top level install target for all libraries (.so/.dylib, .la)
+install_all_libs: $(lib_archive_install_targets) $(lib_install_targets)
 
 ifneq ($(wildcard $(APPLICATION_DIR)/data/.),)
 install_data_$(APPLICATION_NAME)_src := $(APPLICATION_DIR)/data
@@ -438,7 +494,18 @@ install_data:: install_data_$(APPLICATION_NAME)
 endif
 
 install_data_%:
-	@echo "Installing "$($@_src)"..."
+	@echo "Installing data "$($@_dst)"..."
+	@mkdir -p $($@_dst)
+	@cp -r $($@_src) $($@_dst)
+
+ifneq ($(wildcard $(APPLICATION_DIR)/scripts/TestHarness/testers),)
+install_tester_$(APPLICATION_NAME)_src := $(APPLICATION_DIR)/scripts/TestHarness/testers
+install_tester_$(APPLICATION_NAME)_dst := $(share_install_dir)/scripts/TestHarness
+install_testers:: install_tester_$(APPLICATION_NAME)
+endif
+
+install_tester_%:
+	@echo "Installing TestHarness testers "$($@_dst)"..."
 	@mkdir -p $($@_dst)
 	@cp -r $($@_src) $($@_dst)
 
@@ -446,44 +513,58 @@ $(copy_input_targets):
 	@$(eval kv := $(subst ->, ,$(subst target_$(APPLICATION_NAME)_,,$@)))
 	@$(eval source_dir := $(word 1, $(kv)))
 	@$(eval dest_dir := $(if $(word 2, $(kv)),$(word 2, $(kv)),$(source_dir)))
-	@echo "Installing inputs from directory \"$(source_dir)\" into $(dest_dir)"
-	@rm -rf $(share_install_dir)/$(dest_dir)
-	@mkdir -p $(share_install_dir)/$(dest_dir)
+	@$(eval dest_dir_full := $(share_install_dir)/$(dest_dir))
 	@$(eval abs_source_dir := $(realpath $(APPLICATION_DIR)/$(source_dir)))
-	@if [ "$(abs_source_dir)" != "" ]; \
-	then \
-		cp -R $(abs_source_dir)/ $(share_install_dir)/$(dest_dir); \
-	else \
-		(echo "ERROR: Source directory $(APPLICATION_DIR)/$(source_dir) does not exist!"; exit 1) \
-	fi;
-	@if [ -e $(APPLICATION_DIR)/testroot ]; \
-	then \
-		cp -f $(APPLICATION_DIR)/testroot $(share_install_dir)/$(dest_dir)/; \
-	elif [ -e $(source_dir)/testroot ]; \
-	then \
-		cp -f $(source_dir)/testroot $(share_install_dir)/$(dest_dir)/; \
-	else \
-		echo "app_name = $(APPLICATION_NAME)" > $(share_install_dir)/$(dest_dir)/testroot; \
-	fi; \
+	@echo "Installing tests $(dest_dir_full)"
+	@APPLICATION_DIR="$(APPLICATION_DIR)" \
+	 APPLICATION_NAME="$(APPLICATION_NAME)" \
+	 SOURCE_DIR="$(abs_source_dir)" \
+	 DEST_DIR="$(dest_dir_full)" \
+	 $(FRAMEWORK_DIR)/scripts/install_copy_inputs.sh
 
-
-install_lib_%: % all
-	@echo "Installing $<"
+# Install target for a single .la library archive and the associated .so/.dylib library
+install_lib_from_archive_%: %
 	@mkdir -p $(lib_install_dir)
-	@$(eval libname := $(shell grep "dlname='.*'" $< | sed -E "s/dlname='(.*)'/\1/g"))
-	@$(eval libdst := $(lib_install_dir)/$(libname))
-	@cp $(dir $<)$(libname) $(libdst)
-	@$(call patch_rpath,$(libdst),../$(lib_install_suffix/.))
-	@$(call patch_relink,$(libdst),$(libpath_pcre),$(libname_pcre))
-	@$(call patch_relink,$(libdst),$(libpath_framework),$(libname_framework))
-	@$(eval libnames := $(foreach lib,$(applibs),$(shell grep "dlname='.*'" $(lib) 2>/dev/null | sed -E "s/dlname='(.*)'/\1/g")))
-	@$(eval libpaths := $(foreach lib,$(applibs),$(dir $(lib))$(shell grep "dlname='.*'" $(lib) 2>/dev/null | sed -E "s/dlname='(.*)'/\1/g")))
-	@for lib in $(libpaths); do $(call patch_relink,$(libdst),$$lib,$$(basename $$lib)); done
+	@$(eval lib_archive_installed = $(lib_install_dir)/$(notdir $<))
+	@$(eval lib_file = $(call lib_from_archive,$<))
+	@$(eval lib_installed := $(lib_install_dir)/$(lib_file))
+	@$(eval lib_build := $(dir $<)/$(lib_file))
 
-$(binlink): all $(copy_input_targets)
+# Install the .so/.dylib library
+	@echo "Installing library $(lib_installed)"
+	@cp $(lib_build) $(lib_installed)
+# Patch to add additional installed rpaths to the application libs
+# for dependencies-of-dependencies installed in a different folder
+	@if [ "$(notdir $<)" = "$(notdir $(app_LIB))" ] || [ "$(notdir $<)" = "$(notdir $(app_test_LIB))" ]; then \
+	for lib_dir in $(ADDITIONAL_APP_INSTALL_RPATHS); do $(call patch_rpath,$(lib_installed),$(abspath $(lib_install_dir)/../$$lib_dir)); done \
+	fi
+# Patch to add libraries in the installed folder
+	@$(call patch_rpath,$(lib_installed),$(lib_install_dir))
+
+# Install the .la library, which on mac requires the library above to be installed first
+	@echo "Installing library archive $(lib_archive_installed)"
+	@cp $< $(lib_archive_installed)
+	@$(call patch_la,$(lib_archive_installed),$(lib_install_dir))
+	@$(call patch_relink,$(lib_installed),$(libpath_pcre),$(libname_pcre))
+	@$(call patch_relink,$(lib_installed),$(libpath_framework),$(libname_framework))
+# These lines are critical in that they are a catch-all for nested applications. (e.g. These will properly remap MOOSE and the modules
+# in an application library to the installed locations) - DO NOT REMOVE! Yes, this can probably be done better
+	@$(eval libnames := $(foreach lib,$(filter %.la, $(applibs)),$(call lib_from_archive,$(lib))))
+	@$(eval libpaths := $(foreach lib,$(filter %.la, $(applibs)),$(dir $(lib))$(call lib_from_archive,$(lib))))
+	@for lib in $(libpaths); do $(call patch_relink,$(lib_installed),$$lib,$$(basename $$lib)); done
+
+# Install target for a single .so/.dylib library that is not associated with a .la library archive
+install_lib_%: %
+	@mkdir -p $(lib_install_dir)
+	@$(eval lib_installed = $(lib_install_dir)/$(notdir $<))
+	@echo "Installing library $(lib_installed)"
+	@cp $< $(lib_installed)
+	@$(call patch_rpath,$(lib_installed),$(lib_install_dir))
+
+$(binlink): $(copy_input_targets)
 	ln -sf ../../bin/$(notdir $(app_EXEC)) $@
 
-install_$(APPLICATION_NAME)_docs: install_python all
+install_$(APPLICATION_NAME)_docs: install_python $(app_EXEC)
 ifeq ($(MOOSE_SKIP_DOCS),)
 	@echo "Installing docs"
 	@mkdir -p $(docs_install_dir)
@@ -492,17 +573,17 @@ else
 	@echo "Skipping docs installation."
 endif
 
-$(bindst): $(app_EXEC) all $(copy_input_targets) install_$(APPLICATION_NAME)_docs $(binlink)
-	@echo "Installing $<"
+$(installed_app_binary): $(app_EXEC) $(copy_input_targets) install_$(APPLICATION_NAME)_docs install_$(APPLICATION_NAME)_resource $(binlink)
+	@echo "Installing binary $@"
 	@mkdir -p $(bin_install_dir)
 	@cp $< $@
-	@$(call patch_rpath,$@,../$(lib_install_suffix)/.)
-	@$(eval libnames := $(foreach lib,$(applibs),$(shell grep "dlname='.*'" $(lib) 2>/dev/null | sed -E "s/dlname='(.*)'/\1/g")))
-	@$(eval libpaths := $(foreach lib,$(applibs),$(dir $(lib))$(shell grep "dlname='.*'" $(lib) 2>/dev/null | sed -E "s/dlname='(.*)'/\1/g")))
+	@$(call patch_rpath,$@,$(lib_install_dir))
+	@$(eval libnames := $(foreach lib,$(applibs),$(call lib_from_archive,$(lib))))
+	@$(eval libpaths := $(foreach lib,$(applibs),$(dir $(lib))$(call lib_from_archive,$(lib))))
 	@for lib in $(libpaths); do $(call patch_relink,$@,$$lib,$$(basename $$lib)); done
 
 ifeq ($(want_exec),yes)
-install_bin: $(bindst)
+install_bin: $(installed_app_binary)
 else
 install_bin:
 endif

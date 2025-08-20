@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,8 +39,14 @@ ExodusFormatter::printInputFile(ActionWarehouse & wh)
   }
   if (wh.mooseApp().getSystemInfo() != NULL)
   {
-    _ss << "### Version Info ###\n" << wh.mooseApp().getSystemInfo()->getInfo() << "\n";
+    _ss << "### Version Info ###\n"
+        << std::setw(25) << "App Version: " << wh.mooseApp().getVersion() << "\n"
+        << wh.mooseApp().getSystemInfo()->getInfo() << "\n";
   }
+
+  _ss << std::left << "### Parallelism ###\n"
+      << std::setw(25) << "Num Processors: " << wh.mooseApp().n_processors() << "\n"
+      << std::setw(25) << "Num Threads: " << libMesh::n_threads() << "\n";
 
   _ss << "### Input File ###" << std::endl;
   wh.printInputFile(_ss);

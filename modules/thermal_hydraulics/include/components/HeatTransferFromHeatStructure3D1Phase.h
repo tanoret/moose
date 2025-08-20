@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,7 +10,7 @@
 #pragma once
 
 #include "HeatTransferFromTemperature1Phase.h"
-#include "FlowChannel3DAlignment.h"
+#include "MeshAlignment1D3D.h"
 #include "MooseEnum.h"
 
 /**
@@ -34,7 +34,7 @@ protected:
     Z
   };
 
-  virtual const FEType & getFEType() override;
+  virtual const libMesh::FEType & getFEType() override;
 
   virtual void setupMesh() override;
   virtual void init() override;
@@ -51,8 +51,8 @@ protected:
   std::vector<std::shared_ptr<ClosuresBase>> _flow_channel_closures;
   /// Heat structure name
   const std::string & _hs_name;
-  /// Flow channel alignment object
-  FlowChannel3DAlignment _fch_alignment;
+  /// Mesh alignment object
+  MeshAlignment1D3D _mesh_alignment;
   /// Number of layers in the flow channel direction
   unsigned int _num_layers;
   /// Direction for layered average user objects

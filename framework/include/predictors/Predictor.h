@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -65,4 +65,9 @@ protected:
 
   /// Option to skip prediction after a failed timestep
   const bool & _skip_after_failed_timetep;
+
+  /// Timestep tolerance from Transient executioner
+  const Real & _timestep_tolerance;
+
+  friend class SetupPredictorAction;
 };

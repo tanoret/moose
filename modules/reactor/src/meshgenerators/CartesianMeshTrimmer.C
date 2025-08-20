@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -69,8 +69,8 @@ std::unique_ptr<MeshBase>
 CartesianMeshTrimmer::generate()
 {
   // Check if input mesh is trimmable
-  if (hasMeshProperty("square_peripheral_trimmability", _input_name) &&
-      hasMeshProperty("square_center_trimmability", _input_name))
+  if (hasMeshProperty<bool>("square_peripheral_trimmability", _input_name) &&
+      hasMeshProperty<bool>("square_center_trimmability", _input_name))
   {
     if (!getMeshProperty<bool>("square_peripheral_trimmability", _input_name) &&
         std::accumulate(_trim_peripheral_region.begin(), _trim_peripheral_region.end(), 0) > 0)
@@ -81,7 +81,8 @@ CartesianMeshTrimmer::generate()
   }
   else
     paramError("input",
-               "The input mesh's meta data is not compatible with the CartesianMeshTrimmer.");
+               "The input mesh's meta data is not compatible with the CartesianMeshTrimmer because "
+               "the trimmability mesh meta data are absent.");
 
   return PolygonMeshTrimmerBase::generate();
 }

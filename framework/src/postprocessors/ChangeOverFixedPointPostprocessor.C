@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,20 +42,21 @@ ChangeOverFixedPointPostprocessor::ChangeOverFixedPointPostprocessor(
     _pps_value(getPostprocessorValue("postprocessor")),
     _pps_value_old(0),
     _pps_value_initial(declareRestartableData<Real>("pps_value_initial")),
-    _t_step_old(-1)
+    _t_step_old(-1),
+    _value(0.0)
 {
   if (_change_with_respect_to_initial)
   {
     // ensure dependent post-processor is executed on initial
     const PostprocessorName & pp_name = getParam<PostprocessorName>("postprocessor");
     const UserObject & pp = _fe_problem.getUserObject<UserObject>(pp_name);
-    if (!pp.getExecuteOnEnum().contains(EXEC_INITIAL))
+    if (!pp.getExecuteOnEnum().isValueSet(EXEC_INITIAL))
       mooseError("When 'change_with_respect_to_initial' is specified to be true, 'execute_on' for "
                  "the dependent post-processor ('" +
                  pp_name + "') must include 'initial'");
 
     // ensure THIS post-processor is executed on initial
-    if (!_execute_enum.contains(EXEC_INITIAL))
+    if (!_execute_enum.isValueSet(EXEC_INITIAL))
       mooseError("When 'change_with_respect_to_initial' is specified to be true, 'execute_on' for "
                  "the ChangeOverFixedPointPostprocessor ('" +
                  name() + "') must include 'initial'");
@@ -72,8 +73,8 @@ ChangeOverFixedPointPostprocessor::execute()
 {
 }
 
-Real
-ChangeOverFixedPointPostprocessor::getValue()
+void
+ChangeOverFixedPointPostprocessor::finalize()
 {
   // detect the beginning of a new FixedPoint iteration process
   // it can either a new time step or a failed time step
@@ -119,7 +120,13 @@ ChangeOverFixedPointPostprocessor::getValue()
     change = _pps_value - base_value;
 
   if (_take_absolute_value)
-    return std::fabs(change);
+    _value = std::fabs(change);
   else
-    return change;
+    _value = change;
+}
+
+Real
+ChangeOverFixedPointPostprocessor::getValue() const
+{
+  return _value;
 }

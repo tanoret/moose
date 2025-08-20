@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -45,7 +45,7 @@ LevelSetTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool u
 void
 LevelSetTestApp::registerApps()
 {
-  registerApp(LevelSetApp);
+  LevelSetApp::registerApps();
   registerApp(LevelSetTestApp);
 }
 

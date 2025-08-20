@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -92,7 +92,7 @@ DiscreteNucleationTimeStep::DiscreteNucleationTimeStep(const InputParameters & p
 }
 
 PostprocessorValue
-DiscreteNucleationTimeStep::getValue()
+DiscreteNucleationTimeStep::getValue() const
 {
   // check if a nucleus insertion has occurred...
   if (_changes_made.first > 0)

@@ -18,7 +18,6 @@
     design = 'SideIntegralVariablePostprocessor.md'
     requirement = 'The system shall support computing the integral of a finite volume variable '
                   'quantity over a side on the mesh.'
-    ad_indexing_type = 'global'
   []
 
   [side_integral_material_property]
@@ -60,7 +59,7 @@
   []
 
   [functors]
-    issues = '#18086'
+    issues = '#18086 #25464'
     design = 'SideIntegralFunctorPostprocessor.md'
     requirement = 'The system shall '
     [mesh_side]
@@ -71,7 +70,6 @@
 
       detail = 'support computing the integral of a functor '
                'over one or more sides on the mesh.'
-      ad_indexing_type = 'global'
     []
     [domain_side]
       type = 'CSVDiff'
@@ -83,7 +81,6 @@
 
       detail = 'support computing the integral of a functor '
                'over a functor domain boundary inside a mesh.'
-      ad_indexing_type = 'global'
     []
     [mesh_side_refined]
       type = 'CSVDiff'
@@ -93,20 +90,27 @@
 
       detail = 'support computing the integral of a functor '
                'over one or more evenly refined sides on the mesh.'
-      ad_indexing_type = 'global'
     []
     [qp_argument]
       type = 'CSVDiff'
       input = 'side_integral_functor.i'
       csvdiff = 'side_integral_functor_qp_out.csv'
       cli_args = "Outputs/file_base=side_integral_functor_qp_out
-                  AuxVariables/v2/type=MooseVariable
-                  Postprocessors/ext_u/functor_argument=qp Postprocessors/ext_v1/functor_argument=qp Postprocessors/ext_v2/functor_argument=qp Postprocessors/ext_m1/functor_argument=qp Postprocessors/ext_m2/functor_argument=qp
+                  AuxVariables/inactive=v2
+                  AuxVariables/v2_fe/block=2
+                  AuxVariables/v2_fe/InitialCondition/type=FunctionIC
+                  AuxVariables/v2_fe/InitialCondition/function='2*x*x-y'
+                  Postprocessors/ext_u/functor_argument=qp Postprocessors/ext_v1/functor_argument=qp Postprocessors/ext_v2/functor_argument=qp Postprocessors/ext_v2/functor=v2_fe Postprocessors/ext_m1/functor_argument=qp Postprocessors/ext_m2/functor_argument=qp
                   Postprocessors/int_s1_u/functor_argument=qp Postprocessors/int_s1_v1/functor_argument=qp Postprocessors/int_s1_f1/functor_argument=qp Postprocessors/int_s1_m1/functor_argument=qp Postprocessors/int_s1_m2/functor_argument=qp
-                  Postprocessors/int_s2_v2/functor_argument=qp Postprocessors/int_s2_f1/functor_argument=qp Postprocessors/int_s2_m1/functor_argument=qp Postprocessors/int_s2_m2/functor_argument=qp"
+                  Postprocessors/int_s2_v2/functor_argument=qp Postprocessors/int_s2_v2/functor=v2_fe Postprocessors/int_s2_f1/functor_argument=qp Postprocessors/int_s2_m1/functor_argument=qp Postprocessors/int_s2_m2/functor_argument=qp"
 
       detail = 'support computing the integral of a functor using quadrature points instead of side faces'
-      ad_indexing_type = 'global'
+    []
+    [error_no_face_info]
+      type = RunException
+      input = 'side_integral_functor_fe.i'
+      expect_err = "The parameter 'functor_argument' was set to 'face', but the mesh contains no face info objects"
+      detail = 'report an error if face info integration is chosen to compute the integral of a functor when there is no face info in the mesh.'
     []
   []
 []

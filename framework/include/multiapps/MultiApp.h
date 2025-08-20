@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,7 @@
 #include "SetupInterface.h"
 #include "Restartable.h"
 #include "PerfGraphInterface.h"
+#include "Backup.h"
 
 #include "libmesh/communicator.h"
 #include "libmesh/point.h"
@@ -24,9 +25,9 @@ class FEProblemBase;
 class FEProblem;
 class Executioner;
 class MooseApp;
-class Backup;
 class MultiAppTransfer;
 class MultiAppCoordTransform;
+class Positions;
 
 // libMesh forward declarations
 namespace libMesh
@@ -68,6 +69,9 @@ struct LocalRankConfig
   /// only transfer data to a given subapp once even though it may be running on
   /// multiple procs/ranks.
   bool is_first_local_rank;
+  /// For every rank working on a subapp, we store the first rank on each
+  /// process to make the communication to root simpler on the main app
+  processor_id_type my_first_rank;
 };
 
 /// Returns app partitioning information relevant to the given rank for a
@@ -81,17 +85,19 @@ struct LocalRankConfig
 /// Each proc calls this function in order to determine which (sub)apps among
 /// the global list of all subapps for a multiapp should be run by the given
 /// rank.
-LocalRankConfig rankConfig(dof_id_type rank,
-                           dof_id_type nprocs,
+LocalRankConfig rankConfig(processor_id_type rank,
+                           processor_id_type nprocs,
                            dof_id_type napps,
-                           dof_id_type min_app_procs,
-                           dof_id_type max_app_procs,
+                           processor_id_type min_app_procs,
+                           processor_id_type max_app_procs,
                            bool batch_mode = false);
 
 /**
  * Helper class for holding Sub-app backups
+ *
+ * Stores the backups and also triggers a backup on store and restore on load
  */
-class SubAppBackups : public std::vector<std::shared_ptr<Backup>>
+class SubAppBackups : public std::vector<std::unique_ptr<Backup>>
 {
 };
 
@@ -130,6 +136,12 @@ public:
    * sub-apps accordingly.
    */
   void setupPositions();
+
+  /**
+   * Create the i-th local app
+   * @param[in] i local app index
+   */
+  virtual void createLocalApp(const unsigned int i);
 
   /**
    * Method to be called in main-app initial setup for create sub-apps if using positions is false.
@@ -195,7 +207,7 @@ public:
    * Whether or not this MultiApp should be restored at the beginning of
    * each Picard iteration.
    */
-  virtual bool needsRestoration() { return true; }
+  bool needsRestoration() { return !_no_restore; }
 
   /**
    * @param app The global app number to get the Executioner for
@@ -214,9 +226,10 @@ public:
    * @param displaced_mesh True if the bounding box is retrieved for the displaced mesh, other false
    * @param coord_transform An optional coordinate transformation object
    */
-  virtual BoundingBox getBoundingBox(unsigned int app,
-                                     bool displaced_mesh,
-                                     const MultiAppCoordTransform * coord_transform = nullptr);
+  virtual libMesh::BoundingBox
+  getBoundingBox(unsigned int app,
+                 bool displaced_mesh,
+                 const MultiAppCoordTransform * coord_transform = nullptr);
 
   /**
    * Get the FEProblemBase this MultiApp is part of.
@@ -224,7 +237,7 @@ public:
   FEProblemBase & problemBase() { return _fe_problem; }
 
   /**
-   * Get the FEProblemBase for the global app is part of.
+   * Get the FEProblemBase for the global app desired.
    * @param app The global app number
    */
   FEProblemBase & appProblemBase(unsigned int app);
@@ -256,7 +269,8 @@ public:
    * @param var_name The name of the variable you are going to be transferring to.
    * @return The vector to fill.
    */
-  virtual NumericVector<Number> & appTransferVector(unsigned int app, std::string var_name);
+  virtual libMesh::NumericVector<libMesh::Number> & appTransferVector(unsigned int app,
+                                                                      std::string var_name);
 
   /**
    * @return Number of Global Apps in this MultiApp
@@ -272,6 +286,11 @@ public:
    * @return The global number of the first app on the local processor.
    */
   unsigned int firstLocalApp() { return _first_local_app; }
+
+  /**
+   * @return Whether this rank is the first rank of the subapp(s) it's involved in
+   */
+  bool isFirstLocalRank() const;
 
   /**
    * Whether or not this MultiApp has an app on this processor.
@@ -296,7 +315,7 @@ public:
    * @param app The global app number you want the position for.
    * @return the position
    */
-  const Point & position(unsigned int app) const { return _positions[app]; }
+  const Point & position(unsigned int app) const;
 
   /**
    * "Reset" the App corresponding to the global App number
@@ -344,6 +363,12 @@ public:
   bool usingPositions() const { return _use_positions; }
 
   /**
+   * Whether or not this MultiApp is being run in position,
+   * eg with the coordinate transform already applied
+   */
+  bool runningInPosition() const { return _run_in_position; }
+
+  /**
    * Add a transfer that is associated with this multiapp
    */
   void addAssociatedTransfer(MultiAppTransfer & transfer);
@@ -352,11 +377,17 @@ public:
    * Transform a bounding box according to the transformations in the provided coordinate
    * transformation object
    */
-  static void transformBoundingBox(BoundingBox & box, const MultiAppCoordTransform & transform);
+  static void transformBoundingBox(libMesh::BoundingBox & box,
+                                   const MultiAppCoordTransform & transform);
+
+  /**
+   * Sets all the app's output file bases. @see MooseApp::setOutputFileBase for usage
+   */
+  void setAppOutputFileBase();
 
 protected:
   /// function that provides cli_args to subapps
-  virtual std::vector<std::string> cliArgs() const { return _cli_args; }
+  virtual std::vector<std::string> cliArgs() const;
 
   /**
    * _must_ fill in _positions with the positions of the sub-aps
@@ -395,12 +426,15 @@ protected:
   /// call back executed right before app->runInputFile()
   virtual void preRunInputFile();
 
-  /** Method to aid in getting the "cli_args" parameters.
+  /**
+   * @return The command line arguments to be applied to the subapp
+   * with index \p local_app
    *
-   * The method is virtual because it is needed to allow for batch runs within the stochastic tools
-   * module, see SamplerFullSolveMultiApp for an example.
+   * The method is virtual because it is needed to allow for batch runs
+   * within the stochastic tools module; see SamplerFullSolveMultiApp for
+   * an example.
    */
-  virtual std::string getCommandLineArgsParamHelper(unsigned int local_app);
+  virtual std::vector<std::string> getCommandLineArgs(const unsigned int local_app);
 
   /**
    * Build communicators and reserve backups.
@@ -420,10 +454,29 @@ protected:
   void createApps();
 
   /**
-   * Reserve the solution from the previous simulation,
-   *  and it is used as an initial guess for the next run
+   * Preserve the solution from the previous simulation,
+   * and it is used as an initial guess for the next run
    */
   void keepSolutionDuringRestore(bool keep_solution_during_restore);
+
+  /**
+   * Set the output file base of the application which corresponds to the index passed to the
+   * function.
+   *
+   * @param index The sub-application index
+   */
+  void setAppOutputFileBase(unsigned int index);
+
+  /**
+   * Helper for constructing the name of the multiapp
+   *
+   * @param base_name The base name of the multiapp, usually name()
+   * @param index The index of the app
+   * @param total The total number of apps, which is used to pad the name with zeros
+   * @return std::string The name of the multiapp
+   */
+  static std::string
+  getMultiAppName(const std::string & base_name, dof_id_type index, dof_id_type total);
 
   /// The FEProblemBase this MultiApp is part of
   FEProblemBase & _fe_problem;
@@ -431,14 +484,22 @@ protected:
   /// The type of application to build
   std::string _app_type;
 
-  /// The positions of all of the apps
+  /// The positions of all of the apps, using input constant vectors (to be deprecated)
   std::vector<Point> _positions;
+  /// The positions of all of the apps, using the Positions system
+  std::vector<const Positions *> _positions_objs;
+  /// The offsets, in case multiple Positions objects are specified
+  std::vector<unsigned int> _positions_index_offsets;
 
-  /// Toggle use of "positions"
+  /// Toggle use of "positions". Subapps are created at each different position.
+  /// List of positions can be created using the Positions system
   const bool _use_positions;
 
   /// The input file for each app's simulation
   std::vector<FileName> _input_files;
+
+  /// Whether to create the first app on rank 0 while all other MPI ranks are idle
+  const bool & _wait_for_first_app_init;
 
   /// Number of positions for each input file
   std::vector<unsigned int> _npositions_inputfile;
@@ -483,7 +544,7 @@ protected:
   std::vector<bool> _has_bounding_box;
 
   /// This multi-app's bounding box
-  std::vector<BoundingBox> _bounding_box;
+  std::vector<libMesh::BoundingBox> _bounding_box;
 
   /// Relative bounding box inflation
   Real _inflation;
@@ -492,10 +553,10 @@ protected:
   Point _bounding_box_padding;
 
   /// Maximum number of processors to give to each app
-  unsigned int _max_procs_per_app;
+  processor_id_type _max_procs_per_app;
 
   /// Minimum number of processors to give to each app
-  unsigned int _min_procs_per_app;
+  processor_id_type _min_procs_per_app;
 
   /// Whether or not to move the output of the MultiApp into position
   bool _output_in_position;
@@ -527,11 +588,8 @@ protected:
   /// Whether or not this processor as an App _at all_
   bool _has_an_app;
 
-  /// Backups for each local App
-  SubAppBackups & _backups;
-
-  /// CommandLine arguments
-  const std::vector<std::string> & _cli_args;
+  /// CommandLine arguments (controllable!)
+  const std::vector<CLIArgString> & _cli_args;
 
   /// CommandLine arguments from files
   std::vector<std::string> _cli_args_from_file;
@@ -539,8 +597,17 @@ protected:
   /// Flag indicates if or not restart from the latest solution
   bool _keep_solution_during_restore;
 
+  /// Flag indicates if or not restart the auxiliary system from the latest auxiliary solution
+  bool _keep_aux_solution_during_restore;
+
+  /// Whether or not to skip restoring completely
+  const bool _no_restore;
+
   /// The solution from the end of the previous solve, this is cloned from the Nonlinear solution during restore
-  std::vector<std::unique_ptr<NumericVector<Real>>> _end_solutions;
+  std::vector<std::unique_ptr<libMesh::NumericVector<Real>>> _end_solutions;
+
+  /// The auxiliary solution from the end of the previous solve, this is cloned from the auxiliary solution during restore
+  std::vector<std::unique_ptr<NumericVector<Real>>> _end_aux_solutions;
 
   /// The app configuration resulting from calling init
   LocalRankConfig _rank_config;
@@ -548,40 +615,23 @@ protected:
   /// Transfers associated with this multiapp
   std::vector<MultiAppTransfer *> _associated_transfers;
 
-  ///Timers
+  /// Whether to run the child apps with their meshes transformed with the coordinate transforms
+  const bool _run_in_position;
+
+  /// The cached subapp backups (passed from the parent app)
+  SubAppBackups & _sub_app_backups;
+
+  /// Timers
   const PerfID _solve_step_timer;
   const PerfID _init_timer;
   const PerfID _backup_timer;
   const PerfID _restore_timer;
   const PerfID _reset_timer;
+
+private:
+  /// The parameter that was used to set the command line args, if any
+  mutable std::optional<std::string> _cli_args_param;
 };
 
-template <>
-inline void
-dataStore(std::ostream & stream, SubAppBackups & backups, void * context)
-{
-  MultiApp * multi_app = static_cast<MultiApp *>(context);
-
-  multi_app->backup();
-
-  if (!multi_app)
-    mooseError("Error storing std::vector<Backup*>");
-
-  for (unsigned int i = 0; i < backups.size(); i++)
-    dataStore(stream, backups[i], context);
-}
-
-template <>
-inline void
-dataLoad(std::istream & stream, SubAppBackups & backups, void * context)
-{
-  MultiApp * multi_app = static_cast<MultiApp *>(context);
-
-  if (!multi_app)
-    mooseError("Error loading std::vector<Backup*>");
-
-  for (unsigned int i = 0; i < backups.size(); i++)
-    dataLoad(stream, backups[i], context);
-
-  multi_app->restore();
-}
+void dataStore(std::ostream & stream, SubAppBackups & backups, void * context);
+void dataLoad(std::istream & stream, SubAppBackups & backups, void * context);

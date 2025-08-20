@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -16,70 +16,20 @@ registerMooseObject("NavierStokesApp", PINSFVMomentumPressureFlux);
 InputParameters
 PINSFVMomentumPressureFlux::validParams()
 {
-  auto params = FVFluxKernel::validParams();
-  params += INSFVMomentumResidualObject::validParams();
+  auto params = INSFVMomentumPressureFlux::validParams();
   params.addClassDescription("Momentum pressure term eps grad_P, as a flux kernel "
                              "using the divergence theoreom, in the porous media "
                              "incompressible Navier-Stokes momentum equation. This kernel "
                              "is also executed on boundaries.");
   params.addRequiredParam<MooseFunctorName>(NS::porosity, "Porosity functor");
-  params.addRequiredCoupledVar(NS::pressure, "Pressure variable");
-  params.addDeprecatedCoupledVar("p", NS::pressure, "1/1/2022");
-  MooseEnum momentum_component("x=0 y=1 z=2");
-  params.addRequiredParam<MooseEnum>("momentum_component",
-                                     momentum_component,
-                                     "The component of the momentum equation that this kernel "
-                                     "applies to.");
   params.set<bool>("force_boundary_execution") = true;
   return params;
 }
 
 PINSFVMomentumPressureFlux::PINSFVMomentumPressureFlux(const InputParameters & params)
-  : FVFluxKernel(params),
-    INSFVMomentumResidualObject(*this),
-    _eps(getFunctor<ADReal>(NS::porosity)),
-    _p_var(dynamic_cast<const MooseVariableFVReal *>(getFieldVar(NS::pressure, 0))),
-    _index(getParam<MooseEnum>("momentum_component"))
+  : INSFVMomentumPressureFlux(params), _eps(getFunctor<ADReal>(NS::porosity))
 {
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-  mooseError("PINSFV is not supported by local AD indexing. In order to use PINSFV, please run "
-             "the configure script in the root MOOSE directory with the configure option "
-             "'--with-ad-indexing-type=global'");
-#endif
   if (!dynamic_cast<PINSFVSuperficialVelocityVariable *>(&_var))
     mooseError("PINSFVMomentumPressureFlux may only be used with a superficial velocity, "
                "of variable type PINSFVSuperficialVelocityVariable.");
-
-  if (!_p_var)
-    paramError(NS::pressure, "p must be a finite volume variable");
-}
-
-ADReal
-PINSFVMomentumPressureFlux::computeQpResidual()
-{
-  ADReal eps_p_interface;
-  // Momentum and porosity domains should match
-  const auto & face_type = _face_info->faceType(_var.name());
-  const bool use_elem = (face_type == FaceInfo::VarFaceNeighbors::ELEM) ||
-                        (face_type == FaceInfo::VarFaceNeighbors::BOTH);
-
-  const auto * const elem_ptr = use_elem ? &_face_info->elem() : _face_info->neighborPtr();
-  const auto & elem = makeElemArg(elem_ptr);
-
-  if (onBoundary(*_face_info))
-    eps_p_interface = _eps(elem) * (*_p_var)(singleSidedFaceArg());
-  else
-  {
-    const auto * neighbor_ptr = use_elem ? _face_info->neighborPtr() : &_face_info->elem();
-    const auto & neighbor = makeElemArg(neighbor_ptr);
-
-    Moose::FV::interpolate(Moose::FV::InterpMethod::Average,
-                           eps_p_interface,
-                           _eps(elem) * (*_p_var)(elem),
-                           _eps(neighbor) * (*_p_var)(neighbor),
-                           *_face_info,
-                           true);
-  }
-
-  return eps_p_interface * _normal(_index);
 }

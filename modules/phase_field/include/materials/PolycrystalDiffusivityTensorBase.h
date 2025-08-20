@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -34,7 +34,7 @@ protected:
 
   std::string _diffusivity_name;
   MaterialProperty<RealTensorValue> & _D;
-  MaterialProperty<RealTensorValue> & _dDdc;
+  MaterialProperty<RealTensorValue> * _dDdc;
 
   Real _D0;
   Real _Em;
@@ -45,4 +45,8 @@ protected:
 
   const Real _kb;
   const unsigned int _op_num;
+
+  /// solid phase order parameters
+  std::vector<NonlinearVariableName> _vals_name;
+  std::vector<MaterialProperty<RealTensorValue> *> _dDdeta;
 };

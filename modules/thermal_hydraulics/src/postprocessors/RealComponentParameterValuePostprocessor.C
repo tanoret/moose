@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -20,6 +20,8 @@ RealComponentParameterValuePostprocessor::validParams()
   params.addRequiredParam<std::string>("component", "The name of the component to be controlled.");
   params.addRequiredParam<std::string>(
       "parameter", "The name of the parameter in the component to be controlled.");
+  params.addClassDescription(
+      "Postprocessor for reading a Real (floating point) value from the control logic system.");
   return params;
 }
 
@@ -58,7 +60,7 @@ RealComponentParameterValuePostprocessor::execute()
 }
 
 Real
-RealComponentParameterValuePostprocessor::getValue()
+RealComponentParameterValuePostprocessor::getValue() const
 {
   return _value;
 }

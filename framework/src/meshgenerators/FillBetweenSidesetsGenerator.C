@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -13,6 +13,7 @@
 #include "MooseMeshUtils.h"
 #include "CastUniquePointer.h"
 #include "libmesh/node.h"
+#include "libmesh/mesh_serializer.h"
 
 registerMooseObject("MooseApp", FillBetweenSidesetsGenerator);
 
@@ -105,15 +106,16 @@ FillBetweenSidesetsGenerator::FillBetweenSidesetsGenerator(const InputParameters
 std::unique_ptr<MeshBase>
 FillBetweenSidesetsGenerator::generate()
 {
-  auto input_mesh_1 = dynamic_cast<ReplicatedMesh *>(_input_1.get());
-  auto input_mesh_2 = dynamic_cast<ReplicatedMesh *>(_input_2.get());
-  if (!input_mesh_1)
-    paramError("input_mesh_1", "Input is not a replicated mesh, which is required.");
+  auto input_mesh_1 = std::move(_input_1);
+  auto input_mesh_2 = std::move(_input_2);
+
+  // Only serialized meshes are supported right now
+  libMesh::MeshSerializer serial_1(*input_mesh_1);
+  libMesh::MeshSerializer serial_2(*input_mesh_2);
+
   if (*(input_mesh_1->elem_dimensions().begin()) != 2 ||
       *(input_mesh_1->elem_dimensions().rbegin()) != 2)
     paramError("input_mesh_1", "Only 2D meshes are supported.");
-  if (!input_mesh_2)
-    paramError("input_mesh_2", "Input is not a replicated mesh, which is required.");
   if (*(input_mesh_2->elem_dimensions().begin()) != 2 ||
       *(input_mesh_2->elem_dimensions().rbegin()) != 2)
     paramError("input_mesh_2", "Only 2D meshes are supported.");

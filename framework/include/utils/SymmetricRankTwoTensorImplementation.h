@@ -1,11 +1,13 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
 //*
 //* Licensed under LGPL 2.1, please see LICENSE for details
 //* https://www.gnu.org/licenses/lgpl-2.1.html
+
+#pragma once
 
 #include "SymmetricRankTwoTensor.h"
 
@@ -267,17 +269,20 @@ SymmetricRankTwoTensorTempl<T>::transpose() const
 
 /// multiply vector v with row n of this tensor
 template <typename T>
-VectorValue<T>
+libMesh::VectorValue<T>
 SymmetricRankTwoTensorTempl<T>::row(const unsigned int n) const
 {
   switch (n)
   {
     case 0:
-      return VectorValue<T>(_vals[0], _vals[5] / mandelFactor(5), _vals[4] / mandelFactor(4));
+      return libMesh::VectorValue<T>(
+          _vals[0], _vals[5] / mandelFactor(5), _vals[4] / mandelFactor(4));
     case 1:
-      return VectorValue<T>(_vals[5] / mandelFactor(5), _vals[1], _vals[3] / mandelFactor(3));
+      return libMesh::VectorValue<T>(
+          _vals[5] / mandelFactor(5), _vals[1], _vals[3] / mandelFactor(3));
     case 2:
-      return VectorValue<T>(_vals[4] / mandelFactor(4), _vals[3] / mandelFactor(3), _vals[2]);
+      return libMesh::VectorValue<T>(
+          _vals[4] / mandelFactor(4), _vals[3] / mandelFactor(3), _vals[2]);
     default:
       mooseError("Invalid row");
   }
@@ -381,10 +386,10 @@ SymmetricRankTwoTensorTempl<T>::operator-=(const SymmetricRankTwoTensorTempl<T> 
 
 template <typename T>
 template <typename T2>
-SymmetricRankTwoTensorTempl<typename CompareTypes<T, T2>::supertype>
+SymmetricRankTwoTensorTempl<typename libMesh::CompareTypes<T, T2>::supertype>
 SymmetricRankTwoTensorTempl<T>::operator+(const SymmetricRankTwoTensorTempl<T2> & a) const
 {
-  SymmetricRankTwoTensorTempl<typename CompareTypes<T, T2>::supertype> result;
+  SymmetricRankTwoTensorTempl<typename libMesh::CompareTypes<T, T2>::supertype> result;
   for (std::size_t i = 0; i < N; ++i)
     result(i) = _vals[i] + a(i);
   return result;
@@ -392,11 +397,11 @@ SymmetricRankTwoTensorTempl<T>::operator+(const SymmetricRankTwoTensorTempl<T2> 
 
 template <typename T>
 template <typename T2>
-SymmetricRankTwoTensorTempl<typename CompareTypes<T, T2>::supertype>
+SymmetricRankTwoTensorTempl<typename libMesh::CompareTypes<T, T2>::supertype>
 SymmetricRankTwoTensorTempl<T>::operator-(const SymmetricRankTwoTensorTempl<T2> & a) const
 {
-  SymmetricRankTwoTensorTempl<typename CompareTypes<T, T2>::supertype> result(
-      SymmetricRankTwoTensorTempl<typename CompareTypes<T, T2>::supertype>::initNone);
+  SymmetricRankTwoTensorTempl<typename libMesh::CompareTypes<T, T2>::supertype> result(
+      SymmetricRankTwoTensorTempl<typename libMesh::CompareTypes<T, T2>::supertype>::initNone);
   for (std::size_t i = 0; i < N; ++i)
     result(i) = _vals[i] - a(i);
   return result;
@@ -673,38 +678,9 @@ SymmetricRankTwoTensorTempl<T>::syev(const char *, std::vector<T> &, std::vector
 }
 
 template <>
-void
-SymmetricRankTwoTensor::syev(const char * calculation_type,
-                             std::vector<Real> & eigvals,
-                             std::vector<Real> & a) const
-{
-  eigvals.resize(Ndim);
-  a.resize(Ndim * Ndim);
-
-  // prepare data for the LAPACKsyev_ routine (which comes from petscblaslapack.h)
-  PetscBLASInt nd = Ndim;
-  PetscBLASInt lwork = 66 * nd;
-  PetscBLASInt info;
-  std::vector<PetscScalar> work(lwork);
-
-  auto A = RankTwoTensor(*this);
-  for (auto i : make_range(Ndim))
-    for (auto j : make_range(Ndim))
-      // a is destroyed by dsyev, and if calculation_type == "V" then eigenvectors are placed
-      // there
-      a[i * Ndim + j] = A(i, j);
-
-  // compute the eigenvalues only (if calculation_type == "N"),
-  // or both the eigenvalues and eigenvectors (if calculation_type == "V")
-  // assume upper triangle of a is stored (second "U")
-  LAPACKsyev_(calculation_type, "U", &nd, &a[0], &nd, &eigvals[0], &work[0], &lwork, &info);
-
-  if (info != 0)
-    mooseError("In computing the eigenvalues and eigenvectors for the symmetric rank-2 tensor (",
-               Moose::stringify(a),
-               "), the PETSC LAPACK syev routine returned error code ",
-               info);
-}
+void SymmetricRankTwoTensor::syev(const char * calculation_type,
+                                  std::vector<Real> & eigvals,
+                                  std::vector<Real> & a) const;
 
 template <typename T>
 void
@@ -715,12 +691,7 @@ SymmetricRankTwoTensorTempl<T>::symmetricEigenvalues(std::vector<T> & eigvals) c
 }
 
 template <>
-void
-SymmetricRankTwoTensor::symmetricEigenvalues(std::vector<Real> & eigvals) const
-{
-  std::vector<Real> a;
-  syev("N", eigvals, a);
-}
+void SymmetricRankTwoTensor::symmetricEigenvalues(std::vector<Real> & eigvals) const;
 
 template <typename T>
 void
@@ -732,17 +703,8 @@ SymmetricRankTwoTensorTempl<T>::symmetricEigenvaluesEigenvectors(std::vector<T> 
 }
 
 template <>
-void
-SymmetricRankTwoTensor::symmetricEigenvaluesEigenvectors(std::vector<Real> & eigvals,
-                                                         RankTwoTensor & eigvecs) const
-{
-  std::vector<Real> a;
-  syev("V", eigvals, a);
-
-  for (auto i : make_range(Ndim))
-    for (auto j : make_range(Ndim))
-      eigvecs(j, i) = a[i * Ndim + j];
-}
+void SymmetricRankTwoTensor::symmetricEigenvaluesEigenvectors(std::vector<Real> & eigvals,
+                                                              RankTwoTensor & eigvecs) const;
 
 template <typename T>
 void

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -45,7 +45,7 @@ SwitchingFunctionConstraintLagrange::SwitchingFunctionConstraintLagrange(
 
     _dh[i].resize(_num_h);
     for (std::size_t j = 0; j < _num_h; ++j)
-      _dh[i][j] = &getMaterialPropertyDerivative<Real>(_h_names[i], getVar("etas", j)->name());
+      _dh[i][j] = &getMaterialPropertyDerivative<Real>(_h_names[i], coupledName("etas", j));
   }
 }
 

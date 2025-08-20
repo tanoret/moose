@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -50,7 +50,7 @@ LinearCombinationPostprocessor::execute()
 }
 
 PostprocessorValue
-LinearCombinationPostprocessor::getValue()
+LinearCombinationPostprocessor::getValue() const
 {
   Real linear_combination = _b_value;
   for (unsigned int i = 0; i < _n_pp; i++)

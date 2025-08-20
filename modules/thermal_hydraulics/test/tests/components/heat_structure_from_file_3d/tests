@@ -1,8 +1,11 @@
 [Tests]
+  issues = '#19831'
+  design = 'HeatStructureFromFile3D.md'
   [phy:standalone]
     type = Exodiff
     input = 'phy.standalone.i'
     exodiff = 'phy.standalone_out.e'
+    requirement = 'The system shall be able to use an external mesh file to create a 3D heat structure.'
   []
 
   [err:2d_mesh]
@@ -10,12 +13,6 @@
     input = 'phy.standalone.i'
     cli_args = 'Components/blk/file=square.e'
     expect_err = "blk: File '(.+)square\.e' does not contain a 3D mesh\."
-  []
-
-  [err:non_existing_file]
-    type = RunException
-    input = 'phy.standalone.i'
-    cli_args = 'Components/blk/file=no-file.e'
-    expect_err = "blk: Could not open '(.+)no-file\.e'\. Check that the file exists and that you have permission to open it\."
+    requirement = 'The system shall report an error if the mesh from an external mesh file for a 3D heat structure is not 3D.'
   []
 []

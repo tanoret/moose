@@ -8,12 +8,12 @@ select a scalar component from the property value.
 
 | Material property type | `component` parameter example |
 | - | - |
-|`Real` | _none_ |
-|`RealVectorValue` | `component = 1`|
-|`std::vector<Real>` | `component = 7`|
-|`RankTwoTensor` | `component = "0 2"`|
-|`RankThreeTensor` | `component = "1 2 0"`|
-|`RankFourTensor` | `component = "1 0 1 2"`|
+| `Real` | _none_ |
+| `RealVectorValue` | `component = 1` |
+| `std::vector<Real>` | `component = 7` |
+| `RankTwoTensor` | `component = "0 2"` |
+| `RankThreeTensor` | `component = "1 2 0"` |
+| `RankFourTensor` | `component = "1 0 1 2"` |
 
 To use this utility class declare a member in your class header
 
@@ -39,9 +39,9 @@ params.addRequiredParam<MaterialPropertyName>("first_property",
 params.addRequiredParam<MaterialPropertyName>("second_property",
                                               "The name of the second material property");
 params.addParam<std::vector<unsigned int>>(
-    "first_component", "Index of the comonent of the first property");
+    "first_component", "Index of the component of the first property");
 params.addParam<std::vector<unsigned int>>(
-    "second_component", "Index of the comonent of the second property");
+    "second_component", "Index of the component of the second property");
 ```
 
 To initialize the `IndexableProperty` object put

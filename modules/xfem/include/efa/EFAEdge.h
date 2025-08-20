@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -29,7 +29,14 @@ private:
   std::vector<double> _intersection_x;
 
 public:
+  std::pair<EFANode *, EFANode *> getSortedNodes() const
+  {
+    return {std::min(_edge_node1, _edge_node2), std::max(_edge_node1, _edge_node2)};
+  }
+
   bool equivalent(const EFAEdge & other) const;
+  bool isEmbeddedPermanent() const;
+
   bool isPartialOverlap(const EFAEdge & other) const;
   bool containsEdge(const EFAEdge & other) const;
   bool getNodeMasters(EFANode * node,

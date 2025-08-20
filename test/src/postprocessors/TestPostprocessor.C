@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -50,7 +50,7 @@ TestPostprocessor::customSetup(const ExecFlagType & exec_type)
 }
 
 Real
-TestPostprocessor::getValue()
+TestPostprocessor::getValue() const
 {
   if (_test_type == "grow")
   {

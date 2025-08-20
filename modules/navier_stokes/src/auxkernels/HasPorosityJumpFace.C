@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -41,7 +41,7 @@ HasPorosityJumpFace::computeValue()
               ? _mesh.faceInfo(_current_elem, s)
               : _mesh.faceInfo(neighbor, neighbor->which_neighbor_am_i(_current_elem));
       mooseAssert(fi, "This should be non-null");
-      if (std::get<0>(NS::isPorosityJumpFace(_eps, *fi)))
+      if (std::get<0>(NS::isPorosityJumpFace(_eps, *fi, determineState())))
         return 1;
     }
 

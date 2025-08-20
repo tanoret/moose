@@ -9,8 +9,7 @@
     expect_err = "WCNSFVMassFluxBC can only be defined on an internal face if the 'direction' parameter "
                  "is supplied!"
     input = flux_bcs.i
-    method = "!dbg"
-    ad_indexing_type = 'global'
+    capabilities = 'method!=dbg'
   []
   [mass-bc-wrong-direction]
     type = 'RunException'
@@ -19,8 +18,7 @@
     expect_err = "The direction should be a unit vector with a tolerance of 1e-6!"
     cli_args = "FVBCs/inlet_mass/direction='2 0 0'"
     input = flux_bcs.i
-    method = "!dbg"
-    ad_indexing_type = 'global'
+    capabilities = 'method!=dbg'
   []
   [momentum-bc]
     type = 'RunException'
@@ -29,9 +27,8 @@
     expect_err = "WCNSFVMomentumFluxBC can only be defined on an internal face if the 'direction' "
                  "parameter is supplied!"
     input = flux_bcs.i
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     cli_args = "FVBCs/inlet_mass/direction='1 0 0'"
-    ad_indexing_type = 'global'
   []
   [momentum-bc-wrong-direction]
     type = 'RunException'
@@ -40,8 +37,7 @@
     expect_err = "The direction should be a unit vector with a tolerance of 1e-6!"
     cli_args = "FVBCs/inlet_mass/direction='1 0 0' FVBCs/inlet_u/direction='2 0 0' "
     input = flux_bcs.i
-    method = "!dbg"
-    ad_indexing_type = 'global'
+    capabilities = 'method!=dbg'
   []
   [energy-bc]
     type = 'RunException'
@@ -51,10 +47,9 @@
     expect_err = "WCNSFVEnergyFluxBC can only be defined on an internal face if the 'direction' "
                  "parameter is supplied!"
     input = flux_bcs.i
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     cli_args = "FVBCs/inlet_mass/direction='1 0 0' FVBCs/inlet_u/direction='1 0 0' "
                "FVBCs/inlet_v/direction='1 0 0'"
-    ad_indexing_type = 'global'
   []
   [energy-bc-wrong-direction]
     type = 'RunException'
@@ -64,8 +59,7 @@
     cli_args = "FVBCs/inlet_mass/direction='1 0 0' FVBCs/inlet_u/direction='1 0 0' "
                "FVBCs/inlet_v/direction='1 0 0' FVBCs/inlet_T/direction='2 0 0'"
     input = flux_bcs.i
-    method = "!dbg"
-    ad_indexing_type = 'global'
+    capabilities = 'method!=dbg'
   []
   [scalar-bc]
     type = 'RunException'
@@ -74,10 +68,9 @@
     expect_err = "WCNSFVScalarFluxBC can only be defined on an internal face if the 'direction' "
                  "parameter is supplied!"
     input = flux_bcs.i
-    method = "!dbg"
+    capabilities = 'method!=dbg'
     cli_args = "FVBCs/inlet_mass/direction='1 0 0' FVBCs/inlet_u/direction='1 0 0' "
                "FVBCs/inlet_v/direction='1 0 0' FVBCs/inlet_T/direction='1 0 0'"
-    ad_indexing_type = 'global'
   []
   [scalar-bc-wrong-direction]
     type = 'RunException'
@@ -88,7 +81,6 @@
                "FVBCs/inlet_v/direction='1 0 0' FVBCs/inlet_T/direction='1 0 0' "
                "FVBCs/inlet_scalar/direction='2 0 0'"
     input = flux_bcs.i
-    method = "!dbg"
-    ad_indexing_type = 'global'
+    capabilities = 'method!=dbg'
   []
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -17,7 +17,7 @@
 #include "MooseMesh.h"
 #include "Output.h"
 #include "TimeStepper.h"
-#include "Transient.h"
+#include "TransientBase.h"
 #include "NonlinearSystem.h"
 
 #include "libmesh/mesh_tools.h"
@@ -86,6 +86,9 @@ TransientMultiApp::validParams()
                         "Maximum number of steps to allow an app to take "
                         "when trying to catch back up after a failed "
                         "solve.");
+
+  params.addParamNamesToGroup("catch_up max_catch_up_steps", "Recovering failed solutions");
+  params.addParamNamesToGroup("tolerate_failure", "Accepting failed solutions");
 
   return params;
 }
@@ -207,7 +210,7 @@ TransientMultiApp::solveStep(Real dt, Real target_time, bool auto_advance)
     {
       FEProblemBase & problem = appProblemBase(_first_local_app + i);
 
-      Transient * ex = _transient_executioners[i];
+      TransientBase * ex = _transient_executioners[i];
 
       // The App might have a different local time from the rest of the problem
       Real app_time_offset = _apps[i]->getGlobalTimeOffset();
@@ -560,7 +563,7 @@ TransientMultiApp::incrementTStep(Real target_time)
   {
     for (unsigned int i = 0; i < _my_num_apps; i++)
     {
-      Transient * ex = _transient_executioners[i];
+      TransientBase * ex = _transient_executioners[i];
 
       // The App might have a different local time from the rest of the problem
       Real app_time_offset = _apps[i]->getGlobalTimeOffset();
@@ -580,7 +583,7 @@ TransientMultiApp::finishStep(bool recurse_through_multiapp_levels)
   {
     for (unsigned int i = 0; i < _my_num_apps; i++)
     {
-      Transient * ex = _transient_executioners[i];
+      TransientBase * ex = _transient_executioners[i];
       ex->endStep();
       ex->postStep();
       if (recurse_through_multiapp_levels)
@@ -592,12 +595,6 @@ TransientMultiApp::finishStep(bool recurse_through_multiapp_levels)
       }
     }
   }
-}
-
-bool
-TransientMultiApp::needsRestoration()
-{
-  return _sub_cycling || _catch_up || _auto_advance || _tolerate_failure || _detect_steady_state;
 }
 
 Real
@@ -614,7 +611,7 @@ TransientMultiApp::computeDT()
 
     for (unsigned int i = 0; i < _my_num_apps; i++)
     {
-      Transient * ex = _transient_executioners[i];
+      TransientBase * ex = _transient_executioners[i];
       ex->computeDT();
       Real dt = ex->getDT();
 
@@ -662,7 +659,7 @@ void
 TransientMultiApp::setupApp(unsigned int i, Real /*time*/) // FIXME: Should we be passing time?
 {
   auto & app = _apps[i];
-  Transient * ex = dynamic_cast<Transient *>(app->getExecutioner());
+  TransientBase * ex = dynamic_cast<TransientBase *>(app->getExecutioner());
   if (!ex)
     mooseError("MultiApp ", name(), " is not using a Transient Executioner!");
 

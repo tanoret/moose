@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -79,7 +79,10 @@ ComputeNodalKernelBcsThread::onNode(ConstBndNodeRange::const_iterator & node_it)
       _fe_problem.reinitNodeFace(node, boundary_id, _tid);
       const auto & objects = _nkernel_warehouse->getActiveBoundaryObjects(boundary_id, _tid);
       for (const auto & nodal_kernel : objects)
+      {
+        nodal_kernel->setSubdomains(Moose::NodeArg::undefined_subdomain_connection);
         nodal_kernel->computeResidual();
+      }
 
       _num_cached++;
     }
@@ -96,4 +99,18 @@ ComputeNodalKernelBcsThread::onNode(ConstBndNodeRange::const_iterator & node_it)
 void
 ComputeNodalKernelBcsThread::join(const ComputeNodalKernelBcsThread & /*y*/)
 {
+}
+
+void
+ComputeNodalKernelBcsThread::printGeneralExecutionInformation() const
+{
+  if (!_fe_problem.shouldPrintExecution(_tid) || !_nkernel_warehouse->hasActiveObjects())
+    return;
+
+  const auto & console = _fe_problem.console();
+  const auto & execute_on = _fe_problem.getCurrentExecuteOnFlag();
+  console << "[DBG] Executing nodal kernels contribution to residual on nodes on " << execute_on
+          << std::endl;
+  console << "[DBG] Ordering of the nodal kernels on the nodes they are defined on:" << std::endl;
+  console << _nkernel_warehouse->activeObjectsToFormattedString() << std::endl;
 }

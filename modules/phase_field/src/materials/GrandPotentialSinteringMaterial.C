@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -47,6 +47,8 @@ GrandPotentialSinteringMaterial::validParams()
   params.addParam<MooseEnum>("solid_energy_model",
                              solid_energy_model,
                              "Type of energy function to use for the solid phase.");
+  params.addParam<bool>(
+      "mass_conservation", false, "imposing strict mass conservation formulation");
   return params;
 }
 
@@ -56,9 +58,9 @@ GrandPotentialSinteringMaterial::GrandPotentialSinteringMaterial(const InputPara
     _eta(_neta),
     _eta_name(_neta),
     _w(coupledValue("chemical_potential")),
-    _w_name(getVar("chemical_potential", 0)->name()),
+    _w_name(coupledName("chemical_potential", 0)),
     _phi(coupledValue("void_op")),
-    _phi_name(getVar("void_op", 0)->name()),
+    _phi_name(coupledName("void_op", 0)),
     _cs_eq_name(getParam<MaterialPropertyName>("equilibrium_vacancy_concentration")),
     _cs_eq(getMaterialProperty<Real>(_cs_eq_name)),
     _dcs_eq(_neta),
@@ -102,6 +104,20 @@ GrandPotentialSinteringMaterial::GrandPotentialSinteringMaterial(const InputPara
     _dkappa(declarePropertyDerivative<Real>("kappa", _phi_name)),
     _d2kappa(declarePropertyDerivative<Real>("kappa", _phi_name, _phi_name)),
     _gamma(declareProperty<Real>("gamma")),
+    _hv_c_min(declareProperty<Real>("hv_c_min")),
+    _dhv_c_mindphi(declarePropertyDerivative<Real>("hv_c_min", _phi_name)),
+    _d2hv_c_mindphi2(declarePropertyDerivative<Real>("hv_c_min", _phi_name, _phi_name)),
+    _hs_c_min(declareProperty<Real>("hs_c_min")),
+    _dhs_c_mindphi(declarePropertyDerivative<Real>("hs_c_min", _phi_name)),
+    _d2hs_c_mindphi2(declarePropertyDerivative<Real>("hs_c_min", _phi_name, _phi_name)),
+    _dhs_c_min(_neta),
+    _d2hs_c_min(_neta),
+    _hv_over_kVa(declareProperty<Real>("hv_over_kVa")),
+    _dhv_over_kVadphi(declarePropertyDerivative<Real>("hv_over_kVa", _phi_name)),
+    _d2hv_over_kVadphi2(declarePropertyDerivative<Real>("hv_over_kVa", _phi_name, _phi_name)),
+    _hs_over_kVa(declareProperty<Real>("hs_over_kVa")),
+    _dhs_over_kVadphi(declarePropertyDerivative<Real>("hs_over_kVa", _phi_name)),
+    _d2hs_over_kVadphi2(declarePropertyDerivative<Real>("hs_over_kVa", _phi_name, _phi_name)),
 
     _sigma_s(getParam<Real>("surface_energy")),
     _sigma_gb(getParam<Real>("grainboundary_energy")),
@@ -113,15 +129,20 @@ GrandPotentialSinteringMaterial::GrandPotentialSinteringMaterial(const InputPara
     _mu_gb(6.0 * _sigma_gb / _int_width),
     _kappa_s(0.75 * _sigma_s * _int_width),
     _kappa_gb(0.75 * _sigma_gb * _int_width),
-    _kB(8.617343e-5) // eV/K
+    _kB(8.617343e-5), // eV/K
+    _mass_conservation(getParam<bool>("mass_conservation"))
 {
   if ((_switch > 1.0) || (_switch < 0.0))
     mooseError("GrandPotentialSinteringMaterial: surface_switch_value should be between 0 and 1");
 
+  if (_mass_conservation && _solid_energy > 0)
+    mooseError("GrandPotentialSinteringMaterial: strict mass conservation is currently only "
+               "applicable to parabolic free energy");
+
   for (unsigned int i = 0; i < _neta; ++i)
   {
     _eta[i] = &coupledValue("etas", i);
-    _eta_name[i] = getVar("etas", i)->name();
+    _eta_name[i] = coupledName("etas", i);
     _dcs_eq[i] = &getMaterialPropertyDerivativeByName<Real>(_cs_eq_name, _eta_name[i]);
     _d2cs_eq[i].resize(_neta);
     _drhos[i] = &declarePropertyDerivative<Real>("rhos", _eta_name[i]);
@@ -130,6 +151,8 @@ GrandPotentialSinteringMaterial::GrandPotentialSinteringMaterial(const InputPara
     _domegasdeta[i] = &declarePropertyDerivative<Real>("omegas", _eta_name[i]);
     _d2omegasdwdeta[i] = &declarePropertyDerivative<Real>("omegas", _w_name, _eta_name[i]);
     _d2omegasdetadeta[i].resize(_neta);
+    _dhs_c_min[i] = &declarePropertyDerivative<Real>("hs_c_min", _eta_name[i]);
+    _d2hs_c_min[i].resize(_neta);
 
     for (unsigned int j = 0; j <= i; ++j)
     {
@@ -138,6 +161,7 @@ GrandPotentialSinteringMaterial::GrandPotentialSinteringMaterial(const InputPara
       _d2rhos[j][i] = &declarePropertyDerivative<Real>("rhos", _eta_name[j], _eta_name[i]);
       _d2omegasdetadeta[j][i] =
           &declarePropertyDerivative<Real>("omegas", _eta_name[j], _eta_name[i]);
+      _d2hs_c_min[j][i] = &declarePropertyDerivative<Real>("hs_c_min", _eta_name[j], _eta_name[i]);
     }
   }
 }
@@ -145,11 +169,6 @@ GrandPotentialSinteringMaterial::GrandPotentialSinteringMaterial(const InputPara
 void
 GrandPotentialSinteringMaterial::computeQpProperties()
 {
-  // Calculate bnds
-  Real sum_eta_i = 0.0;
-  for (unsigned int i = 0; i < _neta; ++i)
-    sum_eta_i += (*_eta[i])[_qp] * (*_eta[i])[_qp];
-
   // Calculate phase switching functions
   _hv[_qp] = 0.0;
   _dhv[_qp] = 0.0;
@@ -209,16 +228,32 @@ GrandPotentialSinteringMaterial::computeQpProperties()
       _domegasdw[_qp] = -_rhos[_qp];
       _d2omegasdw2[_qp] = -_drhosdw[_qp];
 
+      // bodyforce and matreact coefficients for strict mass conservation case
+      _hv_c_min[_qp] = _hv[_qp] * 1.0;
+      _dhv_c_mindphi[_qp] = _dhv[_qp] * 1.0;
+      _d2hv_c_mindphi2[_qp] = _d2hv[_qp] * 1.0;
+      _hs_c_min[_qp] = _hs[_qp] * _cs_eq[_qp];
+      _dhs_c_mindphi[_qp] = _dhs[_qp] * _cs_eq[_qp];
+      _d2hs_c_mindphi2[_qp] = _d2hs[_qp] * _cs_eq[_qp];
+      _hv_over_kVa[_qp] = _hv[_qp] / (_Va * _kv[_qp]);
+      _dhv_over_kVadphi[_qp] = _dhv[_qp] / (_Va * _kv[_qp]);
+      _d2hv_over_kVadphi2[_qp] = _d2hv[_qp] / (_Va * _kv[_qp]);
+      _hs_over_kVa[_qp] = _hs[_qp] / (_Va * _ks[_qp]);
+      _dhs_over_kVadphi[_qp] = _dhs[_qp] / (_Va * _ks[_qp]);
+      _d2hs_over_kVadphi2[_qp] = _d2hs[_qp] / (_Va * _ks[_qp]);
+
       for (unsigned int i = 0; i < _neta; ++i)
       {
         (*_drhos[i])[_qp] = (*_dcs_eq[i])[_qp] / _Va;
         (*_d2rhosdwdeta[i])[_qp] = 0.0;
         (*_domegasdeta[i])[_qp] = -_w[_qp] * (*_dcs_eq[i])[_qp] / _Va;
         (*_d2omegasdwdeta[i])[_qp] = -(*_dcs_eq[i])[_qp] / _Va;
+        (*_dhs_c_min[i])[_qp] = _hs[_qp] * (*_dcs_eq[i])[_qp];
         for (unsigned int j = i; j < _neta; ++j)
         {
           (*_d2rhos[i][j])[_qp] = (*_d2cs_eq[i][j])[_qp] / _Va;
           (*_d2omegasdetadeta[i][j])[_qp] = -_w[_qp] * (*_d2cs_eq[i][j])[_qp] / _Va;
+          (*_d2hs_c_min[i][j])[_qp] = _hs[_qp] * (*_d2cs_eq[i][j])[_qp];
         }
       }
       break;

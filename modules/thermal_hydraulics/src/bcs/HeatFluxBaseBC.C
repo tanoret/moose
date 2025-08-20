@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #include "HeatFluxBaseBC.h"
 #include "HeatFluxFromHeatStructureBaseUserObject.h"
-#include "THMIndices3Eqn.h"
+#include "THMIndicesVACE.h"
 #include "Assembly.h"
 #include "NonlinearSystemBase.h"
 
@@ -23,6 +23,7 @@ HeatFluxBaseBC::validParams()
   params.addRequiredParam<unsigned int>("n_unit", "Number of units of heat structure");
   params.addRequiredParam<bool>("hs_coord_system_is_cylindrical",
                                 "Is the heat structure coordinate system cylindrical?");
+  params.addClassDescription("Base class for heat flux boundary conditions");
   return params;
 }
 
@@ -70,7 +71,8 @@ HeatFluxBaseBC::computeOffDiagJacobian(const unsigned int jvar_num)
     for (std::size_t i = 0; i < _off_diag_var_nums.size(); i++)
     {
       unsigned int jvar_num = _off_diag_var_nums[i];
-      MooseVariableFEBase & jvar = _fe_problem.getNonlinearSystemBase().getVariable(_tid, jvar_num);
+      MooseVariableFEBase & jvar =
+          _fe_problem.getNonlinearSystemBase(_sys.number()).getVariable(_tid, jvar_num);
       jvar.prepareNeighbor();
       _assembly.copyNeighborShapes(jvar_num);
 
@@ -82,7 +84,7 @@ HeatFluxBaseBC::computeOffDiagJacobian(const unsigned int jvar_num)
           for (_j = 0; _j < jvar.phiNeighborSize(); _j++)
             Ke(_i, _j) += _JxW[_qp] * _coord[_qp] * computeQpOffDiagJacobianNeighbor(jvar_num);
 
-      _assembly.cacheJacobianBlock(Ke, idofs, jdofs, _var.scalingFactor());
+      addJacobian(_assembly, Ke, idofs, jdofs, _var.scalingFactor());
     }
   }
 }

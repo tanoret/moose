@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -43,15 +43,21 @@ PerfGraphInterface::PerfGraphInterface(PerfGraph & perf_graph, const std::string
 {
 }
 
+std::string
+PerfGraphInterface::timedSectionName(const std::string & section_name) const
+{
+  return _prefix.empty() ? "" : (_prefix + "::") + section_name;
+}
+
 PerfID
 PerfGraphInterface::registerTimedSection(const std::string & section_name,
                                          const unsigned int level) const
 {
-  if (_prefix != "")
-    return moose::internal::getPerfGraphRegistry().registerSection(_prefix + "::" + section_name,
-                                                                   level);
+  const auto timed_section_name = timedSectionName(section_name);
+  if (!moose::internal::getPerfGraphRegistry().sectionExists(timed_section_name))
+    return moose::internal::getPerfGraphRegistry().registerSection(timed_section_name, level);
   else
-    return moose::internal::getPerfGraphRegistry().registerSection(section_name, level);
+    return moose::internal::getPerfGraphRegistry().sectionID(timed_section_name);
 }
 
 PerfID
@@ -60,12 +66,12 @@ PerfGraphInterface::registerTimedSection(const std::string & section_name,
                                          const std::string & live_message,
                                          const bool print_dots) const
 {
-  if (_prefix != "")
+  const auto timed_section_name = timedSectionName(section_name);
+  if (!moose::internal::getPerfGraphRegistry().sectionExists(timed_section_name))
     return moose::internal::getPerfGraphRegistry().registerSection(
-        _prefix + "::" + section_name, level, live_message, print_dots);
+        timedSectionName(section_name), level, live_message, print_dots);
   else
-    return moose::internal::getPerfGraphRegistry().registerSection(
-        section_name, level, live_message, print_dots);
+    return moose::internal::getPerfGraphRegistry().sectionID(timed_section_name);
 }
 
 PerfGraph &

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -43,7 +43,7 @@ NodalSum::execute()
 }
 
 Real
-NodalSum::getValue()
+NodalSum::getValue() const
 {
   return _sum;
 }
@@ -57,6 +57,6 @@ NodalSum::finalize()
 void
 NodalSum::threadJoin(const UserObject & y)
 {
-  const NodalSum & pps = static_cast<const NodalSum &>(y);
+  const auto & pps = static_cast<const NodalSum &>(y);
   _sum += pps._sum;
 }

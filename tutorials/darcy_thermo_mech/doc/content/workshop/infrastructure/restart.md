@@ -64,8 +64,14 @@ more variables.
 
 Advanced restart and recovery in MOOSE require checkpoint files
 
-To enable automatic checkpoints using the default options (every time step, and keep last two) in
-a simulation simply add the following flag to your input file:
+Checkpoints are automatically enabled by default and are output every 1 hour of wall time (customizable interval), but can be disabled with:
+```text
+[Outputs]
+  wall_time_checkpoint = false
+[]
+```
+
+Checkpoints can be output at every time step with the following shortcut syntax:
 
 ```text
 [Outputs]
@@ -96,7 +102,7 @@ simulation match and the variables and stateful data should be loaded from the p
 ```text
 [Mesh]
   # Serial number should match corresponding Executioner parameter
-  file = out_cp/0010_mesh.cpr
+  file = out_cp/0010-mesh.cpr
   # This method of restart is only supported on serial meshes
   distribution = serial
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,6 +18,8 @@
 #include "libmesh/parallel_sync.h"
 #include "libmesh/enum_point_locator_type.h"
 #include "libmesh/mesh_tools.h"
+
+using namespace libMesh;
 
 ClaimRays::ClaimRays(RayTracingStudy & study,
                      const std::vector<std::shared_ptr<Ray>> & rays,
@@ -256,9 +258,10 @@ ClaimRays::verifyClaiming()
 
   // Build the structure to send the local generation/claiming information to rank 0
   std::map<processor_id_type, std::vector<std::pair<RayID, char>>> send_info;
-  send_info.emplace(std::piecewise_construct,
-                    std::forward_as_tuple(0),
-                    std::forward_as_tuple(local_map.begin(), local_map.end()));
+  if (local_map.size())
+    send_info.emplace(std::piecewise_construct,
+                      std::forward_as_tuple(0),
+                      std::forward_as_tuple(local_map.begin(), local_map.end()));
 
   // The mapping (filled on rank 0) from Ray ID -> (processor id, claiming status)
   std::map<RayID, std::vector<std::pair<processor_id_type, char>>> global_map;

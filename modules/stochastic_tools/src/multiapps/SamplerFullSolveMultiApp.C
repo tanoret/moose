@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,6 +11,8 @@
 #include "SamplerFullSolveMultiApp.h"
 #include "Sampler.h"
 #include "StochasticToolsTransfer.h"
+#include "Console.h"
+#include "VariadicTable.h"
 
 registerMooseObject("StochasticToolsApp", SamplerFullSolveMultiApp);
 
@@ -37,7 +39,11 @@ SamplerFullSolveMultiApp::validParams()
       "mode",
       modes,
       "The operation mode, 'normal' creates one sub-application for each row in the Sampler and "
-      "'batch' creates one sub-application for each processor and re-executes for each row.");
+      "'batch-reset' and 'batch-restore' creates N sub-applications, where N is the minimum of "
+      "'num_rows' in the Sampler and floor(number of processes / min_procs_per_app). To run "
+      "the rows in the Sampler, 'batch-reset' will destroy and re-create sub-apps as needed, "
+      "whereas the 'batch-restore' will backup and restore sub-apps to the initial state prior "
+      "to execution, without destruction.");
   params.addParam<ReporterName>(
       "should_run_reporter",
       "Vector reporter value determining whether a certain multiapp should be run with this "
@@ -76,7 +82,8 @@ SamplerFullSolveMultiApp::SamplerFullSolveMultiApp(const InputParameters & param
                "Conditionally run sampler multiapp only works in batch modes.");
 }
 
-void SamplerFullSolveMultiApp::preTransfer(Real /*dt*/, Real /*target_time*/)
+void
+SamplerFullSolveMultiApp::preTransfer(Real /*dt*/, Real /*target_time*/)
 {
   // Reinitialize MultiApp size
   const auto num_rows = _sampler.getNumberOfRows();
@@ -196,21 +203,30 @@ SamplerFullSolveMultiApp::solveStepBatch(Real dt, Real target_time, bool auto_ad
         initialSetup();
     }
 
-    for (auto & transfer : to_transfers)
+    execBatchTransfers(to_transfers,
+                       i,
+                       _row_data,
+                       MultiAppTransfer::TO_MULTIAPP,
+                       _fe_problem.verboseMultiApps(),
+                       _console);
+
+    // Set the file base based on the current row
+    for (unsigned int ai = 0; ai < _my_num_apps; ++ai)
     {
-      transfer->setGlobalRowIndex(i);
-      transfer->setCurrentRow(_row_data);
-      transfer->executeToMultiapp();
+      const std::string mname = getMultiAppName(name(), i, _number_of_sampler_rows);
+      _apps[ai]->setOutputFileBase(_app.getOutputFileBase() + "_" + mname);
     }
 
-    last_solve_converged = FullSolveMultiApp::solveStep(dt, target_time, auto_advance);
+    const bool curr_last_solve_converged =
+        FullSolveMultiApp::solveStep(dt, target_time, auto_advance);
+    last_solve_converged = last_solve_converged && curr_last_solve_converged;
 
-    for (auto & transfer : from_transfers)
-    {
-      transfer->setGlobalRowIndex(i);
-      transfer->setCurrentRow(_row_data);
-      transfer->executeFromMultiapp();
-    }
+    execBatchTransfers(from_transfers,
+                       i,
+                       _row_data,
+                       MultiAppTransfer::FROM_MULTIAPP,
+                       _fe_problem.verboseMultiApps(),
+                       _console);
 
     _local_batch_app_index++;
   }
@@ -223,6 +239,86 @@ SamplerFullSolveMultiApp::solveStepBatch(Real dt, Real target_time, bool auto_ad
     transfer->finalizeFromMultiapp();
 
   return last_solve_converged;
+}
+
+void
+SamplerFullSolveMultiApp::execBatchTransfers(
+    const std::vector<std::shared_ptr<StochasticToolsTransfer>> & transfers,
+    dof_id_type global_row_index,
+    const std::vector<Real> & row_data,
+    Transfer::DIRECTION direction,
+    bool verbose,
+    const ConsoleStream & console)
+{
+  if (verbose && transfers.size())
+  {
+    console << COLOR_CYAN << "\nBatch transfers for row " << global_row_index;
+    if (direction == MultiAppTransfer::TO_MULTIAPP)
+      console << " To ";
+    else if (direction == MultiAppTransfer::FROM_MULTIAPP)
+      console << " From ";
+    console << "MultiApps" << COLOR_DEFAULT << ":" << std::endl;
+
+    console << "Sampler row " << global_row_index << " data: [" << Moose::stringify(row_data) << "]"
+            << std::endl;
+
+    // Build Table of Transfer Info
+    VariadicTable<std::string, std::string, std::string, std::string> table(
+        {"Name", "Type", "From", "To"});
+    for (const auto & transfer : transfers)
+      table.addRow(
+          transfer->name(), transfer->type(), transfer->getFromName(), transfer->getToName());
+    table.print(console);
+  }
+
+  for (auto & transfer : transfers)
+  {
+    transfer->setGlobalRowIndex(global_row_index);
+    transfer->setCurrentRow(row_data);
+    if (direction == MultiAppTransfer::TO_MULTIAPP)
+      transfer->executeToMultiapp();
+    else if (direction == MultiAppTransfer::FROM_MULTIAPP)
+      transfer->executeFromMultiapp();
+  }
+
+  if (verbose && transfers.size())
+    console << COLOR_CYAN << "Batch transfers for row " << global_row_index << " Are Finished\n"
+            << COLOR_DEFAULT << std::endl;
+}
+
+void
+SamplerFullSolveMultiApp::showStatusMessage(unsigned int i) const
+{
+  // Local row is the app index if in normal mode, otherwise it's _local_batch_app_index
+  const dof_id_type local_row =
+      _mode == StochasticTools::MultiAppMode::NORMAL ? (dof_id_type)i : _local_batch_app_index;
+  // If the local row is less than the number of local sims, we aren't finished yet
+  if (local_row < _rank_config.num_local_sims - 1)
+    return;
+
+  // Loop through processors to communicate completeness
+  for (const auto & pid : make_range(n_processors()))
+  {
+    // This is what is being sent to trigger completeness
+    dof_id_type last_row = _rank_config.is_first_local_rank
+                               ? _rank_config.first_local_sim_index + _rank_config.num_local_sims
+                               : 0;
+    // Cannot send/receive to the same processor, so avoid if root
+    if (pid > 0)
+    {
+      // Send data to root
+      if (pid == processor_id())
+        _communicator.send(0, last_row);
+      // Receive data from source
+      else if (processor_id() == 0)
+        _communicator.receive(pid, last_row);
+    }
+
+    // Output the samples that are complete if it's the main processor for the batch
+    if (last_row)
+      _console << COLOR_CYAN << type() << " [" << name() << "] " << last_row << "/"
+               << _number_of_sampler_rows << " samples complete!" << std::endl;
+  }
 }
 
 std::vector<std::shared_ptr<StochasticToolsTransfer>>
@@ -240,10 +336,10 @@ SamplerFullSolveMultiApp::getActiveStochasticToolsTransfers(Transfer::DIRECTION 
   return output;
 }
 
-std::string
-SamplerFullSolveMultiApp::getCommandLineArgsParamHelper(unsigned int local_app)
+std::vector<std::string>
+SamplerFullSolveMultiApp::getCommandLineArgs(const unsigned int local_app)
 {
-  std::string args;
+  std::vector<std::string> args;
 
   // With multiple processors per app, there are no local rows for non-root processors
   if (isRootProcessor())
@@ -253,9 +349,7 @@ SamplerFullSolveMultiApp::getCommandLineArgsParamHelper(unsigned int local_app)
     updateRowData(_mode == StochasticTools::MultiAppMode::NORMAL ? local_app
                                                                  : _local_batch_app_index);
 
-    const std::vector<std::string> & full_args_name =
-        MooseUtils::split(FullSolveMultiApp::getCommandLineArgsParamHelper(local_app), ";");
-    args = sampledCommandLineArgs(_row_data, full_args_name);
+    args = sampledCommandLineArgs(_row_data, FullSolveMultiApp::getCommandLineArgs(local_app));
   }
 
   _my_communicator.broadcast(args);
@@ -289,11 +383,11 @@ SamplerFullSolveMultiApp::updateRowData(dof_id_type local_index)
               "Local index must be equal or one greater than the index previously called.");
 }
 
-std::string
+std::vector<std::string>
 SamplerFullSolveMultiApp::sampledCommandLineArgs(const std::vector<Real> & row,
                                                  const std::vector<std::string> & full_args_name)
 {
-  std::ostringstream oss;
+  std::vector<std::string> args;
 
   // Find parameters that are meant to be assigned by sampler values
   std::vector<std::string> cli_args_name;
@@ -303,7 +397,7 @@ SamplerFullSolveMultiApp::sampledCommandLineArgs(const std::vector<Real> & row,
     if (fan.find("=") == std::string::npos)
       cli_args_name.push_back(fan);
     else
-      oss << fan << ";";
+      args.push_back(fan);
   }
 
   // Make sure the parameters either all have brackets, or none of them do
@@ -325,20 +419,19 @@ SamplerFullSolveMultiApp::sampledCommandLineArgs(const std::vector<Real> & row,
     {
       // Split param name and vector assignment: "param[0,(3.14),1]" -> {"param", "0,(3.14),1]"}
       const std::vector<std::string> & vector_param = MooseUtils::split(cli_args_name[i], "[");
-      // Get inices of vector: "0,(3.14),1]" -> {"0", "(3.14)", "1"}
+      // Get indices of vector: "0,(3.14),1]" -> {"0", "(3.14)", "1"}
       const std::vector<std::string> & index_string =
           MooseUtils::split(vector_param[1].substr(0, vector_param[1].find("]")), ",");
 
       // Loop through indices and assign parameter: param='row[0] 3.14 row[1]'
-      oss << vector_param[0] << "='";
-      std::string sep = "";
+      std::vector<std::string> values;
       for (const auto & istr : index_string)
       {
-        oss << sep;
-        sep = " ";
+        Real value;
+
         // If the value is enclosed in parentheses, then it isn't an index, it's a value
         if (istr.find("(") != std::string::npos)
-          oss << std::stod(istr.substr(istr.find("(") + 1));
+          value = std::stod(istr.substr(istr.find("(") + 1));
         // Assign the value from row if it is an index
         else
         {
@@ -349,17 +442,18 @@ SamplerFullSolveMultiApp::sampledCommandLineArgs(const std::vector<Real> & row,
                          ") for ",
                          vector_param[0],
                          " is out of bound.");
-          oss << Moose::stringify(row[index]);
+          value = row[index];
         }
+
+        values.push_back(Moose::stringifyExact(value));
       }
-      oss << "';";
+
+      args.push_back(vector_param[0] + "='" + MooseUtils::stringJoin(values) + "'");
     }
     // Assign scalar parameters
     else
-    {
-      oss << cli_args_name[i] << "=" << Moose::stringify(row[i]) << ";";
-    }
+      args.push_back(cli_args_name[i] + "=" + Moose::stringifyExact(row[i]));
   }
 
-  return oss.str();
+  return args;
 }

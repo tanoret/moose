@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,6 +10,7 @@
 #pragma once
 
 // Moose includes
+#include "MooseTypes.h"
 #include "Restartable.h"
 #include "PenetrationInfo.h"
 #include "PerfGraphInterface.h"
@@ -67,10 +68,10 @@ public:
   BoundaryID _primary_boundary;
   BoundaryID _secondary_boundary;
 
-  FEType _fe_type;
+  libMesh::FEType _fe_type;
 
   // One FE for each thread and for each dimension
-  std::vector<std::vector<FEBase *>> _fe;
+  std::vector<std::vector<libMesh::FEBase *>> _fe;
 
   NearestNodeLocator & _nearest_node;
 

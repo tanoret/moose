@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,6 +25,7 @@
 #include "libmesh/cell_pyramid14.h"
 #include "libmesh/cell_tet4.h"
 #include "libmesh/cell_tet10.h"
+#include "libmesh/cell_tet14.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/enum_to_string.h"
 #include "libmesh/face_quad4.h"
@@ -33,28 +34,14 @@
 #include "libmesh/remote_elem.h"
 #include "libmesh/tensor_value.h"
 
+using namespace libMesh;
+
 namespace TraceRayTools
 {
 
-const std::set<int> TRACEABLE_ELEMTYPES = {HEX8,
-                                           HEX20,
-                                           HEX27,
-                                           QUAD4,
-                                           QUAD8,
-                                           QUAD9,
-                                           TET4,
-                                           TET10,
-                                           TRI3,
-                                           TRI6,
-                                           EDGE2,
-                                           EDGE3,
-                                           EDGE4,
-                                           PYRAMID5,
-                                           PYRAMID13,
-                                           PYRAMID14,
-                                           PRISM6,
-                                           PRISM15,
-                                           PRISM18};
+const std::set<int> TRACEABLE_ELEMTYPES = {
+    HEX8, HEX20, HEX27, QUAD4, QUAD8,    QUAD9,     TET4,      TET10,  TET14,   TRI3,   TRI6,
+    TRI7, EDGE2, EDGE3, EDGE4, PYRAMID5, PYRAMID13, PYRAMID14, PRISM6, PRISM15, PRISM18};
 const std::set<int> ADAPTIVITY_TRACEABLE_ELEMTYPES = {QUAD4, HEX8, TRI3, TET4, EDGE2};
 
 bool
@@ -144,7 +131,7 @@ findPointNeighbors(
   // Helper for avoiding extraneous allocation when building side elements
   std::unique_ptr<const Elem> side_helper;
 
-  auto contains_point = [&point, &info, &side_helper](const Elem * const candidate)
+  auto contains_point = [&point, &info, &side_helper, &elem](const Elem * const candidate)
   {
     if (candidate->contains_point(point))
     {
@@ -156,7 +143,8 @@ findPointNeighbors(
           sides.push_back(s);
       }
 
-      if (!sides.empty())
+      // Dont add the local element
+      if (!sides.empty() && candidate != elem)
       {
         info.emplace_back(candidate, std::move(sides));
         return true;
@@ -182,7 +170,7 @@ findPointNeighbors(
   std::set<const Elem *> point_neighbors;
   elem->find_point_neighbors(point, point_neighbors);
   for (const auto & point_neighbor : point_neighbors)
-    if (!neighbor_set.contains(point_neighbor))
+    if (!neighbor_set.contains(point_neighbor) && point_neighbor != elem)
       mooseError("Missed a point neighbor");
 #endif
 }
@@ -256,7 +244,8 @@ findNodeNeighbors(
   elem->find_point_neighbors(*node, point_neighbors);
   for (const auto & point_neighbor : point_neighbors)
     for (const auto & neighbor_node : point_neighbor->node_ref_range())
-      if (node == &neighbor_node && !neighbor_set.contains(point_neighbor))
+      if (node == &neighbor_node && !neighbor_set.contains(point_neighbor) &&
+          point_neighbor != elem)
         mooseError("Missed a node neighbor");
 #endif
 }
@@ -306,6 +295,9 @@ findEdgeNeighbors(
             candidate, elem, node1, node2, edge_length, info);
       case TET10:
         return findEdgeNeighborsWithinEdgeInternal<Tet10>(
+            candidate, elem, node1, node2, edge_length, info);
+      case TET14:
+        return findEdgeNeighborsWithinEdgeInternal<Tet14>(
             candidate, elem, node1, node2, edge_length, info);
       case PYRAMID13:
         return findEdgeNeighborsWithinEdgeInternal<Pyramid13>(
@@ -608,21 +600,18 @@ withinEdge(const Elem * elem,
   switch (elem->type())
   {
     case HEX8:
-      return withinEdgeTempl<Hex8>(elem, point, extrema, tolerance);
-    case TET4:
-      return withinEdgeTempl<Tet4>(elem, point, extrema, tolerance);
-    case PYRAMID5:
-      return withinEdgeTempl<Pyramid5>(elem, point, extrema, tolerance);
-    case PRISM6:
-      return withinEdgeTempl<Prism6>(elem, point, extrema, tolerance);
     case HEX20:
     case HEX27:
       return withinEdgeTempl<Hex8>(elem, point, extrema, tolerance);
+    case TET4:
     case TET10:
+    case TET14:
       return withinEdgeTempl<Tet4>(elem, point, extrema, tolerance);
+    case PYRAMID5:
     case PYRAMID13:
     case PYRAMID14:
       return withinEdgeTempl<Pyramid5>(elem, point, extrema, tolerance);
+    case PRISM6:
     case PRISM15:
     case PRISM18:
       return withinEdgeTempl<Prism6>(elem, point, extrema, tolerance);
@@ -641,30 +630,26 @@ atVertexOnSide(const Elem * elem, const Point & point, const unsigned short side
   switch (elem->type())
   {
     case HEX8:
-      return atVertexOnSideTempl<Hex8>(elem, point, side);
-    case TET4:
-      return atVertexOnSideTempl<Tet4>(elem, point, side);
-    case PYRAMID5:
-      return atVertexOnSideTempl<Pyramid5>(elem, point, side);
-    case PRISM6:
-      return atVertexOnSideTempl<Prism6>(elem, point, side);
-    case QUAD4:
-      return atVertexOnSideTempl<Quad4>(elem, point, side);
-    case TRI3:
-      return atVertexOnSideTempl<Tri3>(elem, point, side);
     case HEX20:
     case HEX27:
       return atVertexOnSideTempl<Hex8>(elem, point, side);
+    case QUAD4:
     case QUAD8:
     case QUAD9:
       return atVertexOnSideTempl<Quad4>(elem, point, side);
+    case TRI3:
     case TRI6:
+    case TRI7:
       return atVertexOnSideTempl<Tri3>(elem, point, side);
+    case TET4:
     case TET10:
+    case TET14:
       return atVertexOnSideTempl<Tet4>(elem, point, side);
+    case PYRAMID5:
     case PYRAMID13:
     case PYRAMID14:
       return atVertexOnSideTempl<Pyramid5>(elem, point, side);
+    case PRISM6:
     case PRISM15:
     case PRISM18:
       return atVertexOnSideTempl<Prism6>(elem, point, side);
@@ -719,21 +704,18 @@ withinEdgeOnSide(const Elem * const elem,
   switch (elem->type())
   {
     case HEX8:
-      return withinEdgeOnSideTempl<Hex8>(elem, point, side, extrema);
-    case TET4:
-      return withinEdgeOnSideTempl<Tet4>(elem, point, side, extrema);
-    case PYRAMID5:
-      return withinEdgeOnSideTempl<Pyramid5>(elem, point, side, extrema);
-    case PRISM6:
-      return withinEdgeOnSideTempl<Prism6>(elem, point, side, extrema);
     case HEX20:
     case HEX27:
       return withinEdgeOnSideTempl<Hex8>(elem, point, side, extrema);
+    case TET4:
     case TET10:
+    case TET14:
       return withinEdgeOnSideTempl<Tet4>(elem, point, side, extrema);
+    case PYRAMID5:
     case PYRAMID13:
     case PYRAMID14:
       return withinEdgeOnSideTempl<Pyramid5>(elem, point, side, extrema);
+    case PRISM6:
     case PRISM15:
     case PRISM18:
       return withinEdgeOnSideTempl<Prism6>(elem, point, side, extrema);

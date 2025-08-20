@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ReportingIDGeneratorUtils.h"
+
+using namespace libMesh;
 
 std::vector<dof_id_type>
 ReportingIDGeneratorUtils::getCellwiseIntegerIDs(
@@ -85,7 +87,7 @@ ReportingIDGeneratorUtils::getCellBlockIDs(
 }
 
 std::map<SubdomainID, unsigned int>
-ReportingIDGeneratorUtils::getDuckBlockIDs(const std::unique_ptr<MeshBase> & mesh,
+ReportingIDGeneratorUtils::getDuckBlockIDs(const MeshBase & mesh,
                                            const bool has_assembly_boundary,
                                            const std::set<subdomain_id_type> background_blk_ids,
                                            const std::set<SubdomainID> & blks)
@@ -94,7 +96,7 @@ ReportingIDGeneratorUtils::getDuckBlockIDs(const std::unique_ptr<MeshBase> & mes
   if (has_assembly_boundary)
   {
     std::set<SubdomainID> mesh_blks;
-    mesh->subdomain_ids(mesh_blks);
+    mesh.subdomain_ids(mesh_blks);
     unsigned int i = 0;
     for (const auto mesh_blk : mesh_blks)
       if (!blks.count(mesh_blk) && !background_blk_ids.count(mesh_blk))
@@ -108,9 +110,9 @@ ReportingIDGeneratorUtils::getDuckBlockIDs(const std::unique_ptr<MeshBase> & mes
 
 void
 ReportingIDGeneratorUtils::assignReportingIDs(
-    std::unique_ptr<MeshBase> & mesh,
+    MeshBase & mesh,
     const unsigned int extra_id_index,
-    const std::string assign_type,
+    const ReportingIDGeneratorUtils::AssignType assign_type,
     const bool use_exclude_id,
     const std::vector<bool> & exclude_ids,
     const bool has_assembly_boundary,
@@ -122,11 +124,11 @@ ReportingIDGeneratorUtils::assignReportingIDs(
   std::vector<dof_id_type> integer_ids;
   // get reporting ID map
   // assumes that the entire mesh has elements of each individual mesh sequentially ordered.
-  if (assign_type == "cell")
+  if (assign_type == AssignType::cell)
     integer_ids = getCellwiseIntegerIDs(input_meshes, pattern, use_exclude_id, exclude_ids);
-  else if (assign_type == "pattern")
+  else if (assign_type == AssignType::pattern)
     integer_ids = getPatternIntegerIDs(input_meshes, pattern);
-  else if (assign_type == "manual")
+  else if (assign_type == AssignType::manual)
     integer_ids = getManualIntegerIDs(input_meshes, pattern, id_pattern);
 
   if (has_assembly_boundary)
@@ -142,7 +144,7 @@ ReportingIDGeneratorUtils::assignReportingIDs(
     unsigned int i = 0;
     unsigned int id = integer_ids[i];
     unsigned old_id = id;
-    for (auto elem : mesh->element_ptr_range())
+    for (auto elem : mesh.element_ptr_range())
     {
       auto blk = elem->subdomain_id();
       // check whether the current element belongs to duct/surrouding regions or not
@@ -171,7 +173,7 @@ ReportingIDGeneratorUtils::assignReportingIDs(
   {
     // assign reporting IDs to individual elements
     unsigned int i = 0;
-    for (auto & elem : mesh->element_ptr_range())
+    for (auto & elem : mesh.element_ptr_range())
       elem->set_extra_integer(extra_id_index, integer_ids[i++]);
   }
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -64,7 +64,6 @@ protected:
   using GenericRayKernel<is_ad>::_test;                                                            \
   using GenericRayKernel<is_ad>::_q_point;                                                         \
   using GenericRayKernel<is_ad>::_var;                                                             \
-  using GenericRayKernel<is_ad>::_name;                                                            \
   using GenericRayKernel<is_ad>::getVar;                                                           \
   using Coupleable::coupled;                                                                       \
   using Coupleable::coupledComponents;                                                             \

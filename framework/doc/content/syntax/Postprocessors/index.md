@@ -1,9 +1,12 @@
 # Postprocessor System
 
-A PostProcessor object in MOOSE is a C++ object that computes a single scalar (`Real`) value,
-typically the value computed is an aggregation of data from a simulation. For example, the
-maximum value of a variable (see [ElementExtremeValue.md]). The value compute may be coupled to
-other systems via the `getPostprocessorValue` method available in most MOOSE objects.
+A postprocessor is an object that computes a single scalar (`Real`) value,
+such as a value sampled from the solution at a point in the domain, or an integral/average
+over some subdomain or boundary. This value may be used purely for output purposes,
+or it may be retrieved by other systems via the `getPostprocessorValue` method,
+which is available in most MOOSE objects. Furthermore, postprocessors are also
+[functors](Functors/index.md), which allows them to be retrieved into various
+objects via the `getFunctor<Real>` method.
 
 MOOSE includes a large number of postprocessors within the framework, the complete list is
 provided in [Available Objects list](#available-objects) section.
@@ -48,7 +51,7 @@ Postprocessor Values:
 
 The values computed within a Postprocessor object may be used within other objects that inherit
 from the [PostprocessorInterface](interfaces/PostprocessorInterface.md), which is nearly every
-system within MOOSE. For example, the the [PostprocessorNeumannBC.md] object allows for a
+system within MOOSE. For example, the [PostprocessorNeumannBC.md] object allows for a
 Neumann boundary condition to be set to a value computed from a postprocessor; this object will
 be used as example to demonstrate how coupling is performed.
 
@@ -137,7 +140,7 @@ these two methods: the `_u[_qp]` is the value of the variable at the current nod
 from a shared base class and  `_sum` and `_n` are a member variables defined within class for
 performing the calculation.
 
-!listing AverageNodalVariableValue.C start=doco-execute-get-start end=doco-execute-get-end include-start=false
+!listing postprocessors/AverageNodalVariableValue.C start=doco-execute-get-start end=doco-execute-get-end include-start=false
 
 In parallel, the calls to the execute method occur on each process or thread on a subset of the
 domain, in this case nodes. Therefore, the computed values must be combined to get the actual
@@ -145,20 +148,20 @@ summations required to compute the average value. The first step is to setup the
 of this calculation within the initialize method, which in this example sets the
 `_sum` and `_n` member variables to zero.
 
-!listing AverageNodalVariableValue.C start=doco-init-start end=doco-init-end include-start=false
+!listing postprocessors/AverageNodalVariableValue.C start=doco-init-start end=doco-init-end include-start=false
 
 After the aforementioned execute method is called for each node the computed values for `_sum` and
 `_n` must be aggregated from across processes to the root processes. For this problem a gather
 operation is required to collect the values computed on all processes to the root process. This is
 accomplished via the `gatherSum` method.
 
-!listing AverageNodalVariableValue.C start=doco-final-start end=doco-final-end include-start=false
+!listing postprocessors/AverageNodalVariableValue.C start=doco-final-start end=doco-final-end include-start=false
 
 Of course, the type of communication necessary depends on the calculation being performed. The
 [UserObject.md] base class includes helper methods for common parallel communications functions.
 
 The initialize and finalize methods are utilized to aggregate for message passing (MPI) based
-parallelism. For shared memory parallelism the theadJoin method is used. This method is called,
+parallelism. For shared memory parallelism the threadJoin method is used. This method is called,
 like finalize, after execution is complete and includes a single argument. This argument is a
 reference to a UserObject, which is a base class of Postprocessor objects. The purpose of this
 method is to enable the aggregation for the Postprocessor objects that were executed on other
@@ -166,7 +169,7 @@ threads to the object on the root thread. For the AverageNodalVariableValue post
 values for `_sum` and `_n` on the root process object are updated to include the these same values
 from the other threads.
 
-!listing AverageNodalVariableValue.C start=doco-thread-start end=doco-thread-end include-start=false
+!listing postprocessors/AverageNodalVariableValue.C start=doco-thread-start end=doco-thread-end include-start=false
 
 ## Execute On... id=execute-on
 
@@ -181,6 +184,14 @@ in a computation. Both the previous time step's value and the value computed two
 be retrieved. One reason you might use older values is to break cyclic dependencies. MOOSE does
 not consider a dependence on an old value when considering the order of evaluation among objects
 with dependencies.
+
+## Restore on Rejected Timesteps
+
+When a timestep is rejected due to a failed solve, a failed multiapp solve, or
+any other reason, the timestep is usually repeated, usually with a smaller
+timestep size. Before performing the solve on the repeated timestep,
+postprocessors are restored to their old values, in order to facilitate a fresh
+attempt at the timestep.
 
 !syntax list /Postprocessors objects=True actions=False subsystems=False
 

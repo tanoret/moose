@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "QuadratureMaterial.h"
+
+using namespace libMesh;
 
 registerMooseObject("MooseTestApp", QuadratureMaterial);
 
@@ -41,7 +43,7 @@ QuadratureMaterial::QuadratureMaterial(const InputParameters & parameters)
 void
 QuadratureMaterial::computeQpProperties()
 {
-  if (_qrule->get_order() < 8)
+  if (this->hasBlocks(_current_elem->subdomain_id()) && (_qrule->get_order() < 8))
     mooseError("This material expect quadrature order to be higher than 8");
   _mat_prop[_qp] = _qp;
 }

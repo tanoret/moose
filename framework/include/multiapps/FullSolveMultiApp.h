@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,8 +36,17 @@ public:
     // executioner postExecute has been called and we do not need to call it again
   }
 
-  virtual void backup() override;
   virtual void restore(bool force = true) override;
+
+protected:
+  /**
+   * This function is called after each sub-application solve and is meant to display
+   * information about the solve. It can be overridden. In this class, it simply
+   * displays whether or not the sub-application solve was successful.
+   *
+   * @param i Sub-application index
+   */
+  virtual void showStatusMessage(unsigned int i) const;
 
 private:
   /// Switch to tell executioner to keep going despite app solve not converging

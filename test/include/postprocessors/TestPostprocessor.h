@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -42,7 +42,7 @@ public:
    * Returns the postprocessor depending on the 'test_type' parameter
    * @return The postprocessor value
    */
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
 
 private:
   /// Type of testing action to perform

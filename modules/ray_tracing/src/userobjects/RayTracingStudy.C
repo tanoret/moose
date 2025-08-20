@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -26,6 +26,8 @@
 #include "libmesh/mesh_tools.h"
 #include "libmesh/parallel_sync.h"
 #include "libmesh/remote_elem.h"
+
+using namespace libMesh;
 
 InputParameters
 RayTracingStudy::validParams()
@@ -92,8 +94,21 @@ RayTracingStudy::validParams()
                         "Trace intersections are not verified regardless of this parameter in "
                         "optimized modes (opt, oprof).");
 
+  params.addParam<bool>("allow_other_flags_with_prekernels",
+                        false,
+                        "Whether or not to allow the list of execution flags to have PRE_KERNELS "
+                        "mixed with other flags. If this parameter is not set then if PRE_KERNELS "
+                        "is provided it must be the only execution flag.");
+
   ExecFlagEnum & exec_enum = params.set<ExecFlagEnum>("execute_on", true);
   exec_enum.addAvailableFlags(EXEC_PRE_KERNELS);
+
+  params.addParamNamesToGroup(
+      "always_cache_traces data_on_cache_traces aux_data_on_cache_traces segments_on_cache_traces",
+      "Trace cache");
+  params.addParamNamesToGroup("warn_non_planar warn_subdomain_hmax", "Tracing Warnings");
+  params.addParamNamesToGroup("ray_kernel_coverage_check verify_rays verify_trace_intersections",
+                              "Checks and verifications");
 
   // Whether or not each Ray must be registered using the registerRay() API
   params.addPrivateParam<bool>("_use_ray_registration", true);
@@ -186,9 +201,9 @@ RayTracingStudy::RayTracingStudy(const InputParameters & parameters)
   }
 
   // Evaluating on residual and Jacobian evaluation
-  if (_execute_enum.contains(EXEC_PRE_KERNELS))
+  if (_execute_enum.isValueSet(EXEC_PRE_KERNELS))
   {
-    if (_execute_enum.size() > 1)
+    if (!getParam<bool>("allow_other_flags_with_prekernels") && _execute_enum.size() > 1)
       paramError("execute_on",
                  "PRE_KERNELS cannot be mixed with any other execution flag.\nThat is, you cannot "
                  "currently "
@@ -241,13 +256,13 @@ RayTracingStudy::initialSetup()
   std::vector<RayKernelBase *> ray_kernels;
   getRayKernels(ray_kernels, 0);
   for (const auto & rkb : ray_kernels)
-    if (dynamic_cast<RayKernel *>(rkb) && !_execute_enum.contains(EXEC_PRE_KERNELS))
+    if (dynamic_cast<RayKernel *>(rkb) && !_execute_enum.isValueSet(EXEC_PRE_KERNELS))
       mooseError("This study has RayKernel objects that contribute to residuals and Jacobians.",
                  "\nIn this case, the study must use the execute_on = PRE_KERNELS");
 
   // Build 1D quadrature rule for along a segment
   _segment_qrule =
-      QBase::build(QGAUSS, 1, _fe_problem.getNonlinearSystemBase().getMinQuadratureOrder());
+      QBase::build(QGAUSS, 1, _fe_problem.getSystemBase(_sys.number()).getMinQuadratureOrder());
 }
 
 void
@@ -520,6 +535,7 @@ RayTracingStudy::subdomainHMaxSetup()
         "tolerances used in computing ray intersections. This warning suggests that the\n"
         "approximate element size is not a good approximation. This is likely due to poor\n"
         "element aspect ratios.\n\n"
+        "This warning is only output for the first element affected.\n"
         "To disable this warning, set warn_subdomain_hmax = false.\n";
 
     for (const auto & elem : *_mesh.getActiveLocalElementRange())
@@ -530,13 +546,19 @@ RayTracingStudy::subdomainHMaxSetup()
 
       const auto hmax_rel = hmax / max_hmax;
       if (hmax_rel < 1.e-2 || hmax_rel > 1.e2)
-        mooseWarning(
-            warn_prefix, "Element hmax varies significantly from subdomain hmax.\n", warn_suffix);
+        mooseDoOnce(mooseWarning(warn_prefix,
+                                 "Element hmax varies significantly from subdomain hmax.\n",
+                                 warn_suffix,
+                                 "First element affected:\n",
+                                 Moose::stringify(*elem)););
 
       const auto h_rel = max_hmax / hmin;
       if (h_rel > 1.e2)
-        mooseWarning(
-            warn_prefix, "Element hmin varies significantly from subdomain hmax.\n", warn_suffix);
+        mooseDoOnce(mooseWarning(warn_prefix,
+                                 "Element hmin varies significantly from subdomain hmax.\n",
+                                 warn_suffix,
+                                 "First element affected:\n",
+                                 Moose::stringify(*elem)););
     }
   }
 }
@@ -624,7 +646,7 @@ RayTracingStudy::segmentSubdomainSetup(const SubdomainID subdomain,
   _fe_problem.subdomainSetup(subdomain, tid);
 
   std::set<MooseVariableFEBase *> needed_moose_vars;
-  std::set<unsigned int> needed_mat_props;
+  std::unordered_set<unsigned int> needed_mat_props;
 
   // Get RayKernels and their dependencies and call subdomain setup
   getRayKernels(_threaded_current_ray_kernels[tid], subdomain, tid, ray_id);
@@ -645,8 +667,7 @@ RayTracingStudy::segmentSubdomainSetup(const SubdomainID subdomain,
       var->prepareAux();
 
   _fe_problem.setActiveElementalMooseVariables(needed_moose_vars, tid);
-  _fe_problem.setActiveMaterialProperties(needed_mat_props, tid);
-  _fe_problem.prepareMaterials(subdomain, tid);
+  _fe_problem.prepareMaterials(needed_mat_props, subdomain, tid);
 }
 
 void
@@ -679,7 +700,7 @@ RayTracingStudy::reinitSegment(
     std::vector<Real> weights;
     buildSegmentQuadrature(start, end, length, points, weights);
     _fe_problem.reinitElemPhys(elem, points, tid);
-    _fe_problem.assembly(tid).modifyArbitraryWeights(weights);
+    _fe_problem.assembly(tid, _sys.number()).modifyArbitraryWeights(weights);
 
     _fe_problem.reinitMaterials(elem->subdomain_id(), tid);
   }
@@ -1432,9 +1453,10 @@ RayTracingStudy::verifyUniqueRayIDs(const std::vector<std::shared_ptr<Ray>>::con
   {
     // Package our local IDs and send to rank 0
     std::map<processor_id_type, std::vector<RayID>> send_ids;
-    send_ids.emplace(std::piecewise_construct,
-                     std::forward_as_tuple(0),
-                     std::forward_as_tuple(local_rays.begin(), local_rays.end()));
+    if (local_rays.size())
+      send_ids.emplace(std::piecewise_construct,
+                       std::forward_as_tuple(0),
+                       std::forward_as_tuple(local_rays.begin(), local_rays.end()));
     local_rays.clear();
 
     // Mapping on rank 0 from ID -> processor ID

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PartitionerWeightTest.h"
+
+#include "MooseApp.h"
 
 #include "libmesh/elem.h"
 
@@ -31,7 +33,7 @@ PartitionerWeightTest::PartitionerWeightTest(const InputParameters & params)
 std::unique_ptr<Partitioner>
 PartitionerWeightTest::clone() const
 {
-  return std::make_unique<PartitionerWeightTest>(_pars);
+  return _app.getFactory().clone(*this);
 }
 
 dof_id_type

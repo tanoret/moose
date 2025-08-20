@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -67,40 +67,40 @@ public:
   }
 
 protected:
-  std::shared_ptr<MaterialData> _face_material_data;
+  MaterialData & _face_material_data;
 };
 
 template <typename T>
 const MaterialProperty<T> &
 ThreeMaterialPropertyInterface::getFaceMaterialProperty(const std::string & name)
 {
-  return getMaterialProperty<T>(name, *_face_material_data);
+  return getMaterialProperty<T>(name, _face_material_data);
 }
 
 template <typename T>
 const MaterialProperty<T> &
 ThreeMaterialPropertyInterface::getFaceMaterialPropertyByName(const std::string & name)
 {
-  return getMaterialPropertyByName<T>(name, *_face_material_data);
+  return getMaterialPropertyByName<T>(name, _face_material_data);
 }
 
 template <typename T>
 const ADMaterialProperty<T> &
 ThreeMaterialPropertyInterface::getFaceADMaterialProperty(const std::string & name)
 {
-  return getADMaterialProperty<T>(name, *_face_material_data);
+  return getADMaterialProperty<T>(name, _face_material_data);
 }
 
 template <typename T>
 const MaterialProperty<T> &
 ThreeMaterialPropertyInterface::getFaceMaterialPropertyOld(const std::string & name)
 {
-  return getMaterialPropertyOld<T>(name, *_face_material_data);
+  return getMaterialPropertyOld<T>(name, _face_material_data);
 }
 
 template <typename T>
 const MaterialProperty<T> &
 ThreeMaterialPropertyInterface::getFaceMaterialPropertyOlder(const std::string & name)
 {
-  return getMaterialPropertyOlder<T>(name, *_face_material_data);
+  return getMaterialPropertyOlder<T>(name, _face_material_data);
 }

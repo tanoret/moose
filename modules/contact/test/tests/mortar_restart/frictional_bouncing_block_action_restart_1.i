@@ -33,7 +33,7 @@ offset = 1e-2
   []
 []
 
-[Modules/TensorMechanics/Master]
+[Physics/SolidMechanics/QuasiStatic]
   [all]
     strain = FINITE
     generate_output = 'stress_xx stress_yy'
@@ -156,7 +156,7 @@ offset = 1e-2
   [checkpoint]
     type = Checkpoint
     num_files = 2
-    interval = 1
+    time_step_interval = 1
   []
 []
 

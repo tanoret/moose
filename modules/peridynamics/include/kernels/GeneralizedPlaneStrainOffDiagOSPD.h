@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -59,4 +59,7 @@ protected:
 
   /// The variable number of the scalar out-of-plane strain variable
   const unsigned int _scalar_out_of_plane_strain_var_num;
+
+  DenseMatrix<Number> _ken;
+  DenseMatrix<Number> _kne;
 };

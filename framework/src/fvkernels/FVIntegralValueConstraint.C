@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -25,17 +25,17 @@ FVIntegralValueConstraint::validParams()
   InputParameters params = FVScalarLagrangeMultiplierConstraint::validParams();
   params.addClassDescription("This class is used to enforce integral of phi = volume * phi_0 "
                              "with a Lagrange multiplier approach.");
-  params.addParam<Real>("phi0", 0, "What we want the average value of the primal variable to be.");
+  params.setDocString("phi0", "What we want the average value of the primal variable to be.");
   return params;
 }
 
 FVIntegralValueConstraint::FVIntegralValueConstraint(const InputParameters & parameters)
-  : FVScalarLagrangeMultiplierConstraint(parameters), _phi0(getParam<Real>("phi0"))
+  : FVScalarLagrangeMultiplierConstraint(parameters)
 {
 }
 
 ADReal
 FVIntegralValueConstraint::computeQpResidual()
 {
-  return _u[_qp] - _phi0;
+  return _var(makeElemArg(_current_elem), determineState()) - _phi0;
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,8 +11,12 @@
 
 #include "SolveObject.h"
 
+#include "SolverParams.h"
+#include "PetscSupport.h"
+
 #include "ExecFlagEnum.h"
 #include <petsctao.h>
+
 #include "libmesh/petsc_vector.h"
 #include "libmesh/petsc_matrix.h"
 
@@ -76,12 +80,18 @@ protected:
   /// objective function defining objective, gradient, and hessian
   OptimizationReporterBase * _obj_function = nullptr;
 
+  ///function to get the objective reporter
+  OptimizationReporterBase * getObjFunction() { return _obj_function; }
+
   /// Tao optimization object
   Tao _tao;
 
 private:
   /// control optimization executioner output
   bool _verbose;
+
+  /// Use time step as the iteration counter for purposes of outputting
+  bool _output_opt_iters;
 
   ///@{
   /// count individual solves for output
@@ -108,6 +118,15 @@ private:
   /// step length per iteration
   std::vector<double> _xdiff_vec;
 
+  ///@{
+  /// These are needed to reset the petsc options for the optimization solve
+  /// using Moose::PetscSupport::petscSetOptions
+  /// This only sets the finite difference options, the other optimizeSolve
+  /// options are set-up in TAO using TaoSetFromOptions()
+  Moose::PetscSupport::PetscOptions _petsc_options;
+  SolverParams _solver_params;
+  ///@}
+
   /// Here is where we call tao and solve
   PetscErrorCode taoSolve();
 
@@ -123,6 +142,12 @@ private:
   objectiveAndGradientFunctionWrapper(Tao tao, Vec x, Real * objective, Vec gradient, void * ctx);
   static PetscErrorCode variableBoundsWrapper(Tao /*tao*/, Vec xl, Vec xu, void * ctx);
   static PetscErrorCode monitor(Tao tao, void * ctx);
+  static PetscErrorCode equalityFunctionWrapper(Tao tao, Vec x, Vec ce, void * ctx);
+  static PetscErrorCode
+  equalityGradientFunctionWrapper(Tao tao, Vec x, Mat gradient_e, Mat gradient_epre, void * ctx);
+  static PetscErrorCode inequalityFunctionWrapper(Tao tao, Vec x, Vec ci, void * ctx);
+  static PetscErrorCode
+  inequalityGradientFunctionWrapper(Tao tao, Vec x, Mat gradient_i, Mat gradient_ipre, void * ctx);
   ///@}
 
   /// Enum of tao solver types
@@ -132,6 +157,7 @@ private:
     BOUNDED_CONJUGATE_GRADIENT,
     NEWTON_LINE_SEARCH,
     BOUNDED_NEWTON_LINE_SEARCH,
+    BOUNDED_QUASI_NEWTON_TRUST_REGION,
     NEWTON_TRUST_LINE,
     BOUNDED_NEWTON_TRUST_LINE,
     QUASI_NEWTON,
@@ -140,15 +166,33 @@ private:
     BOUNDED_QUASI_NEWTON_LINE_SEARCH,
     ORTHANT_QUASI_NEWTON,
     GRADIENT_PROJECTION_CONJUGATE_GRADIENT,
-    BUNDLE_RISK_MIN
+    BUNDLE_RISK_MIN,
+    AUGMENTED_LAGRANGIAN_MULTIPLIER_METHOD
   } _tao_solver_enum;
 
   /// Number of parameters being optimized
   dof_id_type _ndof;
 
-  /// Parameters (solution)
+  /// Parameters (solution) given to TAO
   std::unique_ptr<libMesh::PetscVector<Number>> _parameters;
 
   /// Hessian (matrix) - usually a matrix-free representation
   Mat _hessian;
+
+  /// Equality constraint vector
+  Vec _ce;
+
+  /// Inequality constraint vector
+  Vec _ci;
+
+  /// Equality constraint gradient
+  Mat _gradient_e;
+
+  /// Inequality constraint gradient
+  Mat _gradient_i;
+
+  /// Used for creating petsc structures when using the ALMM algorithm
+  PetscErrorCode taoALCreate();
+  /// Used for destroying petsc structures when using the ALMM algorithm
+  PetscErrorCode taoALDestroy();
 };

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,7 +8,7 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "RelativeSolutionDifferenceNorm.h"
-#include "Transient.h"
+#include "TransientBase.h"
 
 registerMooseObject("MooseApp", RelativeSolutionDifferenceNorm);
 
@@ -24,14 +24,14 @@ RelativeSolutionDifferenceNorm::validParams()
 }
 
 RelativeSolutionDifferenceNorm::RelativeSolutionDifferenceNorm(const InputParameters & params)
-  : GeneralPostprocessor(params), _trex(dynamic_cast<Transient *>(_app.getExecutioner()))
+  : GeneralPostprocessor(params), _trex(dynamic_cast<TransientBase *>(_app.getExecutioner()))
 {
   if (!_trex)
     mooseError("RelativeSolutionDifferenceNorm postprocessor is only for transient calculations");
 }
 
 Real
-RelativeSolutionDifferenceNorm::getValue()
+RelativeSolutionDifferenceNorm::getValue() const
 {
   return _trex->relativeSolutionDifferenceNorm();
 }

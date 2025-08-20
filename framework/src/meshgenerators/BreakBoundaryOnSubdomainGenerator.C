@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -128,6 +128,8 @@ BreakBoundaryOnSubdomainGenerator::generate()
       }
     }
   }
+
+  mesh->set_isnt_prepared();
 
   return dynamic_pointer_cast<MeshBase>(mesh);
 }

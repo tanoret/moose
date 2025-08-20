@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -47,7 +47,7 @@ private:
   /// force density material
   MaterialProperty<std::vector<RealGradient>> & _dF;
   /// first order derivative of force density material w.r.t c
-  MaterialProperty<std::vector<RealGradient>> & _dFdc;
+  MaterialProperty<std::vector<RealGradient>> * _dFdc;
 
   std::vector<MaterialProperty<std::vector<RealGradient>> *> _dFdeta;
 };

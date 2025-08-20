@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -61,7 +61,7 @@ SLKKSMultiPhaseBase::SLKKSMultiPhaseBase(const InputParameters & parameters)
 
   // get order parameter names
   for (std::size_t i = 0; i < _neta; ++i)
-    _eta_names[i] = getVar("eta", i)->name();
+    _eta_names[i] = coupledName("eta", i);
 
   // Load concentration variables into the arrays
   for (std::size_t i = 0; i < _ncs; ++i)

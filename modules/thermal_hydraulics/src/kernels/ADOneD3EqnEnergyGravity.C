@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -21,7 +21,7 @@ ADOneD3EqnEnergyGravity::validParams()
   params.addRequiredParam<MaterialPropertyName>("rho", "Density property");
   params.addRequiredParam<MaterialPropertyName>("vel", "Velocity property");
   params.addRequiredParam<RealVectorValue>("gravity_vector", "Gravitational acceleration vector");
-  params.addClassDescription("Computes gravity term for the energy equation in 1-phase flow");
+  params.addClassDescription("Computes the gravity term for the energy equation in 1-phase flow");
   return params;
 }
 

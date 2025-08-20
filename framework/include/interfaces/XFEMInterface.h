@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -43,8 +43,6 @@ public:
   explicit XFEMInterface(const InputParameters & params)
     : ConsoleStreamInterface(*params.getCheckedPointerParam<MooseApp *>("_moose_app")),
       _fe_problem(params.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
-      _material_data(nullptr),
-      _bnd_material_data(nullptr),
       _moose_mesh(nullptr),
       _moose_displaced_mesh(nullptr),
       _mesh(nullptr),
@@ -78,17 +76,14 @@ public:
   /**
    * Set the pointer to the MaterialData
    */
-  void setMaterialData(std::vector<std::shared_ptr<MaterialData>> * material_data)
-  {
-    _material_data = material_data;
-  }
+  void setMaterialData(const std::vector<MaterialData *> & data) { _material_data = data; }
 
   /**
    * Set the pointer to the Boundary MaterialData
    */
-  void setBoundaryMaterialData(std::vector<std::shared_ptr<MaterialData>> * bnd_material_data)
+  void setBoundaryMaterialData(const std::vector<MaterialData *> & data)
   {
-    _bnd_material_data = bnd_material_data;
+    _bnd_material_data = data;
   }
 
   /**
@@ -114,7 +109,7 @@ public:
 
   virtual bool getXFEMWeights(MooseArray<Real> & weights,
                               const Elem * elem,
-                              QBase * qrule,
+                              libMesh::QBase * qrule,
                               const MooseArray<Point> & q_points) = 0;
 
   /**
@@ -127,7 +122,7 @@ public:
    */
   virtual bool getXFEMFaceWeights(MooseArray<Real> & weights,
                                   const Elem * elem,
-                                  QBase * qrule,
+                                  libMesh::QBase * qrule,
                                   const MooseArray<Point> & q_points,
                                   unsigned int side) = 0;
 
@@ -139,8 +134,8 @@ public:
 
 protected:
   FEProblemBase * _fe_problem;
-  std::vector<std::shared_ptr<MaterialData>> * _material_data;
-  std::vector<std::shared_ptr<MaterialData>> * _bnd_material_data;
+  std::vector<MaterialData *> _material_data;
+  std::vector<MaterialData *> _bnd_material_data;
 
   MooseMesh * _moose_mesh;
   MooseMesh * _moose_displaced_mesh;

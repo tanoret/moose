@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,8 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "CoupledDiffusionReactionSub.h"
+
+using libMesh::RealGradient;
 
 registerMooseObject("ChemicalReactionsApp", CoupledDiffusionReactionSub);
 
@@ -27,8 +29,8 @@ CoupledDiffusionReactionSub::validParams()
                         "operates on in the equilibrium reaction");
   params.addCoupledVar(
       "gamma_u", 1.0, "Activity coefficient of primary species that this kernel operates on");
-  params.addParam<std::vector<Real>>("sto_v",
-                                     "The stoichiometric coefficients of coupled primary species");
+  params.addParam<std::vector<Real>>(
+      "sto_v", {}, "The stoichiometric coefficients of coupled primary species");
   params.addCoupledVar("v", "List of coupled primary species in this equilibrium species");
   params.addCoupledVar("gamma_v", 1.0, "Activity coefficients of coupled primary species");
   params.addCoupledVar("gamma_eq", 1.0, "Activity coefficient of this equilibrium species");

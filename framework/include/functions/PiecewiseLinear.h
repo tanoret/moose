@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -15,26 +15,13 @@
  * Function which provides a piecewise continuous linear interpolation
  * of a provided (x,y) point data set.
  */
-template <typename BaseClass>
-class PiecewiseLinearTempl : public BaseClass
+class PiecewiseLinear : public PiecewiseLinearBase
 {
 public:
   static InputParameters validParams();
 
-  PiecewiseLinearTempl(const InputParameters & parameters);
-};
+  PiecewiseLinear(const InputParameters & parameters);
 
-class PiecewiseLinear : public PiecewiseLinearTempl<PiecewiseLinearBase>
-{
-public:
-  PiecewiseLinear(const InputParameters & params)
-    : PiecewiseLinearTempl<PiecewiseLinearBase>(params)
-  {
-  }
-  static InputParameters validParams()
-  {
-    return PiecewiseLinearTempl<PiecewiseLinearBase>::validParams();
-  }
+  /// Needed to process data from user objects that are not available at construction
+  void initialSetup() override;
 };
-
-typedef PiecewiseLinearTempl<ADPiecewiseLinearBase> ADPiecewiseLinear;

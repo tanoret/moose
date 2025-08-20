@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -32,10 +32,13 @@ NodalValueSampler::validParams()
 NodalValueSampler::NodalValueSampler(const InputParameters & parameters)
   : NodalVariableVectorPostprocessor(parameters), SamplerBase(parameters, this, _communicator)
 {
-  // ensure that variables are nodal, i.e., not scalar and and not elemental
+  // ensure that variables are 'nodal' (they have DoFs at nodes)
   for (unsigned int i = 0; i < _coupled_moose_vars.size(); i++)
-    if (_coupled_moose_vars[i]->feType().family == SCALAR || !_coupled_moose_vars[i]->isNodal())
+  {
+    if (!_coupled_moose_vars[i]->isNodal())
       paramError("variable", "The variable '", _coupled_moose_vars[i]->name(), "' is not nodal.");
+    SamplerBase::checkForStandardFieldVariableType(_coupled_moose_vars[i]);
+  }
 
   std::vector<std::string> var_names(_coupled_moose_vars.size());
   _values.resize(_coupled_moose_vars.size());
@@ -109,7 +112,7 @@ NodalValueSampler::finalize()
 void
 NodalValueSampler::threadJoin(const UserObject & y)
 {
-  const NodalValueSampler & vpp = static_cast<const NodalValueSampler &>(y);
+  const auto & vpp = static_cast<const NodalValueSampler &>(y);
 
   SamplerBase::threadJoin(vpp);
 }

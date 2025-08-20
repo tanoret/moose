@@ -48,7 +48,7 @@
   []
 []
 
-[Modules/TensorMechanics/Master/All]
+[Physics/SolidMechanics/QuasiStatic/All]
   volumetric_locking_correction = true
   strain = FINITE
   generate_output = 'strain_yy stress_yy'
@@ -113,7 +113,7 @@
   [umat]
     type = AbaqusUMATStress
     constant_properties = '1.0e6 0.3'
-    plugin = '../../../../tensor_mechanics/test/plugins/elastic_temperature'
+    plugin = '../../../../solid_mechanics/test/plugins/elastic_temperature'
     num_state_vars = 0
     temperature = temp
     use_one_based_indexing = true

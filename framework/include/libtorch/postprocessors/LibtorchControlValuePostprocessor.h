@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -46,7 +46,7 @@ public:
    * Returns the value of the latest response of a neural-network-based controller.
    * This means that we grab current response value stored wihtin the controller.
    */
-  virtual Real getValue() override;
+  virtual Real getValue() const override;
 
 private:
   unsigned int _signal_index;

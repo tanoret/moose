@@ -7,52 +7,52 @@
 []
 
 [Variables]
-  [./u]
-  [../]
+  [u]
+  []
 []
 
 [AuxVariables]
-  [./v]
-  [../]
+  [v]
+  []
 []
 
 [Kernels]
-  [./diff]
+  [diff]
     type = CoefDiffusion
     variable = u
     coef = 0.1
-  [../]
-  [./coupled_force]
+  []
+  [coupled_force]
     type = CoupledForce
     variable = u
     v = v
-  [../]
-  [./time]
+  []
+  [time]
     type = TimeDerivative
     variable = u
-  [../]
+  []
 []
 
 [BCs]
-  [./left]
+  [left]
     type = DirichletBC
     variable = u
     boundary = left
     value = 0
-  [../]
-  [./right]
+  []
+  [right]
     type = DirichletBC
     variable = u
     boundary = right
     value = 1
-  [../]
+  []
 []
 
 [Postprocessors]
   [picard_its]
     type = NumFixedPointIterations
     execute_on = 'initial timestep_end'
-  [../]
+  []
 []
 
 [Executioner]
@@ -74,20 +74,23 @@
 []
 
 [MultiApps]
-  [./sub1]
+  [sub1]
     type = TransientMultiApp
     app_type = MooseTestApp
     positions = '0 0 0'
     input_files = picard_sub.i
     execute_on = 'timestep_end'
-  [../]
+    # The input was originally created with effectively no restore
+    # see the changes made for #5554 then reverted in #28115
+    no_restore = true
+  []
 []
 
 [Transfers]
-  [./v]
-    type = MultiAppNearestNodeTransfer
+  [v]
+    type = MultiAppGeneralFieldNearestLocationTransfer
     from_multi_app = sub1
     source_variable = v
     variable = v
-  [../]
+  []
 []

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -93,10 +93,10 @@ private:
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-// The following itmes were created to maintain the various getScatter methods in the
+// The following items were created to maintain the various getScatter methods in the
 // VectorPostprocessorInterface.
 
-// Special consumer modue add
+// Special consumer module add
 extern const ReporterMode REPORTER_MODE_VPP_SCATTER;
 
 /*

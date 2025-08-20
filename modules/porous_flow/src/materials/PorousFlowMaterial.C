@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,7 +8,11 @@
 //* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowMaterial.h"
+
+#include "MaterialPropertyStorage.h"
+
 #include "libmesh/quadrature.h"
+
 #include <limits>
 
 InputParameters
@@ -22,6 +26,11 @@ PorousFlowMaterial::validParams()
   params.addPrivateParam<std::string>("pf_material_type", "pf_material");
   params.addClassDescription("This generalises MOOSE's Material class to allow for Materials that "
                              "hold information related to the nodes in the finite element");
+
+  // Needed due to the custom tomfoolery going on with nodal material sizing in
+  // initStatefulProperties()
+  params.set<bool>("_force_stateful_init") = true;
+
   return params;
 }
 
@@ -42,8 +51,8 @@ PorousFlowMaterial::initialSetup()
   if (!_nodal_material)
     return;
 
-  _material_data->onlyResizeIfSmaller(true);
-  auto & storage = _material_data->getMaterialPropertyStorage();
+  _material_data.onlyResizeIfSmaller(true);
+  auto & storage = _material_data.getMaterialPropertyStorage();
   if (!storage.hasStatefulProperties())
     return;
 
@@ -88,12 +97,12 @@ PorousFlowMaterial::computeNodalProperties()
   // To prevent this, we copy the last node value to the empty array positions.
   if (numnodes < _qrule->n_points())
   {
-    MaterialProperties & props = _material_data->props();
+    MaterialProperties & props = _material_data.props();
 
     // Copy from qp = _current_elem->n_nodes() - 1 to qp = _qrule->n_points() -1
     for (const auto & prop_id : _supplied_prop_ids)
       for (unsigned int qp = numnodes; qp < _qrule->n_points(); ++qp)
-        props[prop_id]->qpCopy(qp, props[prop_id], numnodes - 1);
+        props[prop_id].qpCopy(qp, props[prop_id], numnodes - 1);
   }
 }
 
@@ -132,24 +141,19 @@ PorousFlowMaterial::sizeNodalProperties()
    * call has the potential to clear material property evaluations done earlier in the material
    * dependency chain. So instead we selectively resize just our own properties and not everyone's
    */
-  // _material_data->resize(std::max(_current_elem->n_nodes(), _qrule->n_points()));
+  // _material_data.resize(std::max(_current_elem->n_nodes(), _qrule->n_points()));
 
   const auto new_size = std::max(_current_elem->n_nodes(), _qrule->n_points());
-  auto & storage = _material_data->getMaterialPropertyStorage();
-  auto & props = _material_data->props();
-  auto & props_old = _material_data->propsOld();
-  auto & props_older = _material_data->propsOlder();
+  auto & storage = _material_data.getMaterialPropertyStorage();
 
+  auto & props = _material_data.props();
   for (const auto prop_id : _supplied_prop_ids)
-    props[prop_id]->resize(new_size);
+    props[prop_id].resize(new_size);
 
-  for (const auto prop_id : _supplied_old_prop_ids)
-    props_old[prop_id]->resize(new_size);
-
-  if (storage.hasOlderProperties())
+  for (const auto state : storage.statefulIndexRange())
     for (const auto prop_id : _supplied_old_prop_ids)
-      if (auto * const older_prop = props_older[prop_id])
-        older_prop->resize(new_size);
+      if (_material_data.props(state).hasValue(prop_id))
+        _material_data.props(state)[prop_id].resize(new_size);
 }
 
 unsigned

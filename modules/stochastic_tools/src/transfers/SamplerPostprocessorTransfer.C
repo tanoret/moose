@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -56,6 +56,7 @@ SamplerPostprocessorTransfer::validParams()
                         "If false, NaN will be transferred.");
 
   params.suppressParameter<MultiMooseEnum>("direction");
+  params.suppressParameter<MultiAppName>("multi_app");
   return params;
 }
 
@@ -129,7 +130,7 @@ SamplerPostprocessorTransfer::executeFromMultiapp()
       if (getFromMultiApp()->hasLocalApp(i))
       {
         FEProblemBase & app_problem = getFromMultiApp()->appProblemBase(i);
-        if (app_problem.converged() || _keep_diverge)
+        if (app_problem.converged(/*nl_sys_num=*/0) || _keep_diverge)
           for (std::size_t j = 0; j < _sub_pp_names.size(); ++j)
             _current_data[j].emplace_back(
                 app_problem.getPostprocessorValueByName(_sub_pp_names[j]));
@@ -161,7 +162,7 @@ SamplerPostprocessorTransfer::execute()
     for (dof_id_type i = _sampler_ptr->getLocalRowBegin(); i < _sampler_ptr->getLocalRowEnd(); ++i)
     {
       FEProblemBase & app_problem = getFromMultiApp()->appProblemBase(i);
-      if (app_problem.converged() || _keep_diverge)
+      if (app_problem.converged(/*nl_sys_num=*/0) || _keep_diverge)
         current.emplace_back(app_problem.getPostprocessorValueByName(_sub_pp_names[j]));
       else
         current.emplace_back(std::numeric_limits<double>::quiet_NaN());

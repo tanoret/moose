@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -19,6 +19,7 @@
 #include "MooseEigenSystem.h"
 #include "MooseObjectAction.h"
 #include "MooseMesh.h"
+#include "CopyNodalVarsAction.h"
 
 #include "libmesh/libmesh.h"
 #include "libmesh/exodusII_io.h"
@@ -26,6 +27,9 @@
 #include "libmesh/nonlinear_implicit_system.h"
 #include "libmesh/explicit_system.h"
 #include "libmesh/string_to_enum.h"
+#include "libmesh/fe_interface.h"
+
+using namespace libMesh;
 
 registerMooseAction("MooseApp", AddVariableAction, "add_variable");
 
@@ -52,7 +56,8 @@ AddVariableAction::validParams()
   params.addParam<std::vector<Real>>("scaling",
                                      "Specifies a scaling factor to apply to this variable");
   params.addParam<std::vector<Real>>("initial_condition",
-                                     "Specifies the initial condition for this variable");
+                                     "Specifies a constant initial condition for this variable");
+  params.transferParam<std::string>(CopyNodalVarsAction::validParams(), "initial_from_file_var");
   return params;
 }
 
@@ -60,6 +65,7 @@ AddVariableAction::AddVariableAction(const InputParameters & params)
   : MooseObjectAction(params),
     _fe_type(feType(params)),
     _scalar_var(_fe_type.family == SCALAR),
+    _fv_var(false),
     _components(1)
 {
 }
@@ -69,7 +75,8 @@ AddVariableAction::getNonlinearVariableFamilies()
 {
   return MooseEnum("LAGRANGE MONOMIAL HERMITE SCALAR HIERARCHIC CLOUGH XYZ SZABAB BERNSTEIN "
                    "L2_LAGRANGE L2_HIERARCHIC NEDELEC_ONE LAGRANGE_VEC MONOMIAL_VEC "
-                   "RATIONAL_BERNSTEIN SIDE_HIERARCHIC",
+                   "RAVIART_THOMAS RATIONAL_BERNSTEIN SIDE_HIERARCHIC L2_HIERARCHIC_VEC "
+                   "L2_LAGRANGE_VEC L2_RAVIART_THOMAS",
                    "LAGRANGE");
 }
 
@@ -127,14 +134,22 @@ AddVariableAction::init()
                "`scaling` parameter set, and they are different values. I don't know how you "
                "achieved this, but you need to rectify it.");
 
+  if (_pars.isParamSetByUser("initial_condition") &&
+      _pars.isParamSetByUser("initial_from_file_var"))
+    paramError("initial_condition",
+               "Two initial conditions have been provided for the variable ",
+               name(),
+               " using the 'initial_condition' and 'initial_from_file_var' parameters. Please "
+               "remove one of them.");
+
   _moose_object_pars.applySpecificParameters(_pars, {"order", "family", "scaling"});
 
   // Determine the MooseVariable type
-  const auto is_fv = _moose_object_pars.get<bool>("fv");
+  _fv_var = _moose_object_pars.get<bool>("fv");
   const auto is_array = _components > 1 || _moose_object_pars.get<bool>("array");
   if (_type == "MooseVariableBase")
-    _type = variableType(_fe_type, is_fv, is_array);
-  if (is_fv)
+    _type = variableType(_fe_type, _fv_var, is_array);
+  if (_fv_var)
     _problem->needFV();
 
   // Need static_cast to resolve overloads
@@ -174,8 +189,11 @@ AddVariableAction::createInitialConditionAction()
   InputParameters action_params = _action_factory.getValidParams("AddOutputAction");
   action_params.set<ActionWarehouse *>("awh") = &_awh;
 
-  bool is_vector = (_fe_type.family == LAGRANGE_VEC || _fe_type.family == NEDELEC_ONE ||
-                    _fe_type.family == MONOMIAL_VEC);
+  // Associate all action and initial condition errors with "initial_condition"
+  associateWithParameter("initial_condition", action_params);
+
+  const auto fe_field_type = FEInterface::field_type(_fe_type);
+  const bool is_vector = fe_field_type == TYPE_VECTOR;
 
   if (_scalar_var)
     action_params.set<std::string>("type") = "ScalarConstantIC";
@@ -184,7 +202,12 @@ AddVariableAction::createInitialConditionAction()
     if (is_vector)
       action_params.set<std::string>("type") = "VectorConstantIC";
     else
-      action_params.set<std::string>("type") = "ConstantIC";
+    {
+      if (_fv_var)
+        action_params.set<std::string>("type") = "FVConstantIC";
+      else
+        action_params.set<std::string>("type") = "ConstantIC";
+    }
   }
   else
   {
@@ -194,8 +217,13 @@ AddVariableAction::createInitialConditionAction()
   }
 
   // Create the action
-  std::shared_ptr<MooseObjectAction> action = std::static_pointer_cast<MooseObjectAction>(
-      _action_factory.create("AddInitialConditionAction", long_name, action_params));
+  std::shared_ptr<MooseObjectAction> action;
+  if (_fv_var)
+    action = std::static_pointer_cast<MooseObjectAction>(
+        _action_factory.create("AddFVInitialConditionAction", long_name, action_params));
+  else
+    action = std::static_pointer_cast<MooseObjectAction>(
+        _action_factory.create("AddInitialConditionAction", long_name, action_params));
 
   // Set the required parameters for the object to be created
   action->getObjectParams().set<VariableName>("variable") = var_name;
@@ -224,8 +252,8 @@ AddVariableAction::createInitialConditionAction()
 std::string
 AddVariableAction::determineType(const FEType & fe_type, unsigned int components, bool is_fv)
 {
-  mooseDeprecated("AddVariableAction::determineType() is deprecated. Use "
-                  "AddVariableAction::variableType() instead.");
+  ::mooseDeprecated("AddVariableAction::determineType() is deprecated. Use "
+                    "AddVariableAction::variableType() instead.");
   return variableType(fe_type, is_fv, components > 1);
 }
 
@@ -235,11 +263,12 @@ AddVariableAction::variableType(const FEType & fe_type, const bool is_fv, const 
   if (is_fv)
     return "MooseVariableFVReal";
 
+  const auto fe_field_type = FEInterface::field_type(fe_type);
+
   if (is_array)
   {
-    if (fe_type.family == LAGRANGE_VEC || fe_type.family == NEDELEC_ONE ||
-        fe_type.family == MONOMIAL_VEC)
-      mooseError("Vector finite element families do not currently have ArrayVariable support");
+    if (fe_field_type == TYPE_VECTOR)
+      ::mooseError("Vector finite element families do not currently have ArrayVariable support");
     else
       return "ArrayMooseVariable";
   }
@@ -247,8 +276,7 @@ AddVariableAction::variableType(const FEType & fe_type, const bool is_fv, const 
     return "MooseVariableConstMonomial";
   else if (fe_type.family == SCALAR)
     return "MooseVariableScalar";
-  else if (fe_type.family == LAGRANGE_VEC || fe_type.family == NEDELEC_ONE ||
-           fe_type.family == MONOMIAL_VEC)
+  else if (fe_field_type == TYPE_VECTOR)
     return "VectorMooseVariable";
   else
     return "MooseVariable";
@@ -264,14 +292,15 @@ AddVariableAction::addVariable(const std::string & var_name)
   if (scale_factor.size() != _components)
     mooseError("Size of 'scaling' is not consistent");
 
-  _problem_add_var_method(*_problem, _type, _name, _moose_object_pars);
+  _problem_add_var_method(*_problem, _type, var_name, _moose_object_pars);
 
   if (_moose_object_pars.get<bool>("eigen"))
   {
     // MooseEigenSystem will be eventually removed. NonlinearEigenSystem will be used intead.
     // It is legal for NonlinearEigenSystem to specify a variable as eigen in input file,
     // but we do not need to do anything here.
-    MooseEigenSystem * esys = dynamic_cast<MooseEigenSystem *>(&_problem->getNonlinearSystemBase());
+    MooseEigenSystem * esys =
+        dynamic_cast<MooseEigenSystem *>(&_problem->getNonlinearSystemBase(/*nl_sys=*/0));
     if (esys)
       esys->markEigenVariable(var_name);
   }

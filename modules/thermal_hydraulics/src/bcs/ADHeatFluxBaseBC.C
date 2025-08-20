@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,7 +9,7 @@
 
 #include "ADHeatFluxBaseBC.h"
 #include "ADHeatFluxFromHeatStructureBaseUserObject.h"
-#include "THMIndices3Eqn.h"
+#include "THMIndicesVACE.h"
 #include "Assembly.h"
 #include "NonlinearSystemBase.h"
 
@@ -23,6 +23,7 @@ ADHeatFluxBaseBC::validParams()
   params.addRequiredParam<unsigned int>("n_unit", "Number of units of heat structure");
   params.addRequiredParam<bool>("hs_coord_system_is_cylindrical",
                                 "Is the heat structure coordinate system cylindrical?");
+  params.addClassDescription("Base class for heat flux boundary conditions");
   return params;
 }
 

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -23,11 +23,11 @@ public:
 
   NumInternalSides(const InputParameters & parameters);
   virtual ~NumInternalSides();
-  virtual void execute();
-  virtual void threadJoin(const UserObject & uo);
-  virtual void finalize();
-  virtual void initialize();
-  virtual PostprocessorValue getValue();
+  virtual void execute() override;
+  virtual void threadJoin(const UserObject & uo) override;
+  virtual void finalize() override;
+  virtual void initialize() override;
+  virtual PostprocessorValue getValue() const override;
   const unsigned int & count() const { return _count; }
 
 private:

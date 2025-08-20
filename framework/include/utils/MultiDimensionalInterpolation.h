@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -11,7 +11,7 @@
 
 #include "Moose.h"
 #include "MooseTypes.h"
-#include "DualReal.h"
+#include "ADReal.h"
 #include "MultiIndex.h"
 #include <vector>
 #include <string>
@@ -84,5 +84,5 @@ private:
 };
 
 typedef MultiDimensionalInterpolationTempl<Real> MultiDimensionalInterpolation;
-typedef MultiDimensionalInterpolationTempl<DualReal> DualMultiDimensionalInterpolation;
+typedef MultiDimensionalInterpolationTempl<ADReal> DualMultiDimensionalInterpolation;
 typedef DualMultiDimensionalInterpolation ADMultiDimensionalInterpolation;

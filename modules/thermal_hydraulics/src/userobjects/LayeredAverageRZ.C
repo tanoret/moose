@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,6 +18,8 @@ LayeredAverageRZ::validParams()
   params += RZSymmetry::validParams();
   params.addRequiredParam<Real>("length",
                                 "The length of the block in the direction given by 'axis_dir'.");
+  params.addClassDescription(
+      "Computes layered averages of variable for RZ components in a XY coordinate system");
   return params;
 }
 
@@ -31,7 +33,7 @@ LayeredAverageRZ::LayeredAverageRZ(const InputParameters & parameters)
 void
 LayeredAverageRZ::execute()
 {
-  LayeredIntegral::execute();
+  LayeredIntegralBase<ElementIntegralVariableUserObject>::execute();
 
   Real current_elem_volume = 0.;
   for (unsigned int qp = 0; qp < _qrule->n_points(); qp++)

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -39,7 +39,6 @@ CartesianMeshGenerator::validParams()
   params.addParam<std::vector<unsigned int>>(
       "iz", "Number of grids in all intervals in the Z direction (default to all one)");
   params.addParam<std::vector<unsigned int>>("subdomain_id", "Block IDs (default to all zero)");
-  params.addParamNamesToGroup("dim", "Main");
   params.addClassDescription("This CartesianMeshGenerator creates a non-uniform Cartesian mesh.");
   return params;
 }
@@ -64,14 +63,14 @@ CartesianMeshGenerator::CartesianMeshGenerator(const InputParameters & parameter
 
   for (unsigned int i = 0; i < _dx.size(); ++i)
     if (_dx[i] <= 0)
-      mooseError("dx must be greater than zero");
+      mooseError("dx must be greater than zero. dx: ", Moose::stringify(_dx));
 
   if (isParamValid("dy"))
   {
     _dy = getParam<std::vector<Real>>("dy");
     for (unsigned int i = 0; i < _dy.size(); ++i)
       if (_dy[i] <= 0)
-        mooseError("dy must be greater than zero");
+        mooseError("dy must be greater than zero. dy: ", Moose::stringify(_dy));
   }
 
   if (isParamValid("iy"))
@@ -91,7 +90,7 @@ CartesianMeshGenerator::CartesianMeshGenerator(const InputParameters & parameter
     _dz = getParam<std::vector<Real>>("dz");
     for (unsigned int i = 0; i < _dz.size(); ++i)
       if (_dz[i] <= 0)
-        mooseError("dz must be greater than zero");
+        mooseError("dz must be greater than zero dz: ", Moose::stringify(_dz));
   }
 
   if (isParamValid("iz"))
@@ -112,17 +111,25 @@ CartesianMeshGenerator::CartesianMeshGenerator(const InputParameters & parameter
     if (isParamValid("dz") && isParamValid("dy"))
     {
       if (_subdomain_id.size() != _dx.size() * _dy.size() * _dz.size())
-        mooseError("subdomain_id must be in the size of product of sizes of dx, dy and dz");
+        mooseError(
+            "subdomain_id must be in the size of product of sizes of dx, dy and dz. Sizes are '" +
+            std::to_string(_subdomain_id.size()) + "' and '" +
+            std::to_string(_dx.size() * _dy.size() * _dz.size()) + "' respectively");
     }
     else if (isParamValid("dy"))
     {
       if (_subdomain_id.size() != _dx.size() * _dy.size())
-        mooseError("subdomain_id must be in the size of product of sizes of dx and dy");
+        mooseError(
+            "subdomain_id must be in the size of product of sizes of dx and dy. Sizes are '" +
+            std::to_string(_subdomain_id.size()) + "' and '" +
+            std::to_string(_dx.size() * _dy.size()) + "' respectively");
     }
     else
     {
       if (_subdomain_id.size() != _dx.size())
-        mooseError("subdomain_id must be in the size of product of sizes of dx");
+        mooseError("subdomain_id must be in the size of product of sizes of dx. Sizes are '" +
+                   std::to_string(_subdomain_id.size()) + "' and '" + std::to_string(_dx.size()) +
+                   "' respectively");
     }
   }
   else
@@ -368,5 +375,6 @@ CartesianMeshGenerator::generate()
     }
   }
 
+  mesh->prepare_for_use();
   return dynamic_pointer_cast<MeshBase>(mesh);
 }

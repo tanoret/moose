@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -12,29 +12,18 @@
 #include "MooseApp.h"
 #include "MooseTypes.h"
 #include "MooseUtils.h" // remove when getBaseName is removed
+#include "Builder.h"
 #include "MooseMesh.h"
 #include "FEProblemBase.h"
 #include "DisplacedProblem.h"
 #include "RelationshipManager.h"
 #include "InputParameterWarehouse.h"
+#include "ActionFactory.h"
 
 InputParameters
 Action::validParams()
 {
-  InputParameters params = emptyInputParameters();
-
-  /**
-   * Add the "active" and "inactive" parameters so that all blocks in the input file can selectively
-   * create white or black lists of active/inactive sub-blocks.
-   */
-  params.addParam<std::vector<std::string>>(
-      "active",
-      std::vector<std::string>({"__all__"}),
-      "If specified only the blocks named will be visited and made active");
-  params.addParam<std::vector<std::string>>(
-      "inactive",
-      std::vector<std::string>(),
-      "If specified blocks matching these identifiers will be skipped.");
+  InputParameters params = Moose::Builder::validParams();
 
   params.addPrivateParam<std::string>("_moose_docs_type",
                                       "action"); // the type of syntax for documentation system
@@ -47,13 +36,17 @@ Action::validParams()
   params.addParam<std::vector<std::string>>(
       "control_tags",
       "Adds user-defined labels for accessing object parameters via control logic.");
+  params.addParamNamesToGroup("control_tags", "Advanced");
   params.registerBase("Action");
   return params;
 }
 
 Action::Action(const InputParameters & parameters)
-  : ConsoleStreamInterface(
-        *parameters.getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor")),
+  : ParallelParamObject(
+        parameters.get<std::string>("action_type"),
+        parameters.get<std::string>("_action_name"),
+        *parameters.getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor"),
+        parameters),
     MeshMetaDataInterface(
         *parameters.getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor")),
     PerfGraphInterface(
@@ -69,17 +62,9 @@ Action::Action(const InputParameters & parameters)
             (parameters.isParamValid("task") && parameters.get<std::string>("task") != ""
                  ? std::string("::") + parameters.get<std::string>("task")
                  : "")),
-    ParallelObject(*parameters.getCheckedPointerParam<MooseApp *>("_moose_app")),
-    DataFileInterface<Action>(*this),
-    _pars(parameters),
     _registered_identifier(isParamValid("registered_identifier")
                                ? getParam<std::string>("registered_identifier")
                                : ""),
-    _name(getParam<std::string>("_action_name")),
-    _action_type(getParam<std::string>("action_type")),
-    _app(*getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor")),
-    _factory(_app.getFactory()),
-    _action_factory(_app.getActionFactory()),
     _specific_task_name(_pars.isParamValid("task") ? getParam<std::string>("task") : ""),
     _awh(*getCheckedPointerParam<ActionWarehouse *>("awh")),
     _current_task(_awh.getCurrentTaskName()),
@@ -88,6 +73,8 @@ Action::Action(const InputParameters & parameters)
     _problem(_awh.problemBase()),
     _act_timer(registerTimedSection("act", 4))
 {
+  if (_app.getActionFactory().currentlyConstructing() != &parameters)
+    mooseError("This object was not constructed using the ActionFactory, which is not supported.");
 }
 
 void
@@ -140,7 +127,10 @@ Action::addRelationshipManager(
   return added;
 }
 
-void Action::addRelationshipManagers(Moose::RelationshipManagerType) {}
+void
+Action::addRelationshipManagers(Moose::RelationshipManagerType)
+{
+}
 
 bool
 Action::addRelationshipManagers(Moose::RelationshipManagerType input_rm_type,
@@ -164,41 +154,23 @@ Action::addRelationshipManagers(Moose::RelationshipManagerType input_rm_type,
   return added;
 }
 
-/// DEPRECATED METHODS
-std::string
-Action::getShortName() const
+void
+Action::associateWithParameter(const std::string & param_name, InputParameters & params) const
 {
-  mooseDeprecated("getShortName() is deprecated.");
-  return MooseUtils::shortName(_name);
-}
-
-std::string
-Action::getBaseName() const
-{
-  mooseDeprecated("getBaseName() is deprecated.");
-  return MooseUtils::baseName(_name);
+  associateWithParameter(parameters(), param_name, params);
 }
 
 void
-Action::connectControllableParams(const std::string & parameter,
-                                  const std::string & object_type,
-                                  const std::string & object_name,
-                                  const std::string & object_parameter) const
+Action::associateWithParameter(const InputParameters & from_params,
+                               const std::string & param_name,
+                               InputParameters & params) const
 {
-  MooseObjectParameterName primary_name(uniqueActionName(), parameter);
-  auto base_type = _factory.getValidParams(object_type).get<std::string>("_moose_base");
-  MooseObjectParameterName secondary_name(base_type, object_name, object_parameter);
-  _app.getInputParameterWarehouse().addControllableParameterConnection(primary_name,
-                                                                       secondary_name);
-
-  const std::vector<std::string> & tags = _pars.get<std::vector<std::string>>("control_tags");
-  for (const auto & tag : tags)
+  const auto to_hit_node = params.getHitNode();
+  if (!to_hit_node || to_hit_node->isRoot())
   {
-    if (!tag.empty())
-    {
-      MooseObjectParameterName tagged_name(tag, _name, parameter);
-      _app.getInputParameterWarehouse().addControllableParameterConnection(tagged_name,
-                                                                           secondary_name);
-    }
+    if (const auto hit_node = from_params.getHitNode(param_name))
+      params.setHitNode(*hit_node, {});
+    else if (const auto hit_node = from_params.getHitNode())
+      params.setHitNode(*hit_node, {});
   }
 }

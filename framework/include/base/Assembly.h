@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -22,8 +22,6 @@
 #include "libmesh/fe_base.h"
 #include "libmesh/numeric_vector.h"
 #include "libmesh/elem_side_builder.h"
-
-#include "DualRealOps.h"
 
 #include <unordered_map>
 
@@ -64,6 +62,15 @@ class XFEMInterface;
 class SubProblem;
 class NodeFaceConstraint;
 
+// Assembly.h does not import Moose.h nor libMeshReducedNamespace.h
+using libMesh::FEBase;
+using libMesh::FEFamily;
+using libMesh::FEType;
+using libMesh::FEVectorBase;
+using libMesh::LAGRANGE_VEC;
+using libMesh::Order;
+using libMesh::QuadratureType;
+
 /// Computes a conversion multiplier for use when computing integraals for the
 /// current coordinate system type.  This allows us to handle cases where we use RZ,
 /// spherical, or other non-cartesian coordinate systems. The factor returned
@@ -97,6 +104,17 @@ public:
   virtual ~Assembly();
 
   /**
+   * Workaround for C++ compilers thinking they can't just cast a
+   * const-reference-to-pointer to const-reference-to-const-pointer
+   */
+  template <typename T>
+  static const T * const & constify_ref(T * const & inref)
+  {
+    const T * const * ptr = &inref;
+    return *ptr;
+  }
+
+  /**
    * Get a reference to a pointer that will contain the current volume FE.
    * @param type The type of FE
    * @param dim The dimension of the current volume
@@ -105,7 +123,7 @@ public:
   const FEBase * const & getFE(FEType type, unsigned int dim) const
   {
     buildFE(type);
-    return _const_fe[dim][type];
+    return constify_ref(_fe[dim][type]);
   }
 
   /**
@@ -117,7 +135,7 @@ public:
   const FEBase * const & getFENeighbor(FEType type, unsigned int dim) const
   {
     buildNeighborFE(type);
-    return _const_fe_neighbor[dim][type];
+    return constify_ref(_fe_neighbor[dim][type]);
   }
 
   /**
@@ -129,7 +147,7 @@ public:
   const FEBase * const & getFEFace(FEType type, unsigned int dim) const
   {
     buildFaceFE(type);
-    return _const_fe_face[dim][type];
+    return constify_ref(_fe_face[dim][type]);
   }
 
   /**
@@ -141,7 +159,7 @@ public:
   const FEBase * const & getFEFaceNeighbor(FEType type, unsigned int dim) const
   {
     buildFaceNeighborFE(type);
-    return _const_fe_face_neighbor[dim][type];
+    return constify_ref(_fe_face_neighbor[dim][type]);
   }
 
   /**
@@ -153,7 +171,7 @@ public:
   const FEVectorBase * const & getVectorFE(FEType type, unsigned int dim) const
   {
     buildVectorFE(type);
-    return _const_vector_fe[dim][type];
+    return constify_ref(_vector_fe[dim][type]);
   }
 
   /**
@@ -165,7 +183,7 @@ public:
   const FEVectorBase * const & getVectorFENeighbor(FEType type, unsigned int dim) const
   {
     buildVectorNeighborFE(type);
-    return _const_vector_fe_neighbor[dim][type];
+    return constify_ref(_vector_fe_neighbor[dim][type]);
   }
 
   /**
@@ -177,7 +195,7 @@ public:
   const FEVectorBase * const & getVectorFEFace(FEType type, unsigned int dim) const
   {
     buildVectorFaceFE(type);
-    return _const_vector_fe_face[dim][type];
+    return constify_ref(_vector_fe_face[dim][type]);
   }
 
   /**
@@ -189,20 +207,20 @@ public:
   const FEVectorBase * const & getVectorFEFaceNeighbor(FEType type, unsigned int dim) const
   {
     buildVectorFaceNeighborFE(type);
-    return _const_vector_fe_face_neighbor[dim][type];
+    return constify_ref(_vector_fe_face_neighbor[dim][type]);
   }
 
   /**
    * Returns the reference to the current quadrature being used
    * @return A _reference_ to the pointer.  Make sure to store this as a reference!
    */
-  const QBase * const & qRule() const { return _const_current_qrule; }
+  const libMesh::QBase * const & qRule() const { return constify_ref(_current_qrule); }
 
   /**
    * Returns the reference to the current quadrature being used
    * @return A _reference_ to the pointer.  Make sure to store this as a reference!
    */
-  QBase * const & writeableQRule() { return _current_qrule; }
+  libMesh::QBase * const & writeableQRule() { return _current_qrule; }
 
   /**
    * Returns the reference to the quadrature points
@@ -232,11 +250,7 @@ public:
 
   const MooseArray<ADReal> & adJxWFace() const { return _ad_JxW_face; }
 
-  const MooseArray<ADReal> & adCurvatures() const
-  {
-    _calculate_curvatures = true;
-    return _ad_curvatures;
-  }
+  const MooseArray<ADReal> & adCurvatures() const;
 
   /**
    * Returns the reference to the coordinate transformation coefficients
@@ -276,13 +290,13 @@ public:
    * Returns the reference to the current quadrature being used on a current face
    * @return A _reference_.  Make sure to store this as a reference!
    */
-  const QBase * const & qRuleFace() const { return _const_current_qrule_face; }
+  const libMesh::QBase * const & qRuleFace() const { return constify_ref(_current_qrule_face); }
 
   /**
    * Returns the reference to the current quadrature being used on a current face
    * @return A _reference_.  Make sure to store this as a reference!
    */
-  QBase * const & writeableQRuleFace() { return _current_qrule_face; }
+  libMesh::QBase * const & writeableQRuleFace() { return _current_qrule_face; }
 
   /**
    * Returns the reference to the current quadrature being used
@@ -302,12 +316,6 @@ public:
    */
   const MooseArray<Point> & normals() const { return _current_normals; }
 
-  /**
-   * Returns the array of neighbor normals for quadrature points on a current side
-   * @return A _reference_.  Make sure to store this as a reference!
-   */
-  const MooseArray<Point> & neighborNormals() const { return _current_neighbor_normals; }
-
   /***
    * Returns the array of normals for quadrature points on a current side
    */
@@ -320,15 +328,25 @@ public:
   const MooseArray<std::vector<Point>> & tangents() const { return _current_tangents; }
 
   /**
+   * Number of extra element integers Assembly tracked
+   */
+  unsigned int numExtraElemIntegers() const { return _extra_elem_ids.size() - 1; }
+
+  /**
    * Returns an integer ID of the current element given the index associated with the integer
    */
-  const dof_id_type & extraElemID(unsigned int id) const { return _extra_elem_ids[id]; }
+  const dof_id_type & extraElemID(unsigned int id) const
+  {
+    mooseAssert(id < _extra_elem_ids.size(), "An invalid extra element integer id");
+    return _extra_elem_ids[id];
+  }
 
   /**
    * Returns an integer ID of the current element given the index associated with the integer
    */
   const dof_id_type & extraElemIDNeighbor(unsigned int id) const
   {
+    mooseAssert(id < _neighbor_extra_elem_ids.size(), "An invalid extra element integer id");
     return _neighbor_extra_elem_ids[id];
   }
 
@@ -347,7 +365,7 @@ public:
   }
 
   template <bool is_ad>
-  const MooseArray<MooseADWrapper<Point, is_ad>> & genericQPoints() const;
+  const MooseArray<Moose::GenericType<Point, is_ad>> & genericQPoints() const;
 
   /**
    * Return the current element
@@ -457,13 +475,16 @@ public:
    * Returns the reference to the current quadrature being used on a current neighbor
    * @return A _reference_.  Make sure to store this as a reference!
    */
-  const QBase * const & qRuleNeighbor() const { return _const_current_qrule_neighbor; }
+  const libMesh::QBase * const & qRuleNeighbor() const
+  {
+    return constify_ref(_current_qrule_neighbor);
+  }
 
   /**
    * Returns the reference to the current quadrature being used on a current neighbor
    * @return A _reference_.  Make sure to store this as a reference!
    */
-  QBase * const & writeableQRuleNeighbor() { return _current_qrule_neighbor; }
+  libMesh::QBase * const & writeableQRuleNeighbor() { return _current_qrule_neighbor; }
 
   /**
    * Returns the reference to the transformed jacobian weights on a current face
@@ -529,7 +550,7 @@ public:
    * @param qrule The qrule you want to set
    * @param dim The spatial dimension of the qrule
    */
-  void setVolumeQRule(QBase * qrule, unsigned int dim);
+  void setVolumeQRule(libMesh::QBase * qrule, unsigned int dim);
 
   /**
    * Set the qrule to be used for face integration.
@@ -539,7 +560,7 @@ public:
    * @param qrule The qrule you want to set
    * @param dim The spatial dimension of the qrule
    */
-  void setFaceQRule(QBase * qrule, unsigned int dim);
+  void setFaceQRule(libMesh::QBase * qrule, unsigned int dim);
 
   /**
    * Specifies a custom qrule for integration on mortar segment mesh
@@ -561,6 +582,11 @@ public:
    */
   bool needDual() const { return _need_dual; }
 
+  /**
+   * Set the cached quadrature rules to nullptr
+   */
+  void clearCachedQRules();
+
 private:
   /**
    * Set the qrule to be used for lower dimensional integration.
@@ -568,7 +594,7 @@ private:
    * @param qrule The qrule you want to set
    * @param dim The spatial dimension of the qrule
    */
-  void setLowerQRule(QBase * qrule, unsigned int dim);
+  void setLowerQRule(libMesh::QBase * qrule, unsigned int dim);
 
 public:
   /**
@@ -579,7 +605,7 @@ public:
    * @param qrule The qrule you want to set
    * @param dim The spatial dimension of the qrule
    */
-  void setNeighborQRule(QBase * qrule, unsigned int dim);
+  void setNeighborQRule(libMesh::QBase * qrule, unsigned int dim);
 
   /**
    * Reinitialize objects (JxW, q_points, ...) for an elements
@@ -587,6 +613,11 @@ public:
    * @param elem The element we want to reinitialize on
    */
   void reinit(const Elem * elem);
+
+  /**
+   * Set the volumetric quadrature rule based on the provided element
+   */
+  void setVolumeQRule(const Elem * elem);
 
   /**
    * Reinitialize FE data for the given element on the given side, optionally
@@ -638,7 +669,7 @@ public:
   /**
    * Returns a reference to the quadrature rule for the mortar segments
    */
-  const QBase * const & qRuleMortar() const { return _const_qrule_msm; }
+  const libMesh::QBase * const & qRuleMortar() const { return constify_ref(_qrule_msm); }
 
 private:
   /**
@@ -656,6 +687,11 @@ public:
    * Reinitialize the assembly data at specific points in the reference element.
    */
   void reinit(const Elem * elem, const std::vector<Point> & reference_points);
+
+  /**
+   * Set the face quadrature rule based on the provided element and side
+   */
+  void setFaceQRule(const Elem * const elem, const unsigned int side);
 
   /**
    * Reinitialize the assembly data on an side of an element
@@ -698,6 +734,9 @@ public:
    */
   void reinitNeighborAtPhysical(const Elem * neighbor, const std::vector<Point> & physical_points);
 
+  /**
+   * Reinitializes the neighbor side using reference coordinates.
+   */
   void reinitNeighbor(const Elem * neighbor, const std::vector<Point> & reference_points);
 
   /**
@@ -708,7 +747,7 @@ public:
   /**
    * Initialize the Assembly object and set the CouplingMatrix for use throughout.
    */
-  void init(const CouplingMatrix * cm);
+  void init(const libMesh::CouplingMatrix * cm);
 
   /// Create pair of variables requiring nonlocal jacobian contributions
   void initNonlocalCoupling();
@@ -758,86 +797,82 @@ public:
   void copyNeighborShapes(unsigned int var);
 
   /**
+   * Key structure for APIs manipulating global vectors/matrices. Developers in blessed classes may
+   * create keys using simple curly braces \p {} or may be more explicit and use \p
+   * Assembly::GlobalDataKey{}
+   */
+  class GlobalDataKey
+  {
+    // Blessed classes
+    friend class Assembly;
+    friend class SubProblem;
+    friend class FEProblemBase;
+    friend class DisplacedProblem;
+    friend class ComputeMortarFunctor;
+    friend class NonlinearSystemBase;
+    GlobalDataKey() {}
+    GlobalDataKey(const GlobalDataKey &) {}
+  };
+
+  /**
+   * Key structure for APIs adding/caching local element residuals/Jacobians. Developers in blessed
+   * classes may create keys using simple curly braces \p {} or may be more explicit and use \p
+   * Assembly::LocalDataKey{}
+   */
+  class LocalDataKey
+  {
+    // Blessed classes
+    friend class Assembly;
+    friend class TaggingInterface;
+    LocalDataKey() {}
+    LocalDataKey(const LocalDataKey &) {}
+  };
+
+  /**
    * Add local residuals of all field variables for a set of tags onto the global residual vectors
    * associated with the tags.
    */
-  void addResidual(const std::vector<VectorTag> & vector_tags);
+  void addResidual(GlobalDataKey, const std::vector<VectorTag> & vector_tags);
   /**
    * Add local neighbor residuals of all field variables for a set of tags onto the global residual
    * vectors associated with the tags.
    */
-  void addResidualNeighbor(const std::vector<VectorTag> & vector_tags);
+  void addResidualNeighbor(GlobalDataKey, const std::vector<VectorTag> & vector_tags);
   /**
    * Add local neighbor residuals of all field variables for a set of tags onto the global residual
    * vectors associated with the tags.
    */
-  void addResidualLower(const std::vector<VectorTag> & vector_tags);
+  void addResidualLower(GlobalDataKey, const std::vector<VectorTag> & vector_tags);
+
   /**
    * Add residuals of all scalar variables for a set of tags onto the global residual vectors
    * associated with the tags.
    */
-  void addResidualScalar(const std::vector<VectorTag> & vector_tags);
+  void addResidualScalar(GlobalDataKey, const std::vector<VectorTag> & vector_tags);
 
   /**
    * Takes the values that are currently in _sub_Re of all field variables and appends them to
    * the cached values.
    */
-  void cacheResidual();
-
-  /**
-   * Cache individual residual contributions.  These will ultimately get added to the residual when
-   * addCachedResidual() is called.
-   *
-   * @param dof The degree of freedom to add the residual contribution to
-   * @param value The value of the residual contribution.
-   * @param TagID  the contribution should go to the tagged residual
-   */
-  void cacheResidual(dof_id_type dof, Real value, TagID tag_id);
-
-  /**
-   * Cache individual residual contributions.  These will ultimately get added to the residual when
-   * addCachedResidual() is called.
-   *
-   * @param dof The degree of freedom to add the residual contribution to
-   * @param value The value of the residual contribution.
-   * @param tags the contribution should go to all tags
-   */
-  void cacheResidual(dof_id_type dof, Real value, const std::set<TagID> & tags);
-
-  /**
-   * Deperecated method. Use \p cacheResidual
-   */
-  void cacheResidualContribution(dof_id_type dof, Real value, TagID tag_id);
-
-  /**
-   * Deperecated method. Use \p cacheResidual
-   */
-  void cacheResidualContribution(dof_id_type dof, Real value, const std::set<TagID> & tags);
-
-  /**
-   * Lets an external class cache residual at a set of nodes
-   */
-  void cacheResidualNodes(const DenseVector<Number> & res,
-                          const std::vector<dof_id_type> & dof_index,
-                          TagID tag = 0);
+  void cacheResidual(GlobalDataKey, const std::vector<VectorTag> & tags);
 
   /**
    * Takes the values that are currently in _sub_Rn of all field variables and appends them to
    * the cached values.
    */
-  void cacheResidualNeighbor();
+  void cacheResidualNeighbor(GlobalDataKey, const std::vector<VectorTag> & tags);
 
   /**
    * Takes the values that are currently in _sub_Rl and appends them to the cached values.
    */
-  void cacheResidualLower();
+  void cacheResidualLower(GlobalDataKey, const std::vector<VectorTag> & tags);
 
   /**
    * Pushes all cached residuals to the global residual vectors associated with each tag.
    *
    * Note that this will also clear the cache.
    */
-  void addCachedResiduals();
+  void addCachedResiduals(GlobalDataKey, const std::vector<VectorTag> & tags);
 
   /**
    * Clears all of the residuals in _cached_residual_rows and _cached_residual_values
@@ -847,7 +882,7 @@ public:
    * ensure that we don't have any extra residuals hanging around that we didn't have the vectors
    * for
    */
-  void clearCachedResiduals();
+  void clearCachedResiduals(GlobalDataKey);
 
   /**
    * Adds the values that have been cached by calling cacheResidual(), cacheResidualNeighbor(),
@@ -856,75 +891,95 @@ public:
    *
    * Note that this will also clear the cache.
    */
-  void addCachedResidualDirectly(NumericVector<Number> & residual, const VectorTag & vector_tag);
+  void addCachedResidualDirectly(NumericVector<Number> & residual,
+                                 GlobalDataKey,
+                                 const VectorTag & vector_tag);
 
   /**
    * Sets local residuals of all field variables to the global residual vector for a tag.
    */
-  void setResidual(NumericVector<Number> & residual, const VectorTag & vector_tag);
+  void setResidual(NumericVector<Number> & residual, GlobalDataKey, const VectorTag & vector_tag);
 
   /**
    * Sets local neighbor residuals of all field variables to the global residual vector for a tag.
    */
-  void setResidualNeighbor(NumericVector<Number> & residual, const VectorTag & vector_tag);
+  void setResidualNeighbor(NumericVector<Number> & residual,
+                           GlobalDataKey,
+                           const VectorTag & vector_tag);
 
   /**
    * Adds all local Jacobian to the global Jacobian matrices.
    */
-  void addJacobian();
+  void addJacobian(GlobalDataKey);
 
   /**
    * Adds non-local Jacobian to the global Jacobian matrices.
    */
-  void addJacobianNonlocal();
+  void addJacobianNonlocal(GlobalDataKey);
 
   /**
    * Add ElementNeighbor, NeighborElement, and NeighborNeighbor portions of the Jacobian for compute
    * objects like DGKernels
    */
-  void addJacobianNeighbor();
+  void addJacobianNeighbor(GlobalDataKey);
 
   /**
    * Add Jacobians for pairs of scalar variables into the global Jacobian matrices.
    */
-  void addJacobianScalar();
+  void addJacobianScalar(GlobalDataKey);
 
   /**
    * Add Jacobians for a scalar variables with all other field variables into the global Jacobian
    * matrices.
    */
-  void addJacobianOffDiagScalar(unsigned int ivar);
+  void addJacobianOffDiagScalar(unsigned int ivar, GlobalDataKey);
 
   /**
    * Adds element matrix for ivar rows and jvar columns to the global Jacobian matrix.
    */
-  void addJacobianBlock(SparseMatrix<Number> & jacobian,
+  void addJacobianBlock(libMesh::SparseMatrix<Number> & jacobian,
                         unsigned int ivar,
                         unsigned int jvar,
-                        const DofMap & dof_map,
+                        const libMesh::DofMap & dof_map,
                         std::vector<dof_id_type> & dof_indices,
-                        TagID tag = 0);
+                        GlobalDataKey,
+                        TagID tag);
 
   /**
    * Add element matrix for ivar rows and jvar columns to the global Jacobian matrix for given
    * tags.
    */
-  void addJacobianBlockTags(SparseMatrix<Number> & jacobian,
+  void addJacobianBlockTags(libMesh::SparseMatrix<Number> & jacobian,
                             unsigned int ivar,
                             unsigned int jvar,
-                            const DofMap & dof_map,
+                            const libMesh::DofMap & dof_map,
                             std::vector<dof_id_type> & dof_indices,
+                            GlobalDataKey,
                             const std::set<TagID> & tags);
 
   /**
    * Adds non-local element matrix for ivar rows and jvar columns to the global Jacobian matrix.
    */
-  void addJacobianBlockNonlocal(SparseMatrix<Number> & jacobian,
+  void addJacobianBlockNonlocal(libMesh::SparseMatrix<Number> & jacobian,
                                 unsigned int ivar,
                                 unsigned int jvar,
-                                const DofMap & dof_map,
+                                const libMesh::DofMap & dof_map,
                                 const std::vector<dof_id_type> & idof_indices,
-                                const std::vector<dof_id_type> & jdof_indices);
+                                const std::vector<dof_id_type> & jdof_indices,
+                                GlobalDataKey,
+                                TagID tag);
+
+  /**
+   * Adds non-local element matrix for ivar rows and jvar columns to the global Jacobian matrix.
+   */
+  void addJacobianBlockNonlocalTags(libMesh::SparseMatrix<Number> & jacobian,
+                                    unsigned int ivar,
+                                    unsigned int jvar,
+                                    const libMesh::DofMap & dof_map,
+                                    const std::vector<dof_id_type> & idof_indices,
+                                    const std::vector<dof_id_type> & jdof_indices,
+                                    GlobalDataKey,
+                                    const std::set<TagID> & tags);
 
   /**
    * Add *all* portions of the Jacobian except PrimaryPrimary, e.g. LowerLower, LowerSecondary,
@@ -934,14 +989,14 @@ public:
    * element. Lower denotes the lower-dimensional element living on the primary side of the mortar
    * interface.
    */
-  void addJacobianNeighborLowerD();
+  void addJacobianNeighborLowerD(GlobalDataKey);
 
   /**
    * Add portions of the Jacobian of LowerLower, LowerSecondary, and SecondaryLower for
    * boundary conditions. Secondary indicates the boundary element. Lower denotes the
    * lower-dimensional element living on the boundary side.
    */
-  void addJacobianLowerD();
+  void addJacobianLowerD(GlobalDataKey);
 
   /**
    * Cache *all* portions of the Jacobian, e.g. LowerLower, LowerSecondary, LowerPrimary,
@@ -951,39 +1006,49 @@ public:
    * secondary side of the interface. Lower denotes the lower-dimensional element living on the
    * secondary side of the mortar interface; it's the boundary face of the \p Secondary element.
    */
-  void cacheJacobianMortar();
+  void cacheJacobianMortar(GlobalDataKey);
 
   /**
    * Adds three neighboring element matrices for ivar rows and jvar columns to the global Jacobian
    * matrix.
    */
-  void addJacobianNeighbor(SparseMatrix<Number> & jacobian,
+  void addJacobianNeighbor(libMesh::SparseMatrix<Number> & jacobian,
                            unsigned int ivar,
                            unsigned int jvar,
-                           const DofMap & dof_map,
+                           const libMesh::DofMap & dof_map,
                            std::vector<dof_id_type> & dof_indices,
-                           std::vector<dof_id_type> & neighbor_dof_indices);
+                           std::vector<dof_id_type> & neighbor_dof_indices,
+                           GlobalDataKey,
+                           TagID tag);
+
+  /**
+   * Adds three neighboring element matrices for ivar rows and jvar columns to the global Jacobian
+   * matrix.
+   */
+  void addJacobianNeighborTags(libMesh::SparseMatrix<Number> & jacobian,
+                               unsigned int ivar,
+                               unsigned int jvar,
+                               const libMesh::DofMap & dof_map,
+                               std::vector<dof_id_type> & dof_indices,
+                               std::vector<dof_id_type> & neighbor_dof_indices,
+                               GlobalDataKey,
+                               const std::set<TagID> & tags);
 
   /**
    * Takes the values that are currently in _sub_Kee and appends them to the cached values.
    */
-  void cacheJacobian();
-
-  /**
-   * Caches element matrix for ivar rows and jvar columns
-   */
-  void cacheJacobianCoupledVarPair(const MooseVariableBase & ivar, const MooseVariableBase & jvar);
+  void cacheJacobian(GlobalDataKey);
 
   /**
    * Takes the values that are currently in _sub_Keg and appends them to the cached values.
    */
-  void cacheJacobianNonlocal();
+  void cacheJacobianNonlocal(GlobalDataKey);
 
   /**
    * Takes the values that are currently in the neighbor Dense Matrices and appends them to the
    * cached values.
    */
-  void cacheJacobianNeighbor();
+  void cacheJacobianNeighbor(GlobalDataKey);
 
   /**
    * Adds the values that have been cached by calling cacheJacobian() and or cacheJacobianNeighbor()
@@ -991,79 +1056,199 @@ public:
    *
    * Note that this will also clear the cache.
    */
-  void addCachedJacobian();
+  void addCachedJacobian(GlobalDataKey);
 
   /**
-   * Same as addCachedJacobian but deprecated.
+   * Sets previously-cached Jacobian values via SparseMatrix::set() calls.
    */
-  void addCachedJacobian(SparseMatrix<Number> & jacobian);
+  void setCachedJacobian(GlobalDataKey);
 
   /**
-   * Get local residual block for a variable and a tag.
+   * Zero out previously-cached Jacobian rows.
    */
-  DenseVector<Number> & residualBlock(unsigned int var_num, TagID tag_id = 0)
+  void zeroCachedJacobian(GlobalDataKey);
+
+  /**
+   * Get local residual block for a variable and a tag. Only blessed framework classes may call this
+   * API by creating the requisiste \p LocalDataKey class
+   */
+  DenseVector<Number> & residualBlock(unsigned int var_num, LocalDataKey, TagID tag_id)
   {
     return _sub_Re[tag_id][var_num];
   }
 
   /**
-   * Get local neighbor residual block for a variable and a tag.
+   * Get local neighbor residual block for a variable and a tag. Only blessed framework classes may
+   * call this API by creating the requisiste \p LocalDataKey class
    */
-  DenseVector<Number> & residualBlockNeighbor(unsigned int var_num, TagID tag_id = 0)
+  DenseVector<Number> & residualBlockNeighbor(unsigned int var_num, LocalDataKey, TagID tag_id)
   {
     return _sub_Rn[tag_id][var_num];
   }
 
   /**
-   * Get residual block for lower.
+   * Get residual block for lower. Only blessed framework classes may call this API by creating the
+   * requisiste \p LocalDataKey class
    */
-  DenseVector<Number> & residualBlockLower(unsigned int var_num, TagID tag_id = 0)
+  DenseVector<Number> & residualBlockLower(unsigned int var_num, LocalDataKey, TagID tag_id)
   {
     return _sub_Rl[tag_id][var_num];
   }
 
   /**
-   * Get local Jacobian block for a pair of variables and a tag.
+   * Get local Jacobian block for a pair of variables and a tag. Only blessed framework classes may
+   * call this API by creating the requisiste \p LocalDataKey class
    */
-  DenseMatrix<Number> & jacobianBlock(unsigned int ivar, unsigned int jvar, TagID tag = 0)
+  DenseMatrix<Number> & jacobianBlock(unsigned int ivar, unsigned int jvar, LocalDataKey, TagID tag)
   {
     jacobianBlockUsed(tag, ivar, jvar, true);
     return _sub_Kee[tag][ivar][_block_diagonal_matrix ? 0 : jvar];
   }
 
   /**
-   * Get local Jacobian block from non-local contribution for a pair of variables and a tag.
+   * Get local Jacobian block from non-local contribution for a pair of variables and a tag. Only
+   * blessed framework classes may call this API by creating the requisiste \p LocalDataKey class
    */
-  DenseMatrix<Number> & jacobianBlockNonlocal(unsigned int ivar, unsigned int jvar, TagID tag = 0)
+  DenseMatrix<Number> &
+  jacobianBlockNonlocal(unsigned int ivar, unsigned int jvar, LocalDataKey, TagID tag)
   {
     jacobianBlockNonlocalUsed(tag, ivar, jvar, true);
     return _sub_Keg[tag][ivar][_block_diagonal_matrix ? 0 : jvar];
   }
 
   /**
-   * Get local Jacobian block of a DG Jacobian type for a pair of variables and a tag.
+   * Get local Jacobian block of a DG Jacobian type for a pair of variables and a tag. Only blessed
+   * framework classes may call this API by creating the requisiste \p LocalDataKey class
    */
-  DenseMatrix<Number> & jacobianBlockNeighbor(Moose::DGJacobianType type,
-                                              unsigned int ivar,
-                                              unsigned int jvar,
-                                              TagID tag = 0);
+  DenseMatrix<Number> & jacobianBlockNeighbor(
+      Moose::DGJacobianType type, unsigned int ivar, unsigned int jvar, LocalDataKey, TagID tag);
 
   /**
    * Returns the jacobian block for the given mortar Jacobian type. This jacobian block can involve
    * degrees of freedom from the secondary side interior parent, the primary side
    * interior parent, or the lower-dimensional element (located on the secondary
-   * side)
+   * side). Only blessed framework classes may call this API by creating the requisiste \p
+   * LocalDataKey class
    */
   DenseMatrix<Number> & jacobianBlockMortar(Moose::ConstraintJacobianType type,
                                             unsigned int ivar,
                                             unsigned int jvar,
-                                            TagID tag = 0);
+                                            LocalDataKey,
+                                            TagID tag);
 
+  /**
+   * Lets an external class cache residual at a set of nodes. Only blessed framework classes may
+   * call this API by creating the requisiste \p LocalDataKey class
+   */
+  void cacheResidualNodes(const DenseVector<Number> & res,
+                          const std::vector<dof_id_type> & dof_index,
+                          LocalDataKey,
+                          TagID tag);
+
+  /**
+   * Caches the Jacobian entry 'value', to eventually be
+   * added/set in the (i,j) location of the matrix.
+   *
+   * We use numeric_index_type for the index arrays (rather than
+   * dof_id_type) since that is what the SparseMatrix interface uses,
+   * but at the time of this writing, those two types are equivalent.
+   *
+   * Only blessed framework classes may call this API by creating the requisiste \p LocalDataKey
+   * class
+   */
+  void
+  cacheJacobian(numeric_index_type i, numeric_index_type j, Real value, LocalDataKey, TagID tag);
+
+  /**
+   * Caches the Jacobian entry 'value', to eventually be
+   * added/set in the (i,j) location of the matrices in corresponding to \p tags.
+   *
+   * We use numeric_index_type for the index arrays (rather than
+   * dof_id_type) since that is what the SparseMatrix interface uses,
+   * but at the time of this writing, those two types are equivalent.
+   *
+   * Only blessed framework classes may call this API by creating the requisiste \p LocalDataKey
+   * class
+   */
+  void cacheJacobian(numeric_index_type i,
+                     numeric_index_type j,
+                     Real value,
+                     LocalDataKey,
+                     const std::set<TagID> & tags);
+
+  /**
+   * Cache a local Jacobian block with the provided rows (\p idof_indices) and columns (\p
+   * jdof_indices) for eventual accumulation into the global matrix specified by \p tag. The \p
+   * scaling_factor will be applied before caching. Only blessed framework classes may call this API
+   * by creating the requisiste \p LocalDataKey class
+   */
   void cacheJacobianBlock(DenseMatrix<Number> & jac_block,
                           const std::vector<dof_id_type> & idof_indices,
                           const std::vector<dof_id_type> & jdof_indices,
                           Real scaling_factor,
-                          TagID tag = 0);
+                          LocalDataKey,
+                          TagID tag);
+
+  /**
+   * Process the supplied residual values. This is a mirror of of the non-templated version of \p
+   * addResiduals except that it's meant for \emph only processing residuals (and not their
+   * derivatives/Jacobian). We supply this API such that residual objects that leverage the AD
+   * version of this method when computing the Jacobian (or residual + Jacobian) can mirror the same
+   * behavior when doing pure residual evaluations, such as when evaluating linear residuals during
+   * (P)JFNK. This method will call \p constrain_element_vector on the supplied residuals. Only
+   * blessed framework classes may call this API by creating the requisiste \p LocalDataKey class
+   */
+  template <typename Residuals, typename Indices>
+  void cacheResiduals(const Residuals & residuals,
+                      const Indices & row_indices,
+                      Real scaling_factor,
+                      LocalDataKey,
+                      const std::set<TagID> & vector_tags);
+
+  /**
+   * Process the \p derivatives() data of a vector of \p ADReals. This
+   * method simply caches the derivative values for the corresponding column indices for the
+   * provided \p matrix_tags. Note that this overload will call \p DofMap::constrain_element_matrix.
+   * Only blessed framework classes may call this API by creating the requisiste \p LocalDataKey
+   * class
+   */
+  template <typename Residuals, typename Indices>
+  void cacheJacobian(const Residuals & residuals,
+                     const Indices & row_indices,
+                     Real scaling_factor,
+                     LocalDataKey,
+                     const std::set<TagID> & matrix_tags);
+
+  /**
+   * Process the supplied residual values. This is a mirror of of the non-templated version of \p
+   * addResiduals except that it's meant for \emph only processing residuals (and not their
+   * derivatives/Jacobian). We supply this API such that residual objects that leverage the AD
+   * version of this method when computing the Jacobian (or residual + Jacobian) can mirror the same
+   * behavior when doing pure residual evaluations, such as when evaluating linear residuals during
+   * (P)JFNK. This method will \emph not call \p constrain_element_vector on the supplied residuals.
+   * Only blessed framework classes may call this API by creating the requisiste \p LocalDataKey
+   * class
+   */
+  template <typename Residuals, typename Indices>
+  void cacheResidualsWithoutConstraints(const Residuals & residuals,
+                                        const Indices & row_indices,
+                                        Real scaling_factor,
+                                        LocalDataKey,
+                                        const std::set<TagID> & vector_tags);
+
+  /**
+   * Process the \p derivatives() data of a vector of \p ADReals. This
+   * method simply caches the derivative values for the corresponding column indices for the
+   * provided \p matrix_tags. Note that this overload will \emph not call \p
+   * DofMap::constrain_element_matrix. Only blessed framework classes may call this API by creating
+   * the requisiste \p LocalDataKey class
+   */
+  template <typename Residuals, typename Indices>
+  void cacheJacobianWithoutConstraints(const Residuals & residuals,
+                                       const Indices & row_indices,
+                                       Real scaling_factor,
+                                       LocalDataKey,
+                                       const std::set<TagID> & matrix_tags);
 
   std::vector<std::pair<MooseVariableFieldBase *, MooseVariableFieldBase *>> & couplingEntries()
   {
@@ -1078,6 +1263,16 @@ public:
   nonlocalCouplingEntries()
   {
     return _cm_nonlocal_entry;
+  }
+  const std::vector<std::pair<MooseVariableFieldBase *, MooseVariableScalar *>> &
+  fieldScalarCouplingEntries() const
+  {
+    return _cm_fs_entry;
+  }
+  const std::vector<std::pair<MooseVariableScalar *, MooseVariableFieldBase *>> &
+  scalarFieldCouplingEntries() const
+  {
+    return _cm_sf_entry;
   }
 
   // Read-only references
@@ -1150,6 +1345,10 @@ public:
   {
     return _vector_curl_phi;
   }
+  const VectorVariablePhiDivergence & divPhi(const MooseVariableField<RealVectorValue> &) const
+  {
+    return _vector_div_phi;
+  }
 
   const VectorVariablePhiValue & phiFace(const MooseVariableField<RealVectorValue> &) const
   {
@@ -1166,6 +1365,10 @@ public:
   const VectorVariablePhiCurl & curlPhiFace(const MooseVariableField<RealVectorValue> &) const
   {
     return _vector_curl_phi_face;
+  }
+  const VectorVariablePhiDivergence & divPhiFace(const MooseVariableField<RealVectorValue> &) const
+  {
+    return _vector_div_phi_face;
   }
 
   const VectorVariablePhiValue & phiNeighbor(const MooseVariableField<RealVectorValue> &) const
@@ -1186,6 +1389,11 @@ public:
   {
     return _vector_curl_phi_neighbor;
   }
+  const VectorVariablePhiDivergence &
+  divPhiNeighbor(const MooseVariableField<RealVectorValue> &) const
+  {
+    return _vector_div_phi_neighbor;
+  }
 
   const VectorVariablePhiValue & phiFaceNeighbor(const MooseVariableField<RealVectorValue> &) const
   {
@@ -1205,6 +1413,11 @@ public:
   curlPhiFaceNeighbor(const MooseVariableField<RealVectorValue> &) const
   {
     return _vector_curl_phi_face_neighbor;
+  }
+  const VectorVariablePhiDivergence &
+  divPhiFaceNeighbor(const MooseVariableField<RealVectorValue> &) const
+  {
+    return _vector_div_phi_face_neighbor;
   }
 
   // Writeable references
@@ -1253,6 +1466,10 @@ public:
   {
     return _vector_curl_phi;
   }
+  VectorVariablePhiDivergence & divPhi(const MooseVariableField<RealVectorValue> &)
+  {
+    return _vector_div_phi;
+  }
 
   VectorVariablePhiValue & phiFace(const MooseVariableField<RealVectorValue> &)
   {
@@ -1269,6 +1486,10 @@ public:
   VectorVariablePhiCurl & curlPhiFace(const MooseVariableField<RealVectorValue> &)
   {
     return _vector_curl_phi_face;
+  }
+  VectorVariablePhiDivergence & divPhiFace(const MooseVariableField<RealVectorValue> &)
+  {
+    return _vector_div_phi_face;
   }
 
   VectorVariablePhiValue & phiNeighbor(const MooseVariableField<RealVectorValue> &)
@@ -1287,6 +1508,10 @@ public:
   {
     return _vector_curl_phi_neighbor;
   }
+  VectorVariablePhiDivergence & divPhiNeighbor(const MooseVariableField<RealVectorValue> &)
+  {
+    return _vector_div_phi_neighbor;
+  }
   VectorVariablePhiValue & phiFaceNeighbor(const MooseVariableField<RealVectorValue> &)
   {
     return _vector_phi_face_neighbor;
@@ -1302,6 +1527,10 @@ public:
   VectorVariablePhiCurl & curlPhiFaceNeighbor(const MooseVariableField<RealVectorValue> &)
   {
     return _vector_curl_phi_face_neighbor;
+  }
+  VectorVariablePhiDivergence & divPhiFaceNeighbor(const MooseVariableField<RealVectorValue> &)
+  {
+    return _vector_div_phi_face_neighbor;
   }
 
   // Writeable references with array variable
@@ -1368,7 +1597,7 @@ public:
   template <typename OutputType>
   const typename OutputTools<OutputType>::VariablePhiSecond & feSecondPhi(FEType type) const
   {
-    _need_second_derivative[type] = true;
+    _need_second_derivative.insert(type);
     buildFE(type);
     return _fe_shape_data[type]->_second_phi;
   }
@@ -1409,7 +1638,7 @@ public:
   template <typename OutputType>
   const typename OutputTools<OutputType>::VariablePhiSecond & feSecondPhiFace(FEType type) const
   {
-    _need_second_derivative[type] = true;
+    _need_second_derivative.insert(type);
     buildFaceFE(type);
     return _fe_shape_data_face[type]->_second_phi;
   }
@@ -1431,7 +1660,7 @@ public:
   template <typename OutputType>
   const typename OutputTools<OutputType>::VariablePhiSecond & feSecondPhiNeighbor(FEType type) const
   {
-    _need_second_derivative_neighbor[type] = true;
+    _need_second_derivative_neighbor.insert(type);
     buildNeighborFE(type);
     return _fe_shape_data_neighbor[type]->_second_phi;
   }
@@ -1455,7 +1684,7 @@ public:
   const typename OutputTools<OutputType>::VariablePhiSecond &
   feSecondPhiFaceNeighbor(FEType type) const
   {
-    _need_second_derivative_neighbor[type] = true;
+    _need_second_derivative_neighbor.insert(type);
     buildFaceNeighborFE(type);
     return _fe_shape_data_face_neighbor[type]->_second_phi;
   }
@@ -1463,7 +1692,7 @@ public:
   template <typename OutputType>
   const typename OutputTools<OutputType>::VariablePhiCurl & feCurlPhi(FEType type) const
   {
-    _need_curl[type] = true;
+    _need_curl.insert(type);
     buildFE(type);
     return _fe_shape_data[type]->_curl_phi;
   }
@@ -1471,7 +1700,7 @@ public:
   template <typename OutputType>
   const typename OutputTools<OutputType>::VariablePhiCurl & feCurlPhiFace(FEType type) const
   {
-    _need_curl[type] = true;
+    _need_curl.insert(type);
     buildFaceFE(type);
     return _fe_shape_data_face[type]->_curl_phi;
   }
@@ -1479,7 +1708,7 @@ public:
   template <typename OutputType>
   const typename OutputTools<OutputType>::VariablePhiCurl & feCurlPhiNeighbor(FEType type) const
   {
-    _need_curl[type] = true;
+    _need_curl.insert(type);
     buildNeighborFE(type);
     return _fe_shape_data_neighbor[type]->_curl_phi;
   }
@@ -1487,72 +1716,40 @@ public:
   template <typename OutputType>
   const typename OutputTools<OutputType>::VariablePhiCurl & feCurlPhiFaceNeighbor(FEType type) const
   {
-    _need_curl[type] = true;
+    _need_curl.insert(type);
     buildFaceNeighborFE(type);
     return _fe_shape_data_face_neighbor[type]->_curl_phi;
   }
 
-  /**
-   * Caches the Jacobian entry 'value', to eventually be
-   * added/set in the (i,j) location of the matrix.
-   *
-   * We use numeric_index_type for the index arrays (rather than
-   * dof_id_type) since that is what the SparseMatrix interface uses,
-   * but at the time of this writing, those two types are equivalent.
-   */
-  void cacheJacobian(numeric_index_type i, numeric_index_type j, Real value, TagID tag = 0);
+  template <typename OutputType>
+  const typename OutputTools<OutputType>::VariablePhiDivergence & feDivPhi(FEType type) const
+  {
+    buildFE(type);
+    return _fe_shape_data[type]->_div_phi;
+  }
 
-  /**
-   * Caches the Jacobian entry 'value', to eventually be
-   * added/set in the (i,j) location of the matrices in corresponding to \p tags.
-   *
-   * We use numeric_index_type for the index arrays (rather than
-   * dof_id_type) since that is what the SparseMatrix interface uses,
-   * but at the time of this writing, those two types are equivalent.
-   */
-  void cacheJacobian(numeric_index_type i,
-                     numeric_index_type j,
-                     Real value,
-                     const std::set<TagID> & tags);
+  template <typename OutputType>
+  const typename OutputTools<OutputType>::VariablePhiDivergence & feDivPhiFace(FEType type) const
+  {
+    buildFaceFE(type);
+    return _fe_shape_data_face[type]->_div_phi;
+  }
 
-  /**
-   * Deprecated method. Use cacheJacobian instead
-   */
-  void
-  cacheJacobianContribution(numeric_index_type i, numeric_index_type j, Real value, TagID tag = 0);
+  template <typename OutputType>
+  const typename OutputTools<OutputType>::VariablePhiDivergence &
+  feDivPhiNeighbor(FEType type) const
+  {
+    buildNeighborFE(type);
+    return _fe_shape_data_neighbor[type]->_div_phi;
+  }
 
-  /**
-   * Deprecated method. Use cacheJacobian instead
-   */
-  void cacheJacobianContribution(numeric_index_type i,
-                                 numeric_index_type j,
-                                 Real value,
-                                 const std::set<TagID> & tags);
-
-  /**
-   * Sets previously-cached Jacobian values via SparseMatrix::set() calls.
-   */
-  void setCachedJacobian();
-
-  /**
-   * Deprecated. Use \p setCachedJacobian instead
-   */
-  void setCachedJacobianContributions();
-
-  /**
-   * Zero out previously-cached Jacobian rows.
-   */
-  void zeroCachedJacobian();
-
-  /**
-   * Deprecated. Use \p zeroCachedJacobian instead
-   */
-  void zeroCachedJacobianContributions();
-
-  /**
-   * Deprecated. Call \p addCachedJacobian
-   */
-  void addCachedJacobianContributions();
+  template <typename OutputType>
+  const typename OutputTools<OutputType>::VariablePhiDivergence &
+  feDivPhiFaceNeighbor(FEType type) const
+  {
+    buildFaceNeighborFE(type);
+    return _fe_shape_data_face_neighbor[type]->_div_phi;
+  }
 
   /// On-demand computation of volume element accounting for RZ/RSpherical
   Real elementVolume(const Elem * elem) const;
@@ -1662,7 +1859,7 @@ public:
    * current subdomain (as set via setCurrentSubdomainID is used to determine
    * the correct rule.  The attached quadrature rule is also returned.
    */
-  inline const QBase * attachQRuleElem(unsigned int dim, FEBase & fe)
+  inline const libMesh::QBase * attachQRuleElem(unsigned int dim, FEBase & fe)
   {
     auto qrule = qrules(dim).vol.get();
     fe.attach_quadrature_rule(qrule);
@@ -1674,7 +1871,7 @@ public:
    * current subdomain (as set via setCurrentSubdomainID is used to determine
    * the correct rule.  The attached quadrature rule is also returned.
    */
-  inline const QBase * attachQRuleFace(unsigned int dim, FEBase & fe)
+  inline const libMesh::QBase * attachQRuleFace(unsigned int dim, FEBase & fe)
   {
     auto qrule = qrules(dim).face.get();
     fe.attach_quadrature_rule(qrule);
@@ -1682,113 +1879,10 @@ public:
   }
 
   /**
-   * This simply caches the residual value for the corresponding index for the provided
-   * \p vector_tags, and applies any scaling factors. The scaling factor is defined in
-   * _scaling_vector if global AD indexing is used. Otherwise, a uniform scaling factor of 1.0 is
-   * used.
-   */
-  void processResidual(Real residual, dof_id_type dof_index, const std::set<TagID> & vector_tags);
-
-  /**
-   * This simply caches the derivative values for the corresponding column indices for the provided
-   * \p matrix_tags, and applies any scaling factors
-   */
-  void processJacobian(const ADReal & residual,
-                       dof_id_type dof_index,
-                       const std::set<TagID> & matrix_tags);
-
-  /**
-   * This performs the duties of both \p processResidual and \p processJacobian
-   */
-  void processResidualAndJacobian(const ADReal & residual,
-                                  dof_id_type dof_index,
-                                  const std::set<TagID> & vector_tags,
-                                  const std::set<TagID> & matrix_tags);
-
-  /**
-   * Process the \p derivatives() data of an \p ADReal. When using global indexing, this method
-   * simply caches the derivative values for the corresponding column indices for the provided
-   * \p matrix_tags. Note that this single dof overload will not call \p
-   * DofMap::constraint_element_matrix.
-   *
-   * If not using global indexing, then the user must provide a
-   * functor which takes three arguments: the <tt>ADReal residual</tt> that contains the derivatives
-   * to be processed, the \p row_index corresponding to the row index of the matrices that values
-   * should be added to, and the \p matrix_tags specifying the matrices that will  be added into
-   */
-  template <typename LocalFunctor>
-  void processJacobian(const ADReal & residual,
-                       dof_id_type dof_index,
-                       const std::set<TagID> & matrix_tags,
-                       LocalFunctor & local_functor);
-
-  /**
-   * Process the supplied residual values. This is a mirror of of the non-templated version of \p
-   * processResiduals except that it's meant for \emph only processing residuals (and not their
-   * derivatives/Jacobian). We supply this API such that residual objects that leverage the AD
-   * version of this method when computing the Jacobian (or residual + Jacobian) can mirror the same
-   * behavior when doing pure residual evaluations, such as when evaluting linear residuals during
-   * (P)JFNK. This method will call \p constrain_element_vector on the supplied residuals
-   */
-  template <typename T>
-  void processResiduals(const std::vector<T> & residuals,
-                        const std::vector<dof_id_type> & row_indices,
-                        const std::set<TagID> & vector_tags,
-                        Real scaling_factor);
-
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-  /**
-   * Process the value and \p derivatives() data of a vector of \p ADReals. When using global
-   * indexing, this method simply caches the value (residual) for the provided \p vector_tags and
-   * derivative values (Jacobian) for the corresponding column indices for the provided \p
-   * matrix_tags. Note that this overload will call \p DofMap::constrain_element_vector and \p
-   * DofMap::constrain_element_matrix
-   */
-  void processResidualsAndJacobian(const std::vector<ADReal> & residuals,
-                                   const std::vector<dof_id_type> & row_indices,
-                                   const std::set<TagID> & vector_tags,
-                                   const std::set<TagID> & matrix_tags,
-                                   Real scaling_factor);
-#endif
-
-  /**
-   * Process the \p derivatives() data of a vector of \p ADReals. When using global indexing, this
-   * method simply caches the derivative values for the corresponding column indices for the
-   * provided \p matrix_tags. Note that this overload will call \p DofMap::constrain_element_matrix.
-   *
-   * If not using global indexing, then the user must provide a functor which takes three arguments:
-   * the <tt>std::vector<ADReal> residuals</tt> that contains the derivatives to be processed, the
-   * <tt>std::vector<dof_id_type>row_indices</tt> corresponding to the row indices of the matrices
-   * that values should be added to, and the \p matrix_tags specifying the matrices that will be
-   * added into
-   */
-  template <typename LocalFunctor>
-  void processJacobian(const std::vector<ADReal> & residuals,
-                       const std::vector<dof_id_type> & row_indices,
-                       const std::set<TagID> & matrix_tags,
-                       Real scaling_factor,
-                       LocalFunctor & local_functor);
-
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-  /**
-   * Same as \p processResiduals with the exception that constrain_element_vector and
-   * constrain_element_matrix will not be applied. This should only be used when the contributions
-   * of these residuals to libmesh constrained degrees of freedom should be 0, e.g. if the residuals
-   * correspond to mortar constraint residuals along faces such that interior hanging nodes will not
-   * feel the contribution
-   */
-  void processUnconstrainedResidualsAndJacobian(const std::vector<ADReal> & residuals,
-                                                const std::vector<dof_id_type> & row_indices,
-                                                const std::set<TagID> & vector_tags,
-                                                const std::set<TagID> & matrix_tags,
-                                                Real scaling_factor);
-
-  /**
    * signals this object that a vector containing variable scaling factors should be used when
    * doing residual and matrix assembly
    */
   void hasScalingVector();
-#endif
 
   /**
    * Modify the weights when using the arbitrary quadrature rule. The intention is to use this when
@@ -1801,17 +1895,42 @@ public:
   void modifyArbitraryWeights(const std::vector<Real> & weights);
 
   /**
-   * @return whether we are computing a residual. In practice this will return true whenever we are
-   * not computing a Jacobian
+   * @return whether we are computing a residual
    */
-  bool computingResidual() const { return !_computing_jacobian; }
+  bool computingResidual() const { return _computing_residual; }
 
   /**
    * @return whether we are computing a Jacobian
    */
-  bool computingJacobian() const { return _computing_jacobian || _computing_residual_and_jacobian; }
+  bool computingJacobian() const { return _computing_jacobian; }
 
-protected:
+  /**
+   * @return whether we are computing a residual and a Jacobian simultaneously
+   */
+  bool computingResidualAndJacobian() const { return _computing_residual_and_jacobian; }
+
+  /**
+   * @return The current mortar segment element
+   */
+  const Elem * const & msmElem() const { return _msm_elem; }
+
+  /**
+   * Indicate that we have p-refinement. This method will perform the following tasks:
+   * - Disable p-refinement as requested by the user with \p disable_p_refinement_for_families
+   * -.Disable p-refinement of Lagrange helper types that we use for getting things like the
+   *   physical locations of quadrature points and JxW. (Don't worry, we still use the element
+   *   p-level when initializing the quadrature rule attached to the Lagrange helper so the number
+   *   of quadrature points reflects the element p-level)
+   * @param disable_p_refinement_for_families Families that we should disable p-refinement for
+   */
+  void havePRefinement(const std::unordered_set<FEFamily> & disable_p_refinement_for_families);
+
+  /**
+   * Set the current lower dimensional element. This may be null
+   */
+  void setCurrentLowerDElem(const Elem * const lower_d_elem);
+
+private:
   /**
    * Just an internal helper function to reinit the volume FE objects.
    *
@@ -1834,7 +1953,7 @@ protected:
   void reinitFENeighbor(const Elem * neighbor, const std::vector<Point> & reference_points);
 
   template <typename Points, typename Coords>
-  void setCoordinateTransformation(const QBase * qrule,
+  void setCoordinateTransformation(const libMesh::QBase * qrule,
                                    const Points & q_points,
                                    Coords & coord,
                                    SubdomainID sub_id);
@@ -1844,88 +1963,6 @@ protected:
   void computeCurrentFaceVolume();
 
   void computeCurrentNeighborVolume();
-
-  /**
-   * Appling scaling, constraints to the local residual block and populate the full DoF indices
-   * for array variable.
-   */
-  void processLocalResidual(DenseVector<Number> & res_block,
-                            std::vector<dof_id_type> & dof_indices,
-                            const std::vector<Real> & scaling_factor,
-                            bool is_nodal);
-  /**
-   * Add a local residual block to a global residual vector with proper scaling.
-   */
-  void addResidualBlock(NumericVector<Number> & residual,
-                        DenseVector<Number> & res_block,
-                        const std::vector<dof_id_type> & dof_indices,
-                        const std::vector<Real> & scaling_factor,
-                        bool is_nodal);
-  /**
-   * Push a local residual block with proper scaling into cache.
-   */
-  void cacheResidualBlock(std::vector<Real> & cached_residual_values,
-                          std::vector<dof_id_type> & cached_residual_rows,
-                          DenseVector<Number> & res_block,
-                          const std::vector<dof_id_type> & dof_indices,
-                          const std::vector<Real> & scaling_factor,
-                          bool is_nodal);
-
-  /**
-   * Set a local residual block to a global residual vector with proper scaling.
-   */
-  void setResidualBlock(NumericVector<Number> & residual,
-                        DenseVector<Number> & res_block,
-                        const std::vector<dof_id_type> & dof_indices,
-                        const std::vector<Real> & scaling_factor,
-                        bool is_nodal);
-
-  /**
-   * Add a local Jacobian block to a global Jacobian with proper scaling.
-   */
-  void addJacobianBlock(SparseMatrix<Number> & jacobian,
-                        DenseMatrix<Number> & jac_block,
-                        const MooseVariableBase & ivar,
-                        const MooseVariableBase & jvar,
-                        const std::vector<dof_id_type> & idof_indices,
-                        const std::vector<dof_id_type> & jdof_indices);
-
-  /**
-   * Push a local Jacobian block with proper scaling into cache for a certain tag.
-   */
-  void cacheJacobianBlock(DenseMatrix<Number> & jac_block,
-                          const MooseVariableBase & ivar,
-                          const MooseVariableBase & jvar,
-                          const std::vector<dof_id_type> & idof_indices,
-                          const std::vector<dof_id_type> & jdof_indices,
-                          TagID tag = 0);
-
-  /**
-   * Push non-zeros of a local Jacobian block with proper scaling into cache for a certain tag.
-   */
-  void cacheJacobianBlockNonzero(DenseMatrix<Number> & jac_block,
-                                 const MooseVariableBase & ivar,
-                                 const MooseVariableBase & jvar,
-                                 const std::vector<dof_id_type> & idof_indices,
-                                 const std::vector<dof_id_type> & jdof_indices,
-                                 TagID tag = 0);
-
-  /**
-   * Adds element matrices for ivar rows and jvar columns to the global Jacobian matrices.
-   */
-  void addJacobianCoupledVarPair(const MooseVariableBase & ivar, const MooseVariableBase & jvar);
-
-  /**
-   * Clear any currently cached jacobians
-   *
-   * This is automatically called by setCachedJacobian
-   */
-  void clearCachedJacobian();
-
-  /**
-   * Deprecated. Call \p clearCachedJacobian
-   */
-  void clearCachedJacobianContributions();
 
   /**
    * Update the integration weights for XFEM partial elements.
@@ -1950,7 +1987,7 @@ protected:
   void computeGradPhiAD(const Elem * elem,
                         unsigned int n_qp,
                         ADTemplateVariablePhiGradient<OutputType> & grad_phi,
-                        FEGenericBase<OutputType> * fe);
+                        libMesh::FEGenericBase<OutputType> * fe);
 
   /**
    * resize any objects that contribute to automatic differentiation-related mapping calculations
@@ -1973,7 +2010,8 @@ protected:
    */
   void addResidualNeighbor(const VectorTag & vector_tag);
   /**
-   * Add local neighbor residuals of all field variables for a tag onto the tag's residual vector
+   * Add local lower-dimensional block residuals of all field variables for a tag onto the tag's
+   * residual vector
    */
   void addResidualLower(const VectorTag & vector_tag);
   /**
@@ -1982,11 +2020,114 @@ protected:
   void addResidualScalar(const VectorTag & vector_tag);
 
   /**
-   * Clears all of the residuals for a specific vector tag
+   * Clears all of the cached residuals for a specific vector tag
    */
   void clearCachedResiduals(const VectorTag & vector_tag);
 
-private:
+  /**
+   * Cache individual residual contributions.  These will ultimately get added to the residual when
+   * addCachedResidual() is called.
+   *
+   * @param dof The degree of freedom to add the residual contribution to
+   * @param value The value of the residual contribution.
+   * @param TagID  the contribution should go to this tagged residual
+   */
+  void cacheResidual(dof_id_type dof, Real value, TagID tag_id);
+
+  /**
+   * Cache individual residual contributions.  These will ultimately get added to the residual when
+   * addCachedResidual() is called.
+   *
+   * @param dof The degree of freedom to add the residual contribution to
+   * @param value The value of the residual contribution.
+   * @param tags the contribution should go to all these tags
+   */
+  void cacheResidual(dof_id_type dof, Real value, const std::set<TagID> & tags);
+
+  /**
+   * Appling scaling, constraints to the local residual block and populate the full DoF indices
+   * for array variable.
+   */
+  void processLocalResidual(DenseVector<Number> & res_block,
+                            std::vector<dof_id_type> & dof_indices,
+                            const std::vector<Real> & scaling_factor,
+                            bool is_nodal);
+
+  /**
+   * Add a local residual block to a global residual vector with proper scaling.
+   */
+  void addResidualBlock(NumericVector<Number> & residual,
+                        DenseVector<Number> & res_block,
+                        const std::vector<dof_id_type> & dof_indices,
+                        const std::vector<Real> & scaling_factor,
+                        bool is_nodal);
+
+  /**
+   * Push a local residual block with proper scaling into cache.
+   */
+  void cacheResidualBlock(std::vector<Real> & cached_residual_values,
+                          std::vector<dof_id_type> & cached_residual_rows,
+                          DenseVector<Number> & res_block,
+                          const std::vector<dof_id_type> & dof_indices,
+                          const std::vector<Real> & scaling_factor,
+                          bool is_nodal);
+
+  /**
+   * Set a local residual block to a global residual vector with proper scaling.
+   */
+  void setResidualBlock(NumericVector<Number> & residual,
+                        DenseVector<Number> & res_block,
+                        const std::vector<dof_id_type> & dof_indices,
+                        const std::vector<Real> & scaling_factor,
+                        bool is_nodal);
+
+  /**
+   * Add a local Jacobian block to a global Jacobian with proper scaling.
+   */
+  void addJacobianBlock(libMesh::SparseMatrix<Number> & jacobian,
+                        DenseMatrix<Number> & jac_block,
+                        const MooseVariableBase & ivar,
+                        const MooseVariableBase & jvar,
+                        const std::vector<dof_id_type> & idof_indices,
+                        const std::vector<dof_id_type> & jdof_indices);
+
+  /**
+   * Push a local Jacobian block with proper scaling into cache for a certain tag.
+   */
+  void cacheJacobianBlock(DenseMatrix<Number> & jac_block,
+                          const MooseVariableBase & ivar,
+                          const MooseVariableBase & jvar,
+                          const std::vector<dof_id_type> & idof_indices,
+                          const std::vector<dof_id_type> & jdof_indices,
+                          TagID tag);
+
+  /**
+   * Push non-zeros of a local Jacobian block with proper scaling into cache for a certain tag.
+   */
+  void cacheJacobianBlockNonzero(DenseMatrix<Number> & jac_block,
+                                 const MooseVariableBase & ivar,
+                                 const MooseVariableBase & jvar,
+                                 const std::vector<dof_id_type> & idof_indices,
+                                 const std::vector<dof_id_type> & jdof_indices,
+                                 TagID tag);
+
+  /**
+   * Adds element matrices for ivar rows and jvar columns to the global Jacobian matrices.
+   */
+  void addJacobianCoupledVarPair(const MooseVariableBase & ivar, const MooseVariableBase & jvar);
+
+  /**
+   * Caches element matrix for ivar rows and jvar columns
+   */
+  void cacheJacobianCoupledVarPair(const MooseVariableBase & ivar, const MooseVariableBase & jvar);
+
+  /**
+   * Clear any currently cached jacobians
+   *
+   * This is automatically called by setCachedJacobian
+   */
+  void clearCachedJacobian();
+
   /**
    * Build FEs with a type
    * @param type The type of FE
@@ -2122,14 +2263,22 @@ private:
     return _jacobian_block_nonlocal_used[tag][ivar][_block_diagonal_matrix ? 0 : jvar];
   }
 
+  /**
+   * request phi, dphi, xyz, JxW, etc. data through the FE helper functions
+   */
+  void helpersRequestData();
+
   SystemBase & _sys;
   SubProblem & _subproblem;
 
   const bool _displaced;
 
   /// Coupling matrices
-  const CouplingMatrix * _cm;
-  const CouplingMatrix & _nonlocal_cm;
+  const libMesh::CouplingMatrix * _cm;
+  const libMesh::CouplingMatrix & _nonlocal_cm;
+
+  /// Whether we are currently computing the residual
+  const bool & _computing_residual;
 
   /// Whether we are currently computing the Jacobian
   const bool & _computing_jacobian;
@@ -2155,13 +2304,35 @@ private:
   /// Flag that indicates if the jacobian block for the lower dimensional element was used
   std::vector<std::vector<std::vector<unsigned char>>> _jacobian_block_lower_used;
   /// DOF map
-  const DofMap & _dof_map;
+  const libMesh::DofMap & _dof_map;
   /// Thread number (id)
   THREAD_ID _tid;
 
   MooseMesh & _mesh;
 
   unsigned int _mesh_dimension;
+
+  /// The finite element type of the FE helper classes. The helper class gives us data like JxW, the
+  /// physical quadrature point locations, etc.
+  const FEType _helper_type;
+
+  /// Whether user code requested a \p FEType the same as our \p _helper_type
+  mutable bool _user_added_fe_of_helper_type;
+  mutable bool _user_added_fe_face_of_helper_type;
+  mutable bool _user_added_fe_face_neighbor_of_helper_type;
+  mutable bool _user_added_fe_neighbor_of_helper_type;
+  mutable bool _user_added_fe_lower_of_helper_type;
+
+  /// Containers for holding unique FE helper types if we are doing p-refinement. If we are not
+  /// doing p-refinement then the helper data is owned by the \p _fe data members
+  std::vector<std::unique_ptr<FEBase>> _unique_fe_helper;
+  std::vector<std::unique_ptr<FEBase>> _unique_fe_face_helper;
+  std::vector<std::unique_ptr<FEBase>> _unique_fe_face_neighbor_helper;
+  std::vector<std::unique_ptr<FEBase>> _unique_fe_neighbor_helper;
+  std::vector<std::unique_ptr<FEBase>> _unique_fe_lower_helper;
+
+  /// Whether we are currently building the FE classes for the helpers
+  bool _building_helpers;
 
   /// The XFEM controller
   std::shared_ptr<XFEMInterface> _xfem;
@@ -2188,25 +2359,16 @@ private:
 
   /// Each dimension's actual fe objects indexed on type
   mutable std::map<unsigned int, std::map<FEType, FEBase *>> _fe;
-  /// Each dimension's actual fe objects indexed on type
-  mutable std::map<unsigned int, std::map<FEType, const FEBase *>> _const_fe;
   /// Each dimension's actual vector fe objects indexed on type
   mutable std::map<unsigned int, std::map<FEType, FEVectorBase *>> _vector_fe;
-  /// Each dimension's actual vector fe objects indexed on type
-  mutable std::map<unsigned int, std::map<FEType, const FEVectorBase *>> _const_vector_fe;
   /// Each dimension's helper objects
-  std::map<unsigned int, FEBase **> _holder_fe_helper;
+  std::map<unsigned int, FEBase *> _holder_fe_helper;
   /// The current helper object for transforming coordinates
   FEBase * _current_fe_helper;
-  /// The current current quadrature rule being used (could be either volumetric or arbitrary - for
-  /// dirac kernels). Note that this const version is required because our getter APIs return a
-  /// const QBase * const &. Without the const QBase * member we would be casting the non-const
-  /// version, which creates a temporary, and we cannot return a reference to a temporary
-  const QBase * _const_current_qrule;
   /// The current current quadrature rule being used (could be either volumetric or arbitrary - for dirac kernels)
-  QBase * _current_qrule;
+  libMesh::QBase * _current_qrule;
   /// The current volumetric quadrature for the element
-  QBase * _current_qrule_volume;
+  libMesh::QBase * _current_qrule_volume;
   /// The current arbitrary quadrature rule used within the element interior
   ArbitraryQuadrature * _current_qrule_arbitrary;
   /// The current arbitrary quadrature rule used on the element face
@@ -2220,7 +2382,7 @@ private:
   /// The current coordinate transformation coefficients
   MooseArray<Real> _coord;
   /// The AD version of the current coordinate transformation coefficients
-  MooseArray<DualReal> _ad_coord;
+  MooseArray<ADReal> _ad_coord;
 
   /// Data structure for tracking/grouping a set of quadrature rules for a
   /// particular dimensionality of mesh element.
@@ -2236,11 +2398,11 @@ private:
     }
 
     /// volume/elem (meshdim) quadrature rule
-    std::unique_ptr<QBase> vol;
+    std::unique_ptr<libMesh::QBase> vol;
     /// area/face (meshdim-1) quadrature rule
-    std::unique_ptr<QBase> face;
+    std::unique_ptr<libMesh::QBase> face;
     /// finite volume face/flux quadrature rule (meshdim-1)
-    std::unique_ptr<QBase> fv_face;
+    std::unique_ptr<libMesh::QBase> fv_face;
     /// volume/elem (meshdim) custom points quadrature rule
     std::unique_ptr<ArbitraryQuadrature> arbitrary_vol;
     /// area/face (meshdim-1) custom points quadrature rule
@@ -2261,7 +2423,7 @@ private:
   /// the subdomain that has the highest specified quadrature order.  So when
   /// you need to access a face quadrature rule, you should retrieve it via this
   /// function.
-  QBase * qruleFace(const Elem * elem, unsigned int side);
+  libMesh::QBase * qruleFace(const Elem * elem, unsigned int side);
   ArbitraryQuadrature * qruleArbitraryFace(const Elem * elem, unsigned int side);
 
   template <typename T>
@@ -2309,22 +2471,14 @@ private:
 
   /// types of finite elements
   mutable std::map<unsigned int, std::map<FEType, FEBase *>> _fe_face;
-  /// types of finite elements
-  mutable std::map<unsigned int, std::map<FEType, const FEBase *>> _const_fe_face;
   /// types of vector finite elements
   mutable std::map<unsigned int, std::map<FEType, FEVectorBase *>> _vector_fe_face;
-  /// types of vector finite elements
-  mutable std::map<unsigned int, std::map<FEType, const FEVectorBase *>> _const_vector_fe_face;
   /// Each dimension's helper objects
-  std::map<unsigned int, FEBase **> _holder_fe_face_helper;
+  std::map<unsigned int, FEBase *> _holder_fe_face_helper;
   /// helper object for transforming coordinates
   FEBase * _current_fe_face_helper;
-  /// quadrature rule used on faces. Note that this const version is required because our getter
-  /// APIs return a const QBase * const &. Without the const QBase * member we would be casting the
-  /// non-const version, which creates a temporary, and we cannot return a reference to a temporary
-  const QBase * _const_current_qrule_face;
   /// quadrature rule used on faces
-  QBase * _current_qrule_face;
+  libMesh::QBase * _current_qrule_face;
   /// The current arbitrary quadrature rule used on element faces
   ArbitraryQuadrature * _current_qface_arbitrary;
   /// The current quadrature points on a face
@@ -2333,8 +2487,6 @@ private:
   MooseArray<Real> _current_JxW_face;
   /// The current Normal vectors at the quadrature points.
   MooseArray<Point> _current_normals;
-  /// The current neighbor Normal vectors at the quadrature points.
-  MooseArray<Point> _current_neighbor_normals;
   /// Mapped normals
   std::vector<Eigen::Map<RealDIMValue>> _mapped_normals;
   /// The current tangent vectors at the quadrature points
@@ -2354,33 +2506,20 @@ private:
   mutable std::map<unsigned int, std::map<FEType, FEBase *>> _fe_face_neighbor;
   mutable std::map<unsigned int, std::map<FEType, FEVectorBase *>> _vector_fe_neighbor;
   mutable std::map<unsigned int, std::map<FEType, FEVectorBase *>> _vector_fe_face_neighbor;
-  mutable std::map<unsigned int, std::map<FEType, const FEBase *>> _const_fe_neighbor;
-  mutable std::map<unsigned int, std::map<FEType, const FEBase *>> _const_fe_face_neighbor;
-  mutable std::map<unsigned int, std::map<FEType, const FEVectorBase *>> _const_vector_fe_neighbor;
-  mutable std::map<unsigned int, std::map<FEType, const FEVectorBase *>>
-      _const_vector_fe_face_neighbor;
 
   /// Each dimension's helper objects
-  std::map<unsigned int, FEBase **> _holder_fe_neighbor_helper;
-  std::map<unsigned int, FEBase **> _holder_fe_face_neighbor_helper;
+  std::map<unsigned int, FEBase *> _holder_fe_neighbor_helper;
+  std::map<unsigned int, FEBase *> _holder_fe_face_neighbor_helper;
 
   /// FE objects for lower dimensional elements
   mutable std::map<unsigned int, std::map<FEType, FEBase *>> _fe_lower;
-  /// FE objects for lower dimensional elements
-  mutable std::map<unsigned int, std::map<FEType, const FEBase *>> _const_fe_lower;
   /// Vector FE objects for lower dimensional elements
   mutable std::map<unsigned int, std::map<FEType, FEVectorBase *>> _vector_fe_lower;
-  /// Vector FE objects for lower dimensional elements
-  mutable std::map<unsigned int, std::map<FEType, const FEVectorBase *>> _const_vector_fe_lower;
   /// helper object for transforming coordinates for lower dimensional element quadrature points
-  std::map<unsigned int, FEBase **> _holder_fe_lower_helper;
+  std::map<unsigned int, FEBase *> _holder_fe_lower_helper;
 
-  /// quadrature rule used on neighbors. Note that this const version is required because our getter
-  /// APIs return a const QBase * const &. Without the const QBase * member we would be casting the
-  /// non-const version, which creates a temporary, and we cannot return a reference to a temporary
-  const QBase * _const_current_qrule_neighbor;
   /// quadrature rule used on neighbors
-  QBase * _current_qrule_neighbor;
+  libMesh::QBase * _current_qrule_neighbor;
   /// The current quadrature points on the neighbor face
   MooseArray<Point> _current_q_points_face_neighbor;
   /// Flag to indicate that JxW_neighbor is needed
@@ -2403,21 +2542,13 @@ private:
   /// raw pointer because we need to be able to return a reference to it because
   /// we will be constructing other objects that need the qrule before the qrule
   /// is actually created
-  QBase * _qrule_msm;
-  /// A pointer to const qrule_msm
-  const QBase * _const_qrule_msm;
+  libMesh::QBase * _qrule_msm;
   /// Flag specifying whether a custom quadrature rule has been specified for mortar segment mesh
   bool _custom_mortar_qrule;
 
-private:
-  /// quadrature rule used on lower dimensional elements. This should always be the same as the face
-  /// qrule. Note that this const version is required because our getter APIs return a const QBase *
-  /// const &. Without the const QBase * member we would be casting the non-const version, which
-  /// creates a temporary, and we cannot return a reference to a temporary
-  const QBase * _const_current_qrule_lower;
   /// quadrature rule used on lower dimensional elements. This should always be
   /// the same as the face qrule
-  QBase * _current_qrule_lower;
+  libMesh::QBase * _current_qrule_lower;
 
 protected:
   /// The current "element" we are currently on.
@@ -2549,21 +2680,25 @@ protected:
   VectorVariablePhiGradient _vector_grad_phi;
   VectorVariablePhiSecond _vector_second_phi;
   VectorVariablePhiCurl _vector_curl_phi;
+  VectorVariablePhiDivergence _vector_div_phi;
 
   VectorVariablePhiValue _vector_phi_face;
   VectorVariablePhiGradient _vector_grad_phi_face;
   VectorVariablePhiSecond _vector_second_phi_face;
   VectorVariablePhiCurl _vector_curl_phi_face;
+  VectorVariablePhiDivergence _vector_div_phi_face;
 
   VectorVariablePhiValue _vector_phi_neighbor;
   VectorVariablePhiGradient _vector_grad_phi_neighbor;
   VectorVariablePhiSecond _vector_second_phi_neighbor;
   VectorVariablePhiCurl _vector_curl_phi_neighbor;
+  VectorVariablePhiDivergence _vector_div_phi_neighbor;
 
   VectorVariablePhiValue _vector_phi_face_neighbor;
   VectorVariablePhiGradient _vector_grad_phi_face_neighbor;
   VectorVariablePhiSecond _vector_second_phi_face_neighbor;
   VectorVariablePhiCurl _vector_curl_phi_face_neighbor;
+  VectorVariablePhiDivergence _vector_div_phi_face_neighbor;
 
   class FEShapeData
   {
@@ -2572,6 +2707,7 @@ protected:
     VariablePhiGradient _grad_phi;
     VariablePhiSecond _second_phi;
     VariablePhiCurl _curl_phi;
+    VariablePhiDivergence _div_phi;
   };
 
   class VectorFEShapeData
@@ -2581,23 +2717,24 @@ protected:
     VectorVariablePhiGradient _grad_phi;
     VectorVariablePhiSecond _second_phi;
     VectorVariablePhiCurl _curl_phi;
+    VectorVariablePhiDivergence _div_phi;
   };
 
   /// Shape function values, gradients, second derivatives for each FE type
-  mutable std::map<FEType, FEShapeData *> _fe_shape_data;
-  mutable std::map<FEType, FEShapeData *> _fe_shape_data_face;
-  mutable std::map<FEType, FEShapeData *> _fe_shape_data_neighbor;
-  mutable std::map<FEType, FEShapeData *> _fe_shape_data_face_neighbor;
-  mutable std::map<FEType, FEShapeData *> _fe_shape_data_lower;
-  mutable std::map<FEType, FEShapeData *> _fe_shape_data_dual_lower;
+  mutable std::map<FEType, std::unique_ptr<FEShapeData>> _fe_shape_data;
+  mutable std::map<FEType, std::unique_ptr<FEShapeData>> _fe_shape_data_face;
+  mutable std::map<FEType, std::unique_ptr<FEShapeData>> _fe_shape_data_neighbor;
+  mutable std::map<FEType, std::unique_ptr<FEShapeData>> _fe_shape_data_face_neighbor;
+  mutable std::map<FEType, std::unique_ptr<FEShapeData>> _fe_shape_data_lower;
+  mutable std::map<FEType, std::unique_ptr<FEShapeData>> _fe_shape_data_dual_lower;
 
   /// Shape function values, gradients, second derivatives for each vector FE type
-  mutable std::map<FEType, VectorFEShapeData *> _vector_fe_shape_data;
-  mutable std::map<FEType, VectorFEShapeData *> _vector_fe_shape_data_face;
-  mutable std::map<FEType, VectorFEShapeData *> _vector_fe_shape_data_neighbor;
-  mutable std::map<FEType, VectorFEShapeData *> _vector_fe_shape_data_face_neighbor;
-  mutable std::map<FEType, VectorFEShapeData *> _vector_fe_shape_data_lower;
-  mutable std::map<FEType, VectorFEShapeData *> _vector_fe_shape_data_dual_lower;
+  mutable std::map<FEType, std::unique_ptr<VectorFEShapeData>> _vector_fe_shape_data;
+  mutable std::map<FEType, std::unique_ptr<VectorFEShapeData>> _vector_fe_shape_data_face;
+  mutable std::map<FEType, std::unique_ptr<VectorFEShapeData>> _vector_fe_shape_data_neighbor;
+  mutable std::map<FEType, std::unique_ptr<VectorFEShapeData>> _vector_fe_shape_data_face_neighbor;
+  mutable std::map<FEType, std::unique_ptr<VectorFEShapeData>> _vector_fe_shape_data_lower;
+  mutable std::map<FEType, std::unique_ptr<VectorFEShapeData>> _vector_fe_shape_data_dual_lower;
 
   mutable std::map<FEType, ADTemplateVariablePhiGradient<Real>> _ad_grad_phi_data;
   mutable std::map<FEType, ADTemplateVariablePhiGradient<RealVectorValue>> _ad_vector_grad_phi_data;
@@ -2646,30 +2783,30 @@ protected:
   std::vector<Point> _temp_reference_points;
 
   /// AD quantities
-  std::vector<VectorValue<DualReal>> _ad_dxyzdxi_map;
-  std::vector<VectorValue<DualReal>> _ad_dxyzdeta_map;
-  std::vector<VectorValue<DualReal>> _ad_dxyzdzeta_map;
-  std::vector<VectorValue<DualReal>> _ad_d2xyzdxi2_map;
-  std::vector<VectorValue<DualReal>> _ad_d2xyzdxideta_map;
-  std::vector<VectorValue<DualReal>> _ad_d2xyzdeta2_map;
-  std::vector<DualReal> _ad_jac;
-  MooseArray<DualReal> _ad_JxW;
-  MooseArray<VectorValue<DualReal>> _ad_q_points;
-  std::vector<DualReal> _ad_dxidx_map;
-  std::vector<DualReal> _ad_dxidy_map;
-  std::vector<DualReal> _ad_dxidz_map;
-  std::vector<DualReal> _ad_detadx_map;
-  std::vector<DualReal> _ad_detady_map;
-  std::vector<DualReal> _ad_detadz_map;
-  std::vector<DualReal> _ad_dzetadx_map;
-  std::vector<DualReal> _ad_dzetady_map;
-  std::vector<DualReal> _ad_dzetadz_map;
+  std::vector<VectorValue<ADReal>> _ad_dxyzdxi_map;
+  std::vector<VectorValue<ADReal>> _ad_dxyzdeta_map;
+  std::vector<VectorValue<ADReal>> _ad_dxyzdzeta_map;
+  std::vector<VectorValue<ADReal>> _ad_d2xyzdxi2_map;
+  std::vector<VectorValue<ADReal>> _ad_d2xyzdxideta_map;
+  std::vector<VectorValue<ADReal>> _ad_d2xyzdeta2_map;
+  std::vector<ADReal> _ad_jac;
+  MooseArray<ADReal> _ad_JxW;
+  MooseArray<VectorValue<ADReal>> _ad_q_points;
+  std::vector<ADReal> _ad_dxidx_map;
+  std::vector<ADReal> _ad_dxidy_map;
+  std::vector<ADReal> _ad_dxidz_map;
+  std::vector<ADReal> _ad_detadx_map;
+  std::vector<ADReal> _ad_detady_map;
+  std::vector<ADReal> _ad_detadz_map;
+  std::vector<ADReal> _ad_dzetadx_map;
+  std::vector<ADReal> _ad_dzetady_map;
+  std::vector<ADReal> _ad_dzetadz_map;
 
-  MooseArray<DualReal> _ad_JxW_face;
-  MooseArray<VectorValue<DualReal>> _ad_normals;
-  MooseArray<VectorValue<DualReal>> _ad_q_points_face;
+  MooseArray<ADReal> _ad_JxW_face;
+  MooseArray<VectorValue<ADReal>> _ad_normals;
+  MooseArray<VectorValue<ADReal>> _ad_q_points_face;
   MooseArray<Real> _curvatures;
-  MooseArray<DualReal> _ad_curvatures;
+  MooseArray<ADReal> _ad_curvatures;
 
   /**
    * Container of displacement numbers and directions
@@ -2684,21 +2821,46 @@ protected:
   /// adCoordTransformation()
   mutable bool _calculate_ad_coord;
 
-  mutable std::map<FEType, bool> _need_second_derivative;
-  mutable std::map<FEType, bool> _need_second_derivative_neighbor;
-  mutable std::map<FEType, bool> _need_curl;
+  mutable std::set<FEType> _need_second_derivative;
+  mutable std::set<FEType> _need_second_derivative_neighbor;
+  mutable std::set<FEType> _need_curl;
+  mutable std::set<FEType> _need_div;
+  mutable std::set<FEType> _need_face_div;
+  mutable std::set<FEType> _need_neighbor_div;
+  mutable std::set<FEType> _need_face_neighbor_div;
 
-#ifdef MOOSE_GLOBAL_AD_INDEXING
   /// The map from global index to variable scaling factor
   const NumericVector<Real> * _scaling_vector = nullptr;
-#endif
 
   /// In place side element builder for _current_side_elem
-  ElemSideBuilder _current_side_elem_builder;
+  libMesh::ElemSideBuilder _current_side_elem_builder;
   /// In place side element builder for _current_neighbor_side_elem
-  ElemSideBuilder _current_neighbor_side_elem_builder;
+  libMesh::ElemSideBuilder _current_neighbor_side_elem_builder;
   /// In place side element builder for computeFaceMap()
-  ElemSideBuilder _compute_face_map_side_elem_builder;
+  libMesh::ElemSideBuilder _compute_face_map_side_elem_builder;
+
+  const Elem * _msm_elem = nullptr;
+
+  /// A working vector to avoid repeated heap allocations when caching residuals that must have
+  /// libMesh-level constraints (hanging nodes, periodic bcs) applied to them. This stores local
+  /// residual values
+  DenseVector<Number> _element_vector;
+
+  /// A working matrix to avoid repeated heap allocations when caching Jacobians that must have
+  /// libMesh-level constraints (hanging nodes, periodic bcs) applied to them. This stores local
+  /// Jacobian values
+  DenseMatrix<Number> _element_matrix;
+
+  /// Working vectors to avoid repeated heap allocations when caching residuals/Jacobians that must
+  /// have libMesh-level constraints (hanging nodes, periodic bcs) applied to them. These are for
+  /// storing the dof indices
+  std::vector<dof_id_type> _row_indices, _column_indices;
+
+  /// Whether we have ever conducted p-refinement
+  bool _have_p_refinement;
+
+  /// The current reference points on the neighbor element
+  std::vector<Point> _current_neighbor_ref_points;
 };
 
 template <typename OutputType>
@@ -2828,107 +2990,174 @@ const typename OutputTools<VectorValue<Real>>::VariablePhiCurl &
 Assembly::feCurlPhiFaceNeighbor<VectorValue<Real>>(FEType type) const;
 
 template <>
+const typename OutputTools<VectorValue<Real>>::VariablePhiDivergence &
+Assembly::feDivPhi<VectorValue<Real>>(FEType type) const;
+
+template <>
+const typename OutputTools<VectorValue<Real>>::VariablePhiDivergence &
+Assembly::feDivPhiFace<VectorValue<Real>>(FEType type) const;
+
+template <>
+const typename OutputTools<VectorValue<Real>>::VariablePhiDivergence &
+Assembly::feDivPhiNeighbor<VectorValue<Real>>(FEType type) const;
+
+template <>
+const typename OutputTools<VectorValue<Real>>::VariablePhiDivergence &
+Assembly::feDivPhiFaceNeighbor<VectorValue<Real>>(FEType type) const;
+
+template <>
 inline const ADTemplateVariablePhiGradient<RealVectorValue> &
 Assembly::adGradPhi<RealVectorValue>(const MooseVariableFE<RealVectorValue> & v) const
 {
   return _ad_vector_grad_phi_data.at(v.feType());
 }
 
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-inline void
-Assembly::processJacobian(const ADReal & residual,
-                          const dof_id_type row_index,
-                          const std::set<TagID> & matrix_tags)
-{
-  const auto & derivs = residual.derivatives();
-
-  const auto & column_indices = derivs.nude_indices();
-  const auto & values = derivs.nude_data();
-
-  mooseAssert(column_indices.size() == values.size(), "Indices and values size must be the same");
-
-  const Real scalar = _scaling_vector ? (*_scaling_vector)(row_index) : 1.;
-
-  for (std::size_t i = 0; i < column_indices.size(); ++i)
-    cacheJacobian(row_index, column_indices[i], values[i] * scalar, matrix_tags);
-}
-#else
-inline void
-Assembly::processJacobian(const ADReal &, const dof_id_type, const std::set<TagID> &)
-{
-  mooseError("Not implemented for local AD indexing");
-}
-#endif
-
-template <typename LocalFunctor>
+template <typename Residuals, typename Indices>
 void
-Assembly::processJacobian(const ADReal & residual,
-                          const dof_id_type row_index,
-                          const std::set<TagID> & matrix_tags,
-                          LocalFunctor &
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-                              local_functor
-#endif
-)
+Assembly::cacheResiduals(const Residuals & residuals,
+                         const Indices & input_row_indices,
+                         const Real scaling_factor,
+                         LocalDataKey,
+                         const std::set<TagID> & vector_tags)
 {
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-  processJacobian(residual, row_index, matrix_tags);
-#else
-  local_functor(residual, row_index, matrix_tags);
-#endif
-}
-
-template <typename LocalFunctor>
-void
-Assembly::processJacobian(const std::vector<ADReal> & residuals,
-                          const std::vector<dof_id_type> & input_row_indices,
-                          const std::set<TagID> & matrix_tags,
-                          const Real
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-                              scaling_factor
-#endif
-                          ,
-                          LocalFunctor &
-#ifndef MOOSE_GLOBAL_AD_INDEXING
-                              local_functor
-#endif
-)
-{
-#ifdef MOOSE_GLOBAL_AD_INDEXING
-  processResidualsAndJacobian(residuals, input_row_indices, {}, matrix_tags, scaling_factor);
-#else
-  local_functor(residuals, input_row_indices, matrix_tags);
-#endif
-}
-
-template <typename T>
-void
-Assembly::processResiduals(const std::vector<T> & residuals,
-                           const std::vector<dof_id_type> & input_row_indices,
-                           const std::set<TagID> & vector_tags,
-                           const Real scaling_factor)
-{
-  if (!computingResidual() || vector_tags.empty())
-    return;
-
   mooseAssert(residuals.size() == input_row_indices.size(),
               "The number of residuals should match the number of dof indices");
   mooseAssert(residuals.size() >= 1, "Why you calling me with no residuals?");
 
-  // Need to make a copy because we might modify this in constrain_element_vector
-  std::vector<dof_id_type> row_indices = input_row_indices;
+  if (!computingResidual() || vector_tags.empty())
+    return;
 
-  DenseVector<Number> element_vector(row_indices.size());
-  for (const auto i : index_range(row_indices))
-    element_vector(i) = MetaPhysicL::raw_value(residuals[i]) * scaling_factor;
+  if (residuals.size() == 1)
+  {
+    // No constraining is required. (This is likely a finite volume computation if we only have a
+    // single dof)
+    cacheResidualsWithoutConstraints(
+        residuals, input_row_indices, scaling_factor, LocalDataKey{}, vector_tags);
+    return;
+  }
+
+  // Need to make a copy because we might modify this in constrain_element_vector
+  _row_indices.assign(input_row_indices.begin(), input_row_indices.end());
+
+  _element_vector.resize(_row_indices.size());
+  for (const auto i : index_range(_row_indices))
+    _element_vector(i) = MetaPhysicL::raw_value(residuals[i]) * scaling_factor;
 
   // At time of writing, this method doesn't do anything with the asymmetric_constraint_rows
   // argument, but we set it to false to be consistent with processLocalResidual
   _dof_map.constrain_element_vector(
-      element_vector, row_indices, /*asymmetric_constraint_rows=*/false);
+      _element_vector, _row_indices, /*asymmetric_constraint_rows=*/false);
+
+  for (const auto i : index_range(_row_indices))
+    cacheResidual(_row_indices[i], _element_vector(i), vector_tags);
+}
+
+template <typename Residuals, typename Indices>
+void
+Assembly::cacheResidualsWithoutConstraints(const Residuals & residuals,
+                                           const Indices & row_indices,
+                                           const Real scaling_factor,
+                                           LocalDataKey,
+                                           const std::set<TagID> & vector_tags)
+{
+  mooseAssert(residuals.size() == row_indices.size(),
+              "The number of residuals should match the number of dof indices");
+  mooseAssert(residuals.size() >= 1, "Why you calling me with no residuals?");
+
+  if (computingResidual() && !vector_tags.empty())
+    for (const auto i : index_range(row_indices))
+      cacheResidual(
+          row_indices[i], MetaPhysicL::raw_value(residuals[i]) * scaling_factor, vector_tags);
+}
+
+template <typename Residuals, typename Indices>
+void
+Assembly::cacheJacobian(const Residuals & residuals,
+                        const Indices & input_row_indices,
+                        const Real scaling_factor,
+                        LocalDataKey,
+                        const std::set<TagID> & matrix_tags)
+{
+  if (!computingJacobian() || matrix_tags.empty())
+    return;
+
+  if (residuals.size() == 1)
+  {
+    // No constraining is required. (This is likely a finite volume computation if we only have a
+    // single dof)
+    cacheJacobianWithoutConstraints(
+        residuals, input_row_indices, scaling_factor, LocalDataKey{}, matrix_tags);
+    return;
+  }
+
+  const auto & compare_dofs = residuals[0].derivatives().nude_indices();
+#ifndef NDEBUG
+  auto compare_dofs_set = std::set<dof_id_type>(compare_dofs.begin(), compare_dofs.end());
+
+  for (auto resid_it = residuals.begin() + 1; resid_it != residuals.end(); ++resid_it)
+  {
+    auto current_dofs_set = std::set<dof_id_type>(resid_it->derivatives().nude_indices().begin(),
+                                                  resid_it->derivatives().nude_indices().end());
+    mooseAssert(compare_dofs_set == current_dofs_set,
+                "We're going to see whether the dof sets are the same. IIRC the degree of freedom "
+                "dependence (as indicated by the dof index set held by the ADReal) has to be the "
+                "same for every residual passed to this method otherwise constrain_element_matrix "
+                "will not work.");
+  }
+#endif
+  _column_indices.assign(compare_dofs.begin(), compare_dofs.end());
+
+  // If there's no derivatives then there is nothing to do. Moreover, if we pass zero size column
+  // indices to constrain_element_matrix then we will potentially get errors out of BLAS
+  if (!_column_indices.size())
+    return;
+
+  // Need to make a copy because we might modify this in constrain_element_matrix
+  _row_indices.assign(input_row_indices.begin(), input_row_indices.end());
+
+  _element_matrix.resize(_row_indices.size(), _column_indices.size());
+  for (const auto i : index_range(_row_indices))
+  {
+    const auto & sparse_derivatives = residuals[i].derivatives();
+
+    for (const auto j : index_range(_column_indices))
+      _element_matrix(i, j) = sparse_derivatives[_column_indices[j]] * scaling_factor;
+  }
+
+  _dof_map.constrain_element_matrix(_element_matrix, _row_indices, _column_indices);
+
+  for (const auto i : index_range(_row_indices))
+    for (const auto j : index_range(_column_indices))
+      cacheJacobian(_row_indices[i], _column_indices[j], _element_matrix(i, j), {}, matrix_tags);
+}
+
+template <typename Residuals, typename Indices>
+void
+Assembly::cacheJacobianWithoutConstraints(const Residuals & residuals,
+                                          const Indices & row_indices,
+                                          const Real scaling_factor,
+                                          LocalDataKey,
+                                          const std::set<TagID> & matrix_tags)
+{
+  mooseAssert(residuals.size() == row_indices.size(),
+              "The number of residuals should match the number of dof indices");
+  mooseAssert(residuals.size() >= 1, "Why you calling me with no residuals?");
+
+  if (!computingJacobian() || matrix_tags.empty())
+    return;
 
   for (const auto i : index_range(row_indices))
-    cacheResidual(row_indices[i], element_vector(i), vector_tags);
+  {
+    const auto row_index = row_indices[i];
+
+    const auto & sparse_derivatives = residuals[i].derivatives();
+    const auto & column_indices = sparse_derivatives.nude_indices();
+    const auto & raw_derivatives = sparse_derivatives.nude_data();
+
+    for (std::size_t j = 0; j < column_indices.size(); ++j)
+      cacheJacobian(
+          row_index, column_indices[j], raw_derivatives[j] * scaling_factor, {}, matrix_tags);
+  }
 }
 
 inline const Real &
@@ -2950,4 +3179,10 @@ Assembly::assignDisplacements(
     std::vector<std::pair<unsigned int, unsigned short>> && disp_numbers_and_directions)
 {
   _disp_numbers_and_directions = std::move(disp_numbers_and_directions);
+}
+
+inline void
+Assembly::setCurrentLowerDElem(const Elem * const lower_d_elem)
+{
+  _current_lower_d_elem = lower_d_elem;
 }

@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -43,7 +43,7 @@ PercentChangePostprocessor::execute()
 }
 
 Real
-PercentChangePostprocessor::getValue()
+PercentChangePostprocessor::getValue() const
 {
   return std::fabs((std::fabs(_postprocessor) - std::fabs(_postprocessor_old)) *
                    std::pow(std::fabs(_postprocessor), -1));

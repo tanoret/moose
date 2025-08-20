@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -53,6 +53,11 @@ SubdomainExtraElementIDGenerator::generate()
 
   // construct a map from the subdomain ID to the index in 'subdomains'
   auto subdomain_ids = MooseMeshUtils::getSubdomainIDs(*mesh, _subdomain_names);
+
+  // check that all subdomains are present
+  for (const auto & name : _subdomain_names)
+    if (!MooseMeshUtils::hasSubdomainName(*mesh, name))
+      paramError("subdomains", "Subdomain " + name + " does not exist in the mesh");
 
   // check to make sure no duplicated subdomain ids
   std::set<SubdomainID> unique_subdomain_ids;

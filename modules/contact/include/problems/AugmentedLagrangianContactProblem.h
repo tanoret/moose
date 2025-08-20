@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -10,8 +10,10 @@
 #pragma once
 
 #include "ReferenceResidualProblem.h"
+#include "FEProblem.h"
 #include "NodeFaceConstraint.h"
 #include "MechanicalContactConstraint.h"
+#include "AugmentedLagrangianContactProblemInterface.h"
 
 /**
  * Class to manage nested solution for augmented Lagrange contact.
@@ -19,32 +21,25 @@
  * repeating the solution until convergence has been achieved, checking for convergence, and
  * updating the Lagrangian multipliers.
  */
-class AugmentedLagrangianContactProblem : public ReferenceResidualProblem
+template <class T>
+class AugmentedLagrangianContactProblemTempl : public T,
+                                               public AugmentedLagrangianContactProblemInterface
 {
 public:
   static InputParameters validParams();
 
-  AugmentedLagrangianContactProblem(const InputParameters & params);
-  virtual ~AugmentedLagrangianContactProblem() {}
+  AugmentedLagrangianContactProblemTempl(const InputParameters & params);
+  virtual ~AugmentedLagrangianContactProblemTempl() {}
 
   virtual void timestepSetup() override;
+  virtual void addDefaultNonlinearConvergence(const InputParameters & params) override;
+  virtual bool onlyAllowDefaultNonlinearConvergence() const override { return true; }
 
-  virtual MooseNonlinearConvergenceReason
-  checkNonlinearConvergence(std::string & msg,
-                            const PetscInt it,
-                            const Real xnorm,
-                            const Real snorm,
-                            const Real fnorm,
-                            const Real rtol,
-                            const Real divtol,
-                            const Real stol,
-                            const Real abstol,
-                            const PetscInt nfuncs,
-                            const PetscInt max_funcs,
-                            const Real ref_resid,
-                            const Real div_threshold) override;
-
-private:
-  int _num_lagmul_iterations;
-  int _max_lagmul_iters;
+protected:
+  using AugmentedLagrangianContactProblemInterface::_lagrangian_iteration_number;
+  using AugmentedLagrangianContactProblemInterface::_maximum_number_lagrangian_iterations;
 };
+
+typedef AugmentedLagrangianContactProblemTempl<ReferenceResidualProblem>
+    AugmentedLagrangianContactProblem;
+typedef AugmentedLagrangianContactProblemTempl<FEProblem> AugmentedLagrangianContactFEProblem;

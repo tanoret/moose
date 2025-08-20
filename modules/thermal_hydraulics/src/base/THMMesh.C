@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -9,10 +9,13 @@
 
 #include "THMMesh.h"
 #include "libmesh/node.h"
+#include "libmesh/node_elem.h"
 #include "libmesh/edge_edge2.h"
 #include "libmesh/edge_edge3.h"
 #include "libmesh/face_quad4.h"
 #include "libmesh/face_quad9.h"
+
+using namespace libMesh;
 
 registerMooseObject("ThermalHydraulicsApp", THMMesh);
 
@@ -22,7 +25,10 @@ InputParameters
 THMMesh::validParams()
 {
   InputParameters params = MooseMesh::validParams();
-  // we do not allow renumbering, becuase we generate our meshes
+  params.addClassDescription("Creates a mesh (nodes and elements) for the Components");
+  MooseEnum dims("1=1 2 3", "3");
+  params.addParam<MooseEnum>("dim", dims, "The dimension of the mesh to be generated");
+  // we do not allow renumbering, because we generate our meshes
   params.set<bool>("allow_renumbering") = false;
   return params;
 }
@@ -62,7 +68,7 @@ THMMesh::effectiveSpatialDimension() const
 std::unique_ptr<MooseMesh>
 THMMesh::safeClone() const
 {
-  return std::make_unique<THMMesh>(*this);
+  return _app.getFactory().copyConstruct(*this);
 }
 
 void
@@ -103,6 +109,18 @@ THMMesh::addElement(libMesh::ElemType elem_type, const std::vector<dof_id_type> 
   _mesh->add_elem(elem);
   for (std::size_t i = 0; i < node_ids.size(); i++)
     elem->set_node(i) = _mesh->node_ptr(node_ids[i]);
+  return elem;
+}
+
+Elem *
+THMMesh::addNodeElement(dof_id_type node)
+{
+  dof_id_type elem_id = getNextElementId();
+
+  Elem * elem = new NodeElem;
+  elem->set_id(elem_id);
+  _mesh->add_elem(elem);
+  elem->set_node(0) = _mesh->node_ptr(node);
   return elem;
 }
 

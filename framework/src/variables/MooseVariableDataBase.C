@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -18,8 +18,7 @@ template <typename OutputType>
 MooseVariableDataBase<OutputType>::MooseVariableDataBase(const MooseVariableField<OutputType> & var,
                                                          SystemBase & sys,
                                                          THREAD_ID tid)
-  : _var(var),
-    _sys(sys),
+  : _sys(sys),
     _subproblem(_sys.subproblem()),
     _tid(tid),
     _dof_map(_sys.dofMap()),
@@ -43,7 +42,8 @@ MooseVariableDataBase<OutputType>::MooseVariableDataBase(const MooseVariableFiel
     _need_dof_values_dot_old(false),
     _need_dof_values_dotdot_old(false),
     _need_dof_du_dot_du(false),
-    _need_dof_du_dotdot_du(false)
+    _need_dof_du_dotdot_du(false),
+    _var(var)
 {
   auto num_vector_tags = _subproblem.numVectorTags();
   // Additional solution tags corresponding to older-than-current solution states may be requested
@@ -300,9 +300,8 @@ template <typename OutputType>
 const typename MooseVariableDataBase<OutputType>::FieldVariableValue &
 MooseVariableDataBase<OutputType>::sln(Moose::SolutionState state) const
 {
-  auto functor = [this](TagID tag_id) -> const FieldVariableValue & {
-    return vectorTagValue(tag_id);
-  };
+  auto functor = [this](TagID tag_id) -> const FieldVariableValue &
+  { return vectorTagValue(tag_id); };
 
   return const_cast<MooseVariableDataBase<OutputType> *>(this)
       ->stateToTagHelper<FieldVariableValue>(state, functor);
@@ -312,9 +311,8 @@ template <typename OutputType>
 const typename MooseVariableDataBase<OutputType>::FieldVariableGradient &
 MooseVariableDataBase<OutputType>::gradSln(Moose::SolutionState state) const
 {
-  auto functor = [this](TagID tag_id) -> const FieldVariableGradient & {
-    return vectorTagGradient(tag_id);
-  };
+  auto functor = [this](TagID tag_id) -> const FieldVariableGradient &
+  { return vectorTagGradient(tag_id); };
 
   return const_cast<MooseVariableDataBase<OutputType> *>(this)
       ->stateToTagHelper<FieldVariableGradient>(state, functor);
@@ -602,7 +600,7 @@ MooseVariableDataBase<OutputType>::fetchDoFValues()
   {
     _dof_du_dot_du.resize(n);
     for (decltype(n) i = 0; i < n; ++i)
-      _dof_du_dot_du[i] = _sys.duDotDu();
+      _dof_du_dot_du[i] = _sys.duDotDu(_var.number());
   }
   if (_need_du_dotdot_du || _need_dof_du_dotdot_du)
   {
@@ -710,7 +708,7 @@ MooseVariableDataBase<RealEigenVector>::fetchDoFValues()
   {
     _dof_du_dot_du.resize(n);
     for (decltype(n) i = 0; i < n; ++i)
-      _dof_du_dot_du[i] = _sys.duDotDu();
+      _dof_du_dot_du[i] = _sys.duDotDu(_var.number());
   }
   if (_need_du_dotdot_du || _need_dof_du_dotdot_du)
   {

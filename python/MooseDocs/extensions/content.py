@@ -1,5 +1,5 @@
 #* This file is part of the MOOSE framework
-#* https://www.mooseframework.org
+#* https://mooseframework.inl.gov
 #*
 #* All rights reserved, see COPYRIGHT for full restrictions
 #* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -8,6 +8,7 @@
 #* https://www.gnu.org/licenses/lgpl-2.1.html
 
 import os
+import re
 import uuid
 import collections
 import logging
@@ -88,7 +89,12 @@ class ContentExtension(command.CommandExtension):
             h_node = heading.find_heading(node)
             if h_node is not None:
                 text = h_node.text()
+                # Remove spaces inserted around numbers
+                # Numbers are tokens like words, hence the insertion of a separator
+                text = re.sub(r'\s(\d)\s', r'\1', text)
+                # Replace intended spaces by dashes which are rendered as spaces
                 label = text.replace(' ', '-').lower()
+
                 if method == ContentExtension.LETTER:
                     key = label[0]
                 elif method == ContentExtension.FOLDER:
@@ -105,7 +111,7 @@ class ContentExtension(command.CommandExtension):
         return headings
 
 class ContentCommand(command.CommandComponent):
-    COMMAND = ('content', 'contents') #TODO: Change this to content after format is working
+    COMMAND = ('content')
     SUBCOMMAND = (None, 'list')
 
     @staticmethod
@@ -116,14 +122,11 @@ class ContentCommand(command.CommandComponent):
         return settings
 
     def createToken(self, parent, info, page, settings):
-        if info['command'] == 'contents':
-            msg = 'The command "!contents" is deprecated, please use "!content list".'
-            LOG.warning(common.report_error(msg, page.source, info.line, info[0], prefix='WARNING'))
         ContentToken(parent, location=settings['location'], level=settings['level'])
         return parent
 
 class AtoZCommand(command.CommandComponent):
-    COMMAND = ('content', 'contents')
+    COMMAND = ('content')
     SUBCOMMAND = 'a-to-z'
 
     @staticmethod
@@ -135,15 +138,12 @@ class AtoZCommand(command.CommandComponent):
         return settings
 
     def createToken(self, parent, info, page, settings):
-        if info['command'] == 'contents':
-            msg = 'The command "!contents a-to-z" is deprecated, please use "!content a-to-z".'
-            LOG.warning(common.report_error(msg, page.source, info.line, info[0], prefix='WARNING'))
         AtoZToken(parent, location=settings['location'], level=settings['level'],
                   buttons=settings['buttons'])
         return parent
 
 class TableOfContentsCommand(command.CommandComponent):
-    COMMAND = ('content', 'contents')
+    COMMAND = ('content')
     SUBCOMMAND = 'toc'
 
     @staticmethod
@@ -155,10 +155,6 @@ class TableOfContentsCommand(command.CommandComponent):
         return settings
 
     def createToken(self, parent, info, page, settings):
-        if info['command'] == 'contents':
-            msg = 'The command "!contents toc" is deprecated, please use "!content toc".'
-            LOG.warning(common.report_error(msg, page.source, info.line, info[0], prefix='WARNING'))
-
         levels = settings['levels']
         if isinstance(levels, (str, str)):
             levels = [int(l) for l in levels.split()]
@@ -477,5 +473,5 @@ class RenderPagination(components.RenderComponent):
                         string=string)
 
     def createLatex(self, parent, token, page):
-        msg = "Warning: The Content Extension\'s 'pagination' command is not supported for LaTex documents."
+        msg = "Warning: The Content Extension\'s 'pagination' command is not supported for LaTeX documents."
         latex.String(parent, content=msg)

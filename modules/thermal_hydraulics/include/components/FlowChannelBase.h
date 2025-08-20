@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -27,8 +27,9 @@ public:
   /// Type of convective heat transfer geometry
   enum EConvHeatTransGeom
   {
-    PIPE,      ///< pipe geometry
-    ROD_BUNDLE ///< rod bundle geometry
+    PIPE,          ///< pipe geometry
+    ROD_BUNDLE,    ///< square array rod bundle geometry
+    HEX_ROD_BUNDLE ///< hexagonal array rod bundle geometry
   };
   /// Pipe type
   enum EPipeType
@@ -37,10 +38,19 @@ public:
     CURVED,
     DOWNCOMER
   };
+  /// Pipe location
+  enum EPipeLocation
+  {
+    INTERIOR,
+    EDGE,
+    CORNER
+  };
   /// Map of convective heat transfer geometry type to enum
   static const std::map<std::string, EConvHeatTransGeom> _heat_transfer_geom_to_enum;
   /// Map of pipe type to enum
   static const std::map<std::string, EPipeType> _pipe_type_to_enum;
+  /// Map of pipe location to enum
+  static const std::map<std::string, EPipeLocation> _pipe_location_to_enum;
 
   virtual void addVariables() override;
   virtual void addMooseObjects() override;
@@ -78,6 +88,14 @@ public:
    */
   static MooseEnum getPipeType(const std::string & name);
 
+  /**
+   * Gets a MooseEnum for pipe location
+   *
+   * @param[in] name   default value
+   * @returns MooseEnum for pipe location
+   */
+  static MooseEnum getPipeLocation(const std::string & name);
+
   // Flow channel specific interface ----
   virtual std::shared_ptr<const FlowModel> getFlowModel() const;
 
@@ -97,6 +115,11 @@ public:
    * Gets heat transfer geometry
    */
   EConvHeatTransGeom getHeatTransferGeometry() const { return _HT_geometry; }
+
+  /**
+   * Gets the pipe location
+   */
+  EPipeLocation getPipeLocation() const { return _pipe_location; }
 
   /**
    * Gets the names of all connected heat transfer components
@@ -155,19 +178,20 @@ public:
   std::string getHeatTransferNamesSuffix(const std::string & ht_name) const;
 
   /**
-   * Get the used closures object
+   * Get the used closures object(s)
    *
-   * @return The closures object
+   * @return The closures object(s)
    */
-  std::shared_ptr<ClosuresBase> getClosures() const { return _closures; }
+  std::vector<std::shared_ptr<ClosuresBase>> getClosuresObjects() const
+  {
+    return _closures_objects;
+  }
 
 protected:
   virtual std::shared_ptr<FlowModel> buildFlowModel() = 0;
   virtual void init() override;
   virtual void initSecondary() override;
   virtual void check() const override;
-
-  virtual std::shared_ptr<ClosuresBase> buildClosures();
 
   /**
    * Adds objects which are common for single- and two-phase flow
@@ -191,11 +215,8 @@ protected:
   /// Function describing the flow channel area
   FunctionName _area_function;
 
-  /// The name of used closures
-  const std::string & _closures_name;
-
-  /// Closures object
-  std::shared_ptr<ClosuresBase> _closures;
+  /// Closures object(s)
+  std::vector<std::shared_ptr<ClosuresBase>> _closures_objects;
 
   const bool & _pipe_pars_transferred;
 
@@ -204,6 +225,8 @@ protected:
 
   /// Convective Heat transfer geometry
   EConvHeatTransGeom _HT_geometry;
+  /// Pipe location within the bundle
+  EPipeLocation _pipe_location;
   /// Pitch to diameter ratio for parallel bundle heat transfer
   const Real & _PoD;
   /// True if user provides PoD
@@ -242,4 +265,7 @@ FlowChannelBase::EConvHeatTransGeom stringToEnum(const std::string & s);
 
 template <>
 FlowChannelBase::EPipeType stringToEnum(const std::string & s);
+
+template <>
+FlowChannelBase::EPipeLocation stringToEnum(const std::string & s);
 }

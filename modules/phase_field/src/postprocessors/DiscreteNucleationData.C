@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -36,7 +36,7 @@ DiscreteNucleationData::DiscreteNucleationData(const InputParameters & parameter
 }
 
 Real
-DiscreteNucleationData::getValue()
+DiscreteNucleationData::getValue() const
 {
   switch (_value_type)
   {

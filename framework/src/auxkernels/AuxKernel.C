@@ -1,5 +1,5 @@
 //* This file is part of the MOOSE framework
-//* https://www.mooseframework.org
+//* https://mooseframework.inl.gov
 //*
 //* All rights reserved, see COPYRIGHT for full restrictions
 //* https://github.com/idaholab/moose/blob/master/COPYRIGHT
@@ -64,6 +64,10 @@ AuxKernelTempl<ComputeValueType>::validParams()
   // This flag is set to true if the AuxKernelTempl is being used on a boundary
   params.addPrivateParam<bool>("_on_boundary", false);
 
+  params.addRelationshipManager("GhostLowerDElems",
+                                Moose::RelationshipManagerType::GEOMETRIC |
+                                    Moose::RelationshipManagerType::ALGEBRAIC);
+
   params.declareControllable("enable"); // allows Control to enable/disable this type of object
   params.registerBase("AuxKernel");
 
@@ -79,7 +83,7 @@ AuxKernelTempl<ComputeValueType>::AuxKernelTempl(const InputParameters & paramet
   : MooseObject(parameters),
     MooseVariableInterface<ComputeValueType>(
         this,
-        parameters.getCheckedPointerParam<AuxiliarySystem *>("_aux_sys")
+        parameters.getCheckedPointerParam<SystemBase *>("_sys")
             ->getVariable(parameters.get<THREAD_ID>("_tid"),
                           parameters.get<AuxVariableName>("variable"))
             .isNodal(),
@@ -109,23 +113,23 @@ AuxKernelTempl<ComputeValueType>::AuxKernelTempl(const InputParameters & paramet
     MeshChangedInterface(parameters),
     VectorPostprocessorInterface(this),
     ElementIDInterface(this),
-    FunctorInterface(this),
+    NonADFunctorInterface(this),
     _check_boundary_restricted(getParam<bool>("check_boundary_restricted")),
     _subproblem(*getCheckedPointerParam<SubProblem *>("_subproblem")),
     _sys(*getCheckedPointerParam<SystemBase *>("_sys")),
     _nl_sys(*getCheckedPointerParam<SystemBase *>("_nl_sys")),
-    _aux_sys(*getCheckedPointerParam<AuxiliarySystem *>("_aux_sys")),
+    _aux_sys(static_cast<AuxiliarySystem &>(_sys)),
     _tid(parameters.get<THREAD_ID>("_tid")),
     _var(_aux_sys.getActualFieldVariable<ComputeValueType>(
         _tid, parameters.get<AuxVariableName>("variable"))),
     _nodal(_var.isNodal()),
     _u(_nodal ? _var.nodalValueArray() : _var.sln()),
 
-    _test(_var.phi()),
     _assembly(_subproblem.assembly(_tid, 0)),
     _bnd(boundaryRestricted()),
     _mesh(_subproblem.mesh()),
 
+    _test(_bnd ? _var.phiFace() : _var.phi()),
     _q_point(_bnd ? _assembly.qPointsFace() : _assembly.qPoints()),
     _qrule(_bnd ? _assembly.qRuleFace() : _assembly.qRule()),
     _JxW(_bnd ? _assembly.JxWFace() : _assembly.JxW()),
@@ -138,17 +142,15 @@ AuxKernelTempl<ComputeValueType>::AuxKernelTempl(const InputParameters & paramet
 
     _current_node(_assembly.node()),
     _current_boundary_id(_assembly.currentBoundaryID()),
-    _solution(_aux_sys.solution())
+    _solution(_aux_sys.solution()),
+
+    _current_lower_d_elem(_assembly.lowerDElem()),
+    _coincident_lower_d_calc(_bnd && !isNodal() && _var.isLowerD())
 {
   addMooseVariableDependency(&_var);
   _supplied_vars.insert(parameters.get<AuxVariableName>("variable"));
 
-  const auto & coupled_vars = getCoupledVars();
-  for (const auto & it : coupled_vars)
-    for (const auto & var : it.second)
-      _depend_vars.insert(var->name());
-
-  if (_bnd && !isNodal() && _check_boundary_restricted)
+  if (_bnd && !isNodal() && !_coincident_lower_d_calc && _check_boundary_restricted)
   {
     // when the variable is elemental and this aux kernel operates on boundaries,
     // we need to check that no elements are visited more than once through visiting
@@ -173,6 +175,17 @@ AuxKernelTempl<ComputeValueType>::AuxKernelTempl(const InputParameters & paramet
       }
     }
   }
+
+  // Check for supported variable types
+  // Any 'nodal' family that actually has DoFs outside of nodes, or gradient dofs at nodes is
+  // not properly set by AuxKernelTempl::compute
+  // NOTE: We could add a few exceptions, lower order from certain unsupported families and on
+  //       certain element types only have value-DoFs on nodes
+  const auto type = _var.feType();
+  if (_var.isNodal() && !((type.family == LAGRANGE) || (type.order <= FIRST)))
+    paramError("variable",
+               "Variable family " + Moose::stringify(type.family) + " is not supported at order " +
+                   Moose::stringify(type.order) + " by the AuxKernel system.");
 }
 
 template <typename ComputeValueType>
@@ -218,11 +231,10 @@ template <typename ComputeValueType>
 void
 AuxKernelTempl<ComputeValueType>::coupledCallback(const std::string & var_name, bool is_old) const
 {
-  if (is_old)
+  if (!is_old)
   {
-    std::vector<VariableName> var_names = getParam<std::vector<VariableName>>(var_name);
-    for (const auto & name : var_names)
-      _depend_vars.erase(name);
+    const auto & var_names = getParam<std::vector<VariableName>>(var_name);
+    _depend_vars.insert(var_names.begin(), var_names.end());
   }
 }
 
@@ -271,12 +283,25 @@ AuxKernelTempl<RealVectorValue>::setDofValueHelper(const RealVectorValue &)
 
 template <typename ComputeValueType>
 void
+AuxKernelTempl<ComputeValueType>::insert()
+{
+  if (_coincident_lower_d_calc)
+    _var.insertLower(_aux_sys.solution());
+  else
+    _var.insert(_aux_sys.solution());
+}
+
+template <typename ComputeValueType>
+void
 AuxKernelTempl<ComputeValueType>::compute()
 {
   precalculateValue();
 
   if (isNodal()) /* nodal variables */
   {
+    mooseAssert(!_coincident_lower_d_calc,
+                "Nodal evaluations are point evaluations. We don't have to concern ourselves with "
+                "coincidence of lower-d blocks and higher-d faces because they share nodes");
     if (_var.isNodalDefined())
     {
       _qp = 0;
@@ -287,7 +312,18 @@ AuxKernelTempl<ComputeValueType>::compute()
   }
   else /* elemental variables */
   {
-    _n_local_dofs = _var.numberOfDofs();
+    _n_local_dofs = _coincident_lower_d_calc ? _var.dofIndicesLower().size() : _var.numberOfDofs();
+
+    if (_coincident_lower_d_calc)
+    {
+      static const std::string lower_error = "Make sure that the lower-d variable lives on a "
+                                             "lower-d block that is a superset of the boundary";
+      if (!_current_lower_d_elem)
+        mooseError("No lower-dimensional element. ", lower_error);
+      if (!_n_local_dofs)
+        mooseError("No degrees of freedom. ", lower_error);
+    }
+
     if (_n_local_dofs == 1) /* p0 */
     {
       ComputeValueType value = 0;
@@ -297,10 +333,22 @@ AuxKernelTempl<ComputeValueType>::compute()
       if (_var.isFV())
         setDofValueHelper(value);
       else
+      {
         // update the variable data referenced by other kernels.
         // Note that this will update the values at the quadrature points too
         // (because this is an Elemental variable)
-        _var.setNodalValue(value);
+        if (_coincident_lower_d_calc)
+        {
+          _local_sol.resize(1);
+          if constexpr (std::is_same<Real, ComputeValueType>::value)
+            _local_sol(0) = value;
+          else
+            mooseAssert(false, "We should not enter the single dof branch with a vector variable");
+          _var.setLowerDofValues(_local_sol);
+        }
+        else
+          _var.setNodalValue(value);
+      }
     }
     else /* high-order */
     {
@@ -309,16 +357,17 @@ AuxKernelTempl<ComputeValueType>::compute()
       _local_ke.resize(_n_local_dofs, _n_local_dofs);
       _local_ke.zero();
 
+      const auto & test = _coincident_lower_d_calc ? _var.phiLower() : _test;
+
       // assemble the local mass matrix and the load
-      for (unsigned int i = 0; i < _test.size(); i++)
+      for (unsigned int i = 0; i < test.size(); i++)
         for (_qp = 0; _qp < _qrule->n_points(); _qp++)
         {
-          ComputeValueType t = _JxW[_qp] * _coord[_qp] * _test[i][_qp];
+          ComputeValueType t = _JxW[_qp] * _coord[_qp] * test[i][_qp];
           _local_re(i) += t * computeValue();
-          for (unsigned int j = 0; j < _test.size(); j++)
-            _local_ke(i, j) += t * _test[j][_qp];
+          for (unsigned int j = 0; j < test.size(); j++)
+            _local_ke(i, j) += t * test[j][_qp];
         }
-
       // mass matrix is always SPD but in case of boundary restricted, it will be rank deficient
       _local_sol.resize(_n_local_dofs);
       if (_bnd)
@@ -326,7 +375,7 @@ AuxKernelTempl<ComputeValueType>::compute()
       else
         _local_ke.cholesky_solve(_local_re, _local_sol);
 
-      _var.setDofValues(_local_sol);
+      _coincident_lower_d_calc ? _var.setLowerDofValues(_local_sol) : _var.setDofValues(_local_sol);
     }
   }
 }
@@ -437,7 +486,7 @@ AuxKernelTempl<ComputeValueType>::isMortar()
   return dynamic_cast<MortarNodalAuxKernelTempl<ComputeValueType> *>(this) != nullptr;
 }
 
-// Explicitly instantiates the two versions of the AuxKernelTempl class
+// Explicitly instantiates the three versions of the AuxKernelTempl class
 template class AuxKernelTempl<Real>;
 template class AuxKernelTempl<RealVectorValue>;
 template class AuxKernelTempl<RealEigenVector>;
