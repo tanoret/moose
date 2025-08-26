@@ -65,7 +65,7 @@ public:
    * Performs the momentum pressure coupling.
    * @return True if solver is converged.
    */
-  virtual bool solve();
+  virtual bool solve() override;
 
   /// Return pointers to the systems which are solved for within this object
   const std::vector<LinearSystem *> systemsToSolve() const { return _systems_to_solve; }
