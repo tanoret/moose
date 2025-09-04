@@ -78,6 +78,31 @@ protected:
   /// Production Limiter Constant
   const Real _C_pl;
 
+  /// Temperature field
+  const Moose::Functor<Real> * _temperature;
+
+  /// Thermal expansion coefficient
+  const Moose::Functor<Real> * _alpha;
+
+  /// Turbulent Prandtl number
+  const Moose::Functor<Real> * _Pr_t;
+
+  /// Gravity vector
+  const RealVectorValue * _gravity;
+
+  /// Bool to include relaminarization
+  const bool _relaminarization;
+
+  /// Relaminarization constant
+  const Real _C;
+
+  /// Wall distance
+  const Moose::Functor<Real> * _wall_distance;
+
+  /// Closure numbers for production damping in relaminarization
+  static constexpr Real _D = 1.0;
+  static constexpr Real _E = 0.00375;
+
   ///@{
   /** Maps for wall treatment */
   std::unordered_set<const Elem *> _wall_bounded;

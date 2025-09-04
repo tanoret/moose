@@ -71,6 +71,17 @@ protected:
   /// Whether we are using a newton solve
   const bool _newton_solve;
 
+  /// Bool to include relaminarization
+  const bool _relaminarization;
+
+  /// Wall distance
+  const Moose::Functor<Real> * _wall_distance;
+
+  /// Closure numbers for production damping in relaminarization
+  static constexpr Real _Cd0 = 0.091;
+  static constexpr Real _Cd1 = 0.0042;
+  static constexpr Real _Cd2 = 0.00011;
+
   // -- Parameters of the wall function method
 
   /// Maximum number of iterations to find the friction velocity

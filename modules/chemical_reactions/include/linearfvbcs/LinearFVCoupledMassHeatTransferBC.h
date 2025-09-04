@@ -57,6 +57,9 @@ protected:
 
   bool _var_is_fluid;
 
+  // --- Fromulation ---
+  const MooseEnum _formulation;
+
   // Electrochemistry
   const Real & _alpha_anode;                        // [-]
   const Real & _alpha_cathode;                      // [-]
@@ -75,6 +78,9 @@ protected:
   const Moose::Functor<Real> * _dh;     // hydraulic diameter [m]
   const Moose::Functor<Real> * _k;      // turbulent kinetic energy [m^2/s^2]
   const Moose::Functor<Real> * _u_bulk; // bulk velocity [m/s]
+
+  // Provided current formulation
+  const Moose::Functor<Real> * _j_current; // provided j [mol/(m2.s)]
 
 private:
   static constexpr Real R = 8.314;      // J/(mol K)

@@ -18,8 +18,13 @@ LinearFVCoupledMassHeatTransferBC::validParams()
 
   params.addRequiredParam<MooseFunctorName>("c_fluid", "Liquid concentration variable [mol/m^3]");
   params.addRequiredParam<MooseFunctorName>("c_solid", "Solid/wall variable");
-  params.addRequiredParam<MooseFunctorName>("c_eq",
-                                            "Equilibrium liquid concentration at eta=0 [mol/m^3]");
+  params.addParam<MooseFunctorName>("c_eq", 0.0, "Equilibrium liquid concentration at eta=0 [mol/m^3]");
+
+  // Problem formulation
+  MooseEnum formulation("computed_current provided_current", "computed_current");
+  params.addParam<MooseEnum>("formulation",
+                             formulation,
+                             "Interface Formulation: 'computed_current' or 'provided_current'");
 
   // Electrochemistry (default: symmetric transfer, no driving)
   params.addParam<Real>("alpha_anode", 0.5, "Anodic transfer coefficient [-]");
@@ -44,6 +49,9 @@ LinearFVCoupledMassHeatTransferBC::validParams()
   params.addParam<MooseFunctorName>("k", "Turbulent kinetic energy k [m^2/s^2]");
   params.addParam<MooseFunctorName>("vel_bulk", "Bulk velocity [m/s]");
 
+  // Provided current
+  params.addParam<MooseFunctorName>("j_current", "Interface masss current [mol/(m2.s)]");
+
   params.addClassDescription(
       "Robin mass-transfer BC with electrochemical correction (plating/corrosion).");
   return params;
@@ -57,6 +65,7 @@ LinearFVCoupledMassHeatTransferBC::LinearFVCoupledMassHeatTransferBC(
     _c_eq(getFunctor<Real>("c_eq")),
     _var_is_fluid("wraps_" + _var.name() == _c_fluid.functorName() ||
                   "wraps_" + _var.name() + "_raw_value" == _c_fluid.functorName()),
+    _formulation(getParam<MooseEnum>("formulation")),
     _alpha_anode(getParam<Real>("alpha_anode")),
     _alpha_cathode(getParam<Real>("alpha_cathode")),
     _reaction_potential(getFunctor<Real>("E_reaction")),
@@ -71,36 +80,45 @@ LinearFVCoupledMassHeatTransferBC::LinearFVCoupledMassHeatTransferBC(
     _D(parameters.isParamValid("D") ? &(getFunctor<Real>("D")) : nullptr),
     _dh(parameters.isParamValid("dh") ? &(getFunctor<Real>("dh")) : nullptr),
     _k(parameters.isParamValid("k") ? &(getFunctor<Real>("k")) : nullptr),
-    _u_bulk(parameters.isParamValid("vel_bulk") ? &(getFunctor<Real>("vel_bulk")) : nullptr)
+    _u_bulk(parameters.isParamValid("vel_bulk") ? &(getFunctor<Real>("vel_bulk")) : nullptr),
+    _j_current(parameters.isParamValid("j_current") ? &(getFunctor<Real>("j_current")) : nullptr)
 {
   // Parameter checks for k_m models
-  if (_mass_transfer_treatment == "constant" && !_km)
-    paramError("km", "Provide 'km' for constant mass-transfer treatment.");
-  else if (_mass_transfer_treatment == "correlation")
+  if (_formulation == "computed_current")
   {
-    if (!_Re)
-      paramError("Re", "Provide 'Re' for correlation treatment.");
-    if (!_Sc)
-      paramError("Sc", "Provide 'Sc' for correlation treatment.");
-    if (!_D)
-      paramError("D", "Provide 'D' for correlation treatment.");
-    if (!_dh)
-      paramError("dh", "Provide 'dh' for correlation treatment.");
+    if (_mass_transfer_treatment == "constant" && !_km)
+      paramError("km", "Provide 'km' for constant mass-transfer treatment.");
+    else if (_mass_transfer_treatment == "correlation")
+    {
+      if (!_Re)
+        paramError("Re", "Provide 'Re' for correlation treatment.");
+      if (!_Sc)
+        paramError("Sc", "Provide 'Sc' for correlation treatment.");
+      if (!_D)
+        paramError("D", "Provide 'D' for correlation treatment.");
+      if (!_dh)
+        paramError("dh", "Provide 'dh' for correlation treatment.");
+    }
+    else if (_mass_transfer_treatment == "resolved")
+    {
+      if (!_k)
+        paramError("k", "Provide 'k' for resolved treatment.");
+      if (!_u_bulk)
+        paramError("vel_bulk", "Provide 'vel_bulk' for resolved treatment.");
+      if (!_Re)
+        paramError("Re", "Provide 'Re' for resolved treatment.");
+      if (!_Sc)
+        paramError("Sc", "Provide 'Sc' for resolved treatment.");
+      if (!_D)
+        paramError("D", "Provide 'D' for resolved treatment.");
+      if (!_dh)
+        paramError("dh", "Provide 'dh' for resolved treatment.");
+    }
   }
-  else if (_mass_transfer_treatment == "resolved")
+  else // _formulation == "provided_current"
   {
-    if (!_k)
-      paramError("k", "Provide 'k' for resolved treatment.");
-    if (!_u_bulk)
-      paramError("vel_bulk", "Provide 'vel_bulk' for resolved treatment.");
-    if (!_Re)
-      paramError("Re", "Provide 'Re' for resolved treatment.");
-    if (!_Sc)
-      paramError("Sc", "Provide 'Sc' for resolved treatment.");
-    if (!_D)
-      paramError("D", "Provide 'D' for resolved treatment.");
-    if (!_dh)
-      paramError("dh", "Provide 'dh' for resolved treatment.");
+    if (!_j_current)
+      paramError("j_current", "Provide 'j_current' for provided current model.");
   }
 }
 
@@ -159,12 +177,11 @@ LinearFVCoupledMassHeatTransferBC::computeMassTransferCoefficient() const
 
     km_val = Sh * (*_D)(face, state) / std::max((*_dh)(face, state), 1e-10);
   }
-
   else // "resolved" via Chilton–Colburn using wall friction from k
   {
     // u_*^2 ~ C_mu^{1/2} k;   f = 2 u_*^2 / u_b^2 = 2 sqrt(C_mu) k / u_b^2
     const Real f =
-        2.0 * std::sqrt(C_mu) * (*_k)(face, state) / Utility::pow<2>((*_u_bulk)(face, state));
+        2.0 * std::sqrt(C_mu) * (*_k)(face, state) / (Utility::pow<2>((*_u_bulk)(face, state)) + 1e-14);
 
     const Real Sh = 0.5 * f * (*_Re)(face, state) * std::pow((*_Sc)(face, state), 1.0 / 3.0);
     km_val = Sh * (*_D)(face, state) / std::max((*_dh)(face, state), 1e-10);
@@ -203,35 +220,43 @@ LinearFVCoupledMassHeatTransferBC::computeBoundaryNormalGradient() const
   const auto face = singleSidedFaceArg(_current_face_info);
   const auto state = determineState();
 
-  const Real keff = this->computeEffectiveMassTransferCoefficient();
-  const Real ceqcor = this->computeCorrectedEquilibriumConcentration();
-  const Real cL = _c_fluid(face, state);
+  if (_formulation == "computed_current")
+  {
+    const Real keff = this->computeEffectiveMassTransferCoefficient();
+    const Real ceqcor = this->computeCorrectedEquilibriumConcentration();
+    const Real cL = _c_fluid(face, state);
 
-  const Real J = keff * (cL - ceqcor); // [mol m^-2 s^-1], positive = plating (liq->solid)
+    const Real J = keff * (cL - ceqcor); // [mol m^-2 s^-1], positive = plating (liq->solid)
 
-  // Orient with outward normal of *this* variable's side
-  const auto elem_info = (_current_face_type == FaceInfo::VarFaceNeighbors::ELEM)
-                             ? _current_face_info->elemInfo()
-                             : _current_face_info->neighborInfo();
-  const auto neighbor_info = (_current_face_type == FaceInfo::VarFaceNeighbors::ELEM)
-                                 ? _current_face_info->neighborInfo()
-                                 : _current_face_info->elemInfo();
+    // Orient with outward normal of *this* variable's side
+    const auto elem_info = (_current_face_type == FaceInfo::VarFaceNeighbors::ELEM)
+                              ? _current_face_info->elemInfo()
+                              : _current_face_info->neighborInfo();
+    const auto neighbor_info = (_current_face_type == FaceInfo::VarFaceNeighbors::ELEM)
+                                  ? _current_face_info->neighborInfo()
+                                  : _current_face_info->elemInfo();
 
-  const auto this_side = _var_is_fluid ? elem_info : neighbor_info;
+    const auto this_side = _var_is_fluid ? elem_info : neighbor_info;
 
-  const int sgn = (_current_face_info->normal() *
-                   (_current_face_info->faceCentroid() - this_side->centroid())) > 0
-                      ? 1
-                      : -1;
+    const int sgn = (_current_face_info->normal() *
+                    (_current_face_info->faceCentroid() - this_side->centroid())) > 0
+                        ? 1
+                        : -1;
 
-  return sgn * J;
+    return sgn * J;
+  }
+  else // _formulation == "provided_current"
+    return (*_j_current)(face, state);
 }
 
 Real
 LinearFVCoupledMassHeatTransferBC::computeBoundaryValueMatrixContribution() const
 {
   // First-order FV face value approximation -> coefficient on c at the face
-  return 1.0;
+  if (_formulation == "computed_current")
+    return 1.0;
+  else
+    return 0.0;
 }
 
 Real
@@ -245,7 +270,7 @@ Real
 LinearFVCoupledMassHeatTransferBC::computeBoundaryGradientMatrixContribution() const
 {
   // For the liquid equation, assemble the k_eff coefficient on c_liq
-  if (_var_is_fluid)
+  if (_formulation == "computed_current" && _var_is_fluid)
     return this->computeEffectiveMassTransferCoefficient();
   else
     return 0.0; // solid-side variable is fed via RHS only (acts as accumulator/source)
@@ -257,20 +282,31 @@ LinearFVCoupledMassHeatTransferBC::computeBoundaryGradientRHSContribution() cons
   const auto face = singleSidedFaceArg(_current_face_info);
   const auto state = determineState();
 
-  const Real keff = this->computeEffectiveMassTransferCoefficient();
-  const Real ceqcor = this->computeCorrectedEquilibriumConcentration();
-
-  if (_var_is_fluid)
+  if(_formulation == "computed_current")
   {
-    // Fluid equation: -n·(D∇c) = k_eff (c - c_eq*) -> RHS = k_eff * c_eq*
-    return keff * ceqcor;
+    const Real keff = this->computeEffectiveMassTransferCoefficient();
+    const Real ceqcor = this->computeCorrectedEquilibriumConcentration();
+
+    if (_var_is_fluid)
+    {
+      // Fluid equation: -n·(D∇c) = k_eff (c - c_eq*) -> RHS = k_eff * c_eq*
+      return keff * ceqcor;
+    }
+    else
+    {
+      // Solid-side: add the same interfacial molar flux J to the solid variable
+      // J = k_eff * (c_liq - c_eq*)
+      // Note: this makes plating (J>0) increase solid content; corrosion (J<0) decreases it.
+      const Real cL = _c_fluid(face, state);
+      return keff * (cL - ceqcor);
+    }
   }
   else
   {
-    // Solid-side: add the same interfacial molar flux J to the solid variable
-    // J = k_eff * (c_liq - c_eq*)
-    // Note: this makes plating (J>0) increase solid content; corrosion (J<0) decreases it.
-    const Real cL = _c_fluid(face, state);
-    return keff * (cL - ceqcor);
+    // Return the provided current
+    if (_var_is_fluid)
+      return (*_j_current)(face, state);
+    else
+      return -(*_j_current)(face, state);
   }
 }

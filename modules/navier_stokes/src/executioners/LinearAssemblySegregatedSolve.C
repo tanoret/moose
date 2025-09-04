@@ -460,6 +460,8 @@ LinearAssemblySegregatedSolve::solveAdvectedSystem(const unsigned int system_num
 {
   _problem.setCurrentLinearSystem(system_num);
 
+  _problem.execute(EXEC_INITIAL);
+
   // We will need some members from the implicit linear system
   LinearImplicitSystem & li_system = libMesh::cast_ref<LinearImplicitSystem &>(system.system());
 
