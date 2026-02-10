@@ -46,13 +46,6 @@ LinearFVPhaseChangeSource::LinearFVPhaseChangeSource(const InputParameters & par
 Real
 LinearFVPhaseChangeSource::computeMatrixContribution()
 {
-  // This kernel contributes only to the RHS (via T_dot), not to the linear "K u" part.
-  return 0.0;
-}
-
-Real
-LinearFVPhaseChangeSource::computeRightHandSideContribution()
-{
   // Element context
   const auto state    = determineState();
   const auto elem_arg = makeElemArg(_current_elem_info->elem());
@@ -74,10 +67,38 @@ LinearFVPhaseChangeSource::computeRightHandSideContribution()
 
   // Apparent heat capacity term rho * L * (df/dT) * T_dot
   const Real rhoL    = _rho(elem_arg, state) * _L(elem_arg, state);
-  const Real Told_dt = _time_integrator.timeDerivativeRHSContribution(_dof_id, _factor_history);
-  const Real Tdot    = T * _time_integrator.timeDerivativeMatrixContribution(1.0) - Told_dt;
+  //const Real Told_dt = _time_integrator.timeDerivativeRHSContribution(_dof_id, _factor_history);
+  const Real Tdot    =  _time_integrator.timeDerivativeMatrixContribution(1.0);// - Told_dt;
 
   return rhoL * dfdT * Tdot * _current_elem_volume;
+}
+
+Real
+LinearFVPhaseChangeSource::computeRightHandSideContribution()
+{
+  // Element context
+  const auto state    = determineState();
+  const auto elem_arg = makeElemArg(_current_elem_info->elem());
+
+  const Real T_sol = _T_solidus(elem_arg, state);
+  const Real T_liq = _T_liquidus(elem_arg, state);
+  const Real dT_pc = T_liq - T_sol;
+
+  // Guard against degenerate or inverted mushy interval
+  if (dT_pc <= 0.0)
+    return 0.0;
+
+  // Temperature and smoothed liquid fraction in [0,1]
+  const Real T      = _var.getElemValue(*_current_elem_info, state);
+  const Real s      = std::clamp((T - T_sol) / dT_pc, 0.0, 1.0);
+
+  // df/dT for f(s) = 3s^2 - 2s^3 is 6 s (1 - s) / dT_p
+  const Real dfdT   = 6.0 * s * (1.0 - s) / dT_pc;
+
+  // Apparent heat capacity term rho * L * (df/dT) * T_dot
+  const Real rhoL    = _rho(elem_arg, state) * _L(elem_arg, state);
+  const Real Told_dt = _time_integrator.timeDerivativeRHSContribution(_dof_id, _factor_history);
+  return rhoL * dfdT * Told_dt * _current_elem_volume;
 }
 
 void
